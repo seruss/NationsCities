@@ -343,6 +343,22 @@ else if (_room != null && _game != null)
         });
     }
 
+    [JSInvokable]
+    public async Task ReportViolationFromJS(string violationType, double durationSeconds)
+    {
+        if (_hubConnection == null || string.IsNullOrEmpty(RoomCode)) return;
+        
+        try  
+        {
+            await _hubConnection.InvokeAsync("ReportViolation", RoomCode, violationType, durationSeconds);
+            Console.WriteLine($"[GameRound] Violation reported: {violationType}, {durationSeconds}s");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[GameRound] Failed to report violation: {ex.Message}");
+        }
+    }
+
     private void StartTimer()
     {
         _timer?.Stop();
@@ -408,6 +424,8 @@ else if (_room != null && _game != null)
     }
     
     // Anti-Cheat Methods
+    private DotNetObjectReference<GameRound>? _dotNetHelper;
+    
     private async Task StartAntiCheatTracking()
     {
         if (_game == null || _hubConnection == null) return;
@@ -417,7 +435,30 @@ else if (_room != null && _game != null)
         {
             try
             {
-                await JSRuntime.InvokeVoidAsync("antiCheatTracker.startTracking", RoomCode, DotNetObjectReference.Create(_hubConnection));
+                // Create reference for JavaScript callbacks
+                _dotNetHelper = DotNetObjectReference.Create(this);
+                
+                // Start tracking
+                await JSRuntime.InvokeVoidAsync("antiCheatTracker.startTracking", RoomCode);
+                
+                // Register event handler that calls back to this instance 
+                await JSRuntime.InvokeVoidAsync("eval", $@"
+                    if (!window._antiCheatHandlerRegistered) {{
+                        window.addEventListener('anticheat-report', async (e) => {{
+                            const report = e.detail;
+                            try {{
+                                const dotNetHelper = {System.Text.Json.JsonSerializer.Serialize(_dotNetHelper)};
+                                await dotNetHelper.invokeMethodAsync('ReportViolationFromJS', 
+                                    report.violationType,
+                                    report.durationSeconds);
+                            }} catch (err) {{
+                                console.error('[AntiCheat] Callback failed:', err);
+                            }}
+                        }});
+                        window._antiCheatHandlerRegistered = true;
+                    }}
+                ");
+                
                 Console.WriteLine("[GameRound] Anti-cheat tracking started");
             }
             catch (Exception ex)

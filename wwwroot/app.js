@@ -45,7 +45,6 @@ window.AntiCheatTracker = class {
     constructor() {
         this._isTracking = false;
         this._roomCode = null;
-        this._hubConnection = null;
         this._violationStartTime = null;
         this._isCurrentlyViolating = false;
         this._lastVisibilityState = document.visibilityState;
@@ -65,16 +64,14 @@ window.AntiCheatTracker = class {
     /**
      * Start tracking violations for a room
      * @param {string} roomCode - Room code
-     * @param {object} hubConnection - SignalR hub connection
      */
-    startTracking(roomCode, hubConnection) {
+    startTracking(roomCode) {
         if (this._isTracking) {
             console.warn('[AntiCheat] Already tracking');
             return;
         }
 
         this._roomCode = roomCode;
-        this._hubConnection = hubConnection;
         this._isTracking = true;
 
         // Page Visibility API (primary method for mobile)
@@ -107,7 +104,6 @@ window.AntiCheatTracker = class {
 
         this._isTracking = false;
         this._roomCode = null;
-        this._hubConnection = null;
         this._totalViolations = 0;
 
         console.log('[AntiCheat] Tracking stopped');
@@ -190,24 +186,25 @@ window.AntiCheatTracker = class {
     }
 
     /**
-     * Report violation to server via SignalR
+     * Report violation via custom event (Blazor will handle hub call)
      */
-    async _reportViolation(violationType, durationSeconds) {
-        if (!this._hubConnection || !this._roomCode) {
-            console.error('[AntiCheat] Cannot report - no hub connection');
+    _reportViolation(violationType, durationSeconds) {
+        if (!this._roomCode) {
+            console.error('[AntiCheat] Cannot report - no room code');
             return;
         }
 
-        try {
-            await this._hubConnection.invoke('ReportViolation',
-                this._roomCode,
-                violationType,
-                durationSeconds
-            );
-            console.log(`[AntiCheat] Violation reported to server`);
-        } catch (err) {
-            console.error('[AntiCheat] Failed to report violation:', err);
-        }
+        // Dispatch event for Blazor to handle
+        const event = new CustomEvent('anticheat-report', {
+            detail: {
+                roomCode: this._roomCode,
+                violationType: violationType,
+                durationSeconds: durationSeconds
+            }
+        });
+        window.dispatchEvent(event);
+
+        console.log(`[AntiCheat] Violation event dispatched: ${violationType}, ${durationSeconds.toFixed(2)}s`);
     }
 
     /**

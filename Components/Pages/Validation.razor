@@ -174,6 +174,9 @@ else if (_answersForVoting != null)
     
     private int _roundNumber = 1;
     private char _letter = 'A';
+    
+    // Track player's own votes separately (answerId -> isValid)
+    private Dictionary<string, bool?> _myVotes = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -255,11 +258,12 @@ else if (_answersForVoting != null)
             var answer = _answersForVoting?.FirstOrDefault(a => a.Id == answerId);
             if (answer != null)
             {
-                // Clear existing votes and rebuild based on server counts
+                // Don't clear votes - server sends counts only
+                // Just update to match server counts while preserving identity
                 answer.VotesValid.Clear();
                 answer.VotesInvalid.Clear();
                 
-                // Add placeholder IDs to match the counts (we only care about count for UI)
+                // Add placeholder IDs to match the counts
                 for (int i = 0; i < validCount; i++)
                 {
                     answer.VotesValid.Add($"vote_{i}");
@@ -289,9 +293,12 @@ else if (_answersForVoting != null)
     {
         if (_hubConnection != null && !_hasSubmittedVotes)
         {
+            // Track this player's vote locally
+            _myVotes[answerId] = isValid;
+            
             await _hubConnection.InvokeAsync("VoteAnswer", RoomCode, answerId, isValid);
             
-            // Optimistic update
+            // Optimistic update - keep for server sync
             var answer = _answersForVoting?.FirstOrDefault(a => a.Id == answerId);
             if (answer != null && _myConnectionId != null)
             {
@@ -328,11 +335,23 @@ else if (_answersForVoting != null)
 
     private bool HasVotedValid(AnswerForVoting answer)
     {
+        // Check local vote tracking first
+        if (_myVotes.TryGetValue(answer.Id, out var vote))
+        {
+            return vote == true;
+        }
+        // Fallback to checking vote lists (for initial state)
         return _myConnectionId != null && answer.VotesValid.Contains(_myConnectionId);
     }
 
     private bool HasVotedInvalid(AnswerForVoting answer)
     {
+        // Check local vote tracking first
+        if (_myVotes.TryGetValue(answer.Id, out var vote))
+        {
+            return vote == false;
+        }
+        // Fallback to checking vote lists (for initial state)
         return _myConnectionId != null && answer.VotesInvalid.Contains(_myConnectionId);
     }
 
