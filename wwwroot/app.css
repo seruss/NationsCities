@@ -1,0 +1,475 @@
+/* ===========================================
+   Państwa, Miasta - Mobile-First CSS
+   =========================================== */
+
+/* Bazowe style dla mobile */
+* {
+    -webkit-tap-highlight-color: transparent;
+}
+
+html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    overscroll-behavior: none;
+}
+
+/* Safe area padding dla notchy */
+.safe-area-top {
+    padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Blazor error UI */
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    background: #b32121;
+    color: white;
+    padding: 1rem;
+    text-align: center;
+}
+
+#blazor-error-ui .reload {
+    color: white;
+    text-decoration: underline;
+    margin-left: 0.5rem;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+/* Validation styles */
+.valid.modified:not([type=checkbox]) {
+    outline: 2px solid #22c55e;
+    outline-offset: -2px;
+}
+
+.invalid {
+    outline: 2px solid #ef4444;
+    outline-offset: -2px;
+}
+
+.validation-message {
+    color: #ef4444;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+/* Error boundary */
+.blazor-error-boundary {
+    background: #b32121;
+    padding: 1rem;
+    color: white;
+    border-radius: 0.5rem;
+}
+
+.blazor-error-boundary::after {
+    content: "Wystąpił błąd. Odśwież stronę.";
+}
+
+/* Material Symbols config */
+.material-symbols-outlined {
+    font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Custom scrollbar (ukryty na mobile) */
+@media (min-width: 768px) {
+    ::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: #334155;
+        border-radius: 3px;
+    }
+}
+
+/* Hide scrollbar na mobile */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Button press effect */
+.btn-press:active {
+    transform: scale(0.98);
+}
+
+/* Input focus glow */
+input:focus,
+textarea:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(37, 140, 244, 0.3);
+}
+
+/* Animacje */
+@keyframes pulse-fast {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.animate-pulse-fast {
+    animation: pulse-fast 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes countdown {
+    from {
+        width: 100%;
+    }
+
+    to {
+        width: 0%;
+    }
+}
+
+/* Avatar z inicjałami */
+.avatar-initials {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    text-transform: uppercase;
+    user-select: none;
+}
+
+/* Modal styles */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(4px);
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.modal-content {
+    background: #1e293b;
+    border-radius: 1rem;
+    max-width: 500px;
+    width: 100%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #334155;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid #334155;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #334155;
+    display: flex;
+    gap: 0.75rem;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Custom checkbox */
+.custom-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    border-radius: 0.75rem;
+    background: #0f172a;
+    border: 2px solid #334155;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.custom-checkbox:hover {
+    background: #1e293b;
+    border-color: #258cf4;
+}
+
+.custom-checkbox input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 2px solid #475569;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.custom-checkbox input[type="checkbox"]:checked {
+    background: #258cf4;
+    border-color: #258cf4;
+}
+
+.custom-checkbox input[type="checkbox"]:checked::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 0.875rem;
+    font-weight: bold;
+}
+
+.custom-checkbox:has(input:checked) {
+    background: rgba(37, 140, 244, 0.1);
+    border-color: #258cf4;
+}
+
+/* Number input */
+.number-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: #0f172a;
+    padding: 1rem;
+    border-radius: 0.75rem;
+    border: 2px solid #334155;
+}
+
+.number-input-wrapper input[type="number"] {
+    flex: 1;
+    background: #1e293b;
+    border: 2px solid #475569;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    color: white;
+    font-size: 1.125rem;
+    font-weight: bold;
+    text-align: center;
+    min-width: 0;
+}
+
+.number-input-wrapper input[type="number"]:focus {
+    border-color: #258cf4;
+    box-shadow: 0 0 0 3px rgba(37, 140, 244, 0.1);
+}
+
+/* Remove spinner buttons from number input */
+.number-input-wrapper input[type="number"]::-webkit-inner-spin-button,
+.number-input-wrapper input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.number-input-wrapper input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+.number-input-button {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.5rem;
+    background: #258cf4;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.number-input-button:hover {
+    background: #1d70c9;
+}
+
+.number-input-button:active {
+    transform: scale(0.95);
+}
+
+.number-input-button:disabled {
+    background: #475569;
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* Category card styles (blueprint design) */
+.category-modal {
+    max-width: 600px;
+}
+
+.category-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1.5rem 1rem;
+    background: #0f172a;
+    border: 2px solid #334155;
+    border-radius: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+.category-card:hover {
+    background: #1e293b;
+    border-color: #258cf4;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(37, 140, 244, 0.15);
+}
+
+.category-card.selected {
+    background: rgba(37, 140, 244, 0.1);
+    border-color: #258cf4;
+    box-shadow: 0 0 0 3px rgba(37, 140, 244, 0.1);
+}
+
+.category-icon-wrapper {
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 50%;
+    background: rgba(37, 140, 244, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.category-card:hover .category-icon-wrapper {
+    background: rgba(37, 140, 244, 0.2);
+}
+
+.category-card.selected .category-icon-wrapper {
+    background: #258cf4;
+}
+
+.category-icon {
+    font-size: 2rem !important;
+    color: #258cf4;
+    transition: all 0.2s;
+}
+
+.category-card.selected .category-icon {
+    color: white;
+}
+
+.category-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: white;
+}
+
+.category-check {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    color: #258cf4;
+}
+
+.category-check .material-symbols-outlined {
+    font-size: 1.5rem;
+}
+
+/* Category List Modal (Blueprint design) */
+.category-list-modal {
+    max-width: 600px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.category-modal-body {
+    overflow-y: auto;
+    flex: 1;
+    padding: 1rem;
+}
+
+/* Toggle Switch (Blueprint style) */
+.toggle-switch {
+    position: relative;
+    display: flex;
+    height: 31px;
+    width: 51px;
+    cursor: pointer;
+    align-items: center;
+    border-radius: 9999px;
+    border: none;
+    background: #475569;
+    padding: 2px;
+    transition: all 0.2s;
+}
+
+.toggle-switch.checked {
+    background: #258cf4;
+    justify-content: flex-end;
+}
+
+.toggle-slider {
+    height: 27px;
+    width: 27px;
+    border-radius: 9999px;
+    background: white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}

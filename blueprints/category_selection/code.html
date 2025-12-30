@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Category Selection - Państwa, miasta</title>
+<!-- Google Fonts: Be Vietnam Pro -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Theme Configuration -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#258cf4",
+                        "background-light": "#f5f7f8",
+                        "background-dark": "#101922",
+                        "surface-dark": "#1a2430", // Slightly lighter for elements on dark bg
+                        "text-secondary": "#9cabba",
+                    },
+                    fontFamily: {
+                        "display": ["Be Vietnam Pro", "Noto Sans", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        /* Custom scrollbar for better aesthetics on webkit browsers */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: rgba(156, 171, 186, 0.3);
+            border-radius: 20px;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-white antialiased overflow-hidden">
+<div class="relative flex h-full min-h-screen w-full flex-col overflow-hidden max-w-md mx-auto shadow-2xl bg-background-light dark:bg-background-dark">
+<!-- Top App Bar -->
+<header class="flex items-center justify-between bg-background-light dark:bg-background-dark p-4 pb-2 z-10">
+<button class="text-slate-900 dark:text-white flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-slate-200 dark:hover:bg-surface-dark transition-colors">
+<span class="material-symbols-outlined text-2xl">arrow_back</span>
+</button>
+<h2 class="text-slate-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center">Select Categories</h2>
+<button class="flex items-center justify-end px-2 py-1 rounded hover:bg-slate-200 dark:hover:bg-surface-dark transition-colors">
+<p class="text-primary text-sm font-bold leading-normal tracking-[0.015em] shrink-0">Select All</p>
+</button>
+</header>
+<!-- Scrollable Content -->
+<main class="flex-1 overflow-y-auto pb-24">
+<!-- Headline / Intro -->
+<div class="px-4 pt-4 pb-2">
+<h1 class="text-slate-900 dark:text-white tracking-tight text-[28px] font-bold leading-tight text-left pb-2">Customize the round</h1>
+<p class="text-slate-500 dark:text-text-secondary text-base font-normal leading-normal">
+                    Select the topics for this game or add your own unique categories to spice things up.
+                </p>
+</div>
+<!-- Custom Category Input -->
+<div class="px-4 py-4">
+<div class="flex items-center gap-3 bg-white dark:bg-surface-dark rounded-xl p-2 pl-4 shadow-sm border border-slate-200 dark:border-slate-700">
+<span class="material-symbols-outlined text-slate-400">edit</span>
+<input class="bg-transparent border-none text-base text-slate-900 dark:text-white placeholder-slate-400 flex-1 focus:ring-0 p-0" placeholder="Add custom category..." type="text"/>
+<button class="bg-primary/20 hover:bg-primary/30 text-primary rounded-lg w-10 h-10 flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined">add</span>
+</button>
+</div>
+</div>
+<div class="h-px bg-slate-200 dark:bg-slate-800 mx-4 mb-2"></div>
+<!-- List of Categories -->
+<div class="flex flex-col">
+<!-- Category Item 1 -->
+<div class="group flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-surface-dark transition-colors border-b border-slate-100 dark:border-slate-800/50">
+<div class="flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+<span class="material-symbols-outlined">public</span>
+</div>
+<div class="flex flex-col flex-1 overflow-hidden">
+<p class="text-slate-900 dark:text-white text-base font-semibold leading-normal truncate">Państwa (Countries)</p>
+<p class="text-slate-500 dark:text-text-secondary text-xs truncate">Standard Category</p>
+</div>
+<div class="shrink-0">
+<label class="relative flex h-[31px] w-[51px] cursor-pointer items-center rounded-full border-none bg-slate-300 dark:bg-[#283039] p-0.5 has-[:checked]:justify-end has-[:checked]:bg-primary transition-all duration-200">
+<div class="h-full w-[27px] rounded-full bg-white shadow-sm"></div>
+<input checked="" class="invisible absolute" type="checkbox"/>
+</label>
+</div>
+</div>
+<!-- Category Item 2 -->
+<div class="group flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-surface-dark transition-colors border-b border-slate-100 dark:border-slate-800/50">
+<div class="flex items-center justify-center w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400">
+<span class="material-symbols-outlined">location_city</span>
+</div>
+<div class="flex flex-col flex-1 overflow-hidden">
+<p class="text-slate-900 dark:text-white text-base font-semibold leading-normal truncate">Miasta (Cities)</p>
+<p class="text-slate-500 dark:text-text-secondary text-xs truncate">Standard Category</p>
+</div>
+<div class="shrink-0">
+<label class="relative flex h-[31px] w-[51px] cursor-pointer items-center rounded-full border-none bg-slate-300 dark:bg-[#283039] p-0.5 has-[:checked]:justify-end has-[:checked]:bg-primary transition-all duration-200">
+<div class="h-full w-[27px] rounded-full bg-white shadow-sm"></div>
+<input checked="" class="invisible absolute" type="checkbox"/>
+</label>
+</div>
+</div>
+<!-- Category Item 3 -->
+<div class="group flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-surface-dark transition-colors border-b border-slate-100 dark:border-slate-800/50">
+<div class="flex items-center justify-center w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
+<span class="material-symbols-outlined">pets</span>
+</div>
+<div class="flex flex-col flex-1 overflow-hidden">
+<p class="text-slate-900 dark:text-white text-base font-semibold leading-normal truncate">Zwierzęta (Animals)</p>
+<p class="text-slate-500 dark:text-text-secondary text-xs truncate">Standard Category</p>
+</div>
+<div class="shrink-0">
+<label class="relative flex h-[31px] w-[51px] cursor-pointer items-center rounded-full border-none bg-slate-300 dark:bg-[#283039] p-0.5 has-[:checked]:justify-end has-[:checked]:bg-primary transition-all duration-200">
+<div class="h-full w-[27px] rounded-full bg-white shadow-sm"></div>
+<input checked="" class="invisible absolute" type="checkbox"/>
+</label>
+</div>
+</div>
+<!-- Category Item 4 -->
+<div class="group flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-surface-dark transition-colors border-b border-slate-100 dark:border-slate-800/50">
+<div class="flex items-center justify-center w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
+<span class="material-symbols-outlined">potted_plant</span>
+</div>
+<div class="flex flex-col flex-1 overflow-hidden">
+<p class="text-slate-900 dark:text-white text-base font-semibold leading-normal truncate">Rośliny (Plants)</p>
+<p class="text-slate-500 dark:text-text-secondary text-xs truncate">Standard Category</p>
+</div>
+<div class="shrink-0">
+<label class="relative flex h-[31px] w-[51px] cursor-pointer items-center rounded-full border-none bg-slate-300 dark:bg-[#283039] p-0.5 has-[:checked]:justify-end has-[:checked]:bg-primary transition-all duration-200">
+<div class="h-full w-[27px] rounded-full bg-white shadow-sm"></div>
+<input class="invisible absolute" type="checkbox"/>
+</label>
+</div>
+</div>
+<!-- Category Item 5 -->
+<div class="group flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-surface-dark transition-colors border-b border-slate-100 dark:border-slate-800/50">
+<div class="flex items-center justify-center w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400">
+<span class="material-symbols-outlined">badge</span>
+</div>
+<div class="flex flex-col flex-1 overflow-hidden">
+<p class="text-slate-900 dark:text-white text-base font-semibold leading-normal truncate">Imiona (Names)</p>
+<p class="text-slate-500 dark:text-text-secondary text-xs truncate">Standard Category</p>
+</div>
+<div class="shrink-0">
+<label class="relative flex h-[31px] w-[51px] cursor-pointer items-center rounded-full border-none bg-slate-300 dark:bg-[#283039] p-0.5 has-[:checked]:justify-end has-[:checked]:bg-primary transition-all duration-200">
+<div class="h-full w-[27px] rounded-full bg-white shadow-sm"></div>
+<input checked="" class="invisible absolute" type="checkbox"/>
+</label>
+</div>
+</div>
+<!-- Category Item 6 -->
+<div class="group flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-surface-dark transition-colors border-b border-slate-100 dark:border-slate-800/50">
+<div class="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
+<span class="material-symbols-outlined">directions_car</span>
+</div>
+<div class="flex flex-col flex-1 overflow-hidden">
+<p class="text-slate-900 dark:text-white text-base font-semibold leading-normal truncate">Marki Samochodów (Car Brands)</p>
+<p class="text-slate-500 dark:text-text-secondary text-xs truncate">Standard Category</p>
+</div>
+<div class="shrink-0">
+<label class="relative flex h-[31px] w-[51px] cursor-pointer items-center rounded-full border-none bg-slate-300 dark:bg-[#283039] p-0.5 has-[:checked]:justify-end has-[:checked]:bg-primary transition-all duration-200">
+<div class="h-full w-[27px] rounded-full bg-white shadow-sm"></div>
+<input class="invisible absolute" type="checkbox"/>
+</label>
+</div>
+</div>
+<!-- Category Item 7 -->
+<div class="group flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-surface-dark transition-colors border-b border-slate-100 dark:border-slate-800/50">
+<div class="flex items-center justify-center w-10 h-10 rounded-full bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400">
+<span class="material-symbols-outlined">work</span>
+</div>
+<div class="flex flex-col flex-1 overflow-hidden">
+<p class="text-slate-900 dark:text-white text-base font-semibold leading-normal truncate">Zawody (Professions)</p>
+<p class="text-slate-500 dark:text-text-secondary text-xs truncate">Standard Category</p>
+</div>
+<div class="shrink-0">
+<label class="relative flex h-[31px] w-[51px] cursor-pointer items-center rounded-full border-none bg-slate-300 dark:bg-[#283039] p-0.5 has-[:checked]:justify-end has-[:checked]:bg-primary transition-all duration-200">
+<div class="h-full w-[27px] rounded-full bg-white shadow-sm"></div>
+<input class="invisible absolute" type="checkbox"/>
+</label>
+</div>
+</div>
+<!-- Category Item Custom Example -->
+<div class="group flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-surface-dark transition-colors border-b border-slate-100 dark:border-slate-800/50 bg-primary/5 dark:bg-primary/5">
+<div class="flex items-center justify-center w-10 h-10 rounded-full bg-primary/20 text-primary">
+<span class="material-symbols-outlined">star</span>
+</div>
+<div class="flex flex-col flex-1 overflow-hidden">
+<p class="text-slate-900 dark:text-white text-base font-semibold leading-normal truncate">Polscy Raperzy (Polish Rappers)</p>
+<p class="text-primary text-xs truncate font-medium">Custom Category</p>
+</div>
+<div class="shrink-0">
+<label class="relative flex h-[31px] w-[51px] cursor-pointer items-center rounded-full border-none bg-slate-300 dark:bg-[#283039] p-0.5 has-[:checked]:justify-end has-[:checked]:bg-primary transition-all duration-200">
+<div class="h-full w-[27px] rounded-full bg-white shadow-sm"></div>
+<input checked="" class="invisible absolute" type="checkbox"/>
+</label>
+</div>
+</div>
+<!-- Spacer for scrolling under fixed footer -->
+<div class="h-24"></div>
+</div>
+</main>
+<!-- Sticky Footer -->
+<footer class="absolute bottom-0 left-0 w-full bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 pb-8 pt-4 px-4 shadow-lg z-20">
+<div class="flex items-center justify-between mb-3 px-1">
+<span class="text-slate-500 dark:text-text-secondary text-sm font-medium">5 categories selected</span>
+</div>
+<button class="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl h-12 px-5 bg-primary text-white text-base font-bold leading-normal tracking-[0.015em] hover:bg-blue-600 transition-colors shadow-lg shadow-blue-500/20 active:scale-[0.98] transform">
+<span class="truncate">Confirm Selection</span>
+</button>
+</footer>
+</div>
+</body></html>

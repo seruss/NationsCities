@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Answer Validation - Państwa, miasta</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#258cf4",
+                        "background-light": "#f5f7f8",
+                        "background-dark": "#101922",
+                        "surface-dark": "#1A2633", // Slightly lighter than background-dark for cards
+                        "surface-light": "#FFFFFF",
+                    },
+                    fontFamily: {
+                        "display": ["Be Vietnam Pro", "sans-serif"]
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style>
+        /* Custom scrollbar hide for cleaner UI */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-[#111418] dark:text-white overflow-x-hidden selection:bg-primary/30">
+<!-- Main Container -->
+<div class="relative flex min-h-screen w-full flex-col pb-24">
+<!-- Sticky Header -->
+<div class="sticky top-0 z-50 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 transition-colors duration-200">
+<div class="flex items-center px-4 h-16 justify-between max-w-lg mx-auto w-full">
+<button class="flex size-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+<span class="material-symbols-outlined text-2xl">arrow_back</span>
+</button>
+<h1 class="text-lg font-bold leading-tight tracking-tight flex-1 text-center">Round 3: Letter 'P'</h1>
+<button class="flex size-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+<span class="material-symbols-outlined text-2xl">help</span>
+</button>
+</div>
+<!-- Compact Timer Strip -->
+<div class="w-full bg-surface-light dark:bg-surface-dark border-b border-gray-200 dark:border-gray-800">
+<div class="max-w-lg mx-auto px-4 py-2 flex items-center justify-between gap-4">
+<div class="flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-gray-400">
+<span class="material-symbols-outlined text-[20px]">timer</span>
+<span>Voting ends in:</span>
+</div>
+<div class="flex gap-1 font-mono text-primary font-bold">
+<span class="bg-primary/10 px-2 py-0.5 rounded">00</span>:
+                        <span class="bg-primary/10 px-2 py-0.5 rounded">45</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Scrollable Content -->
+<main class="flex-1 w-full max-w-lg mx-auto px-4 py-6 flex flex-col gap-8">
+<!-- Category: Państwa -->
+<section>
+<header class="flex items-center gap-3 mb-4">
+<div class="size-8 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-lg">public</span>
+</div>
+<h2 class="text-xl font-bold">Państwa (Countries)</h2>
+<span class="ml-auto text-xs font-bold uppercase tracking-wider text-gray-500 bg-gray-200 dark:bg-gray-800 px-2 py-1 rounded">2 Answers</span>
+</header>
+<div class="flex flex-col gap-4">
+<!-- Answer Card 1: Valid -->
+<article class="bg-surface-light dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 relative overflow-hidden group">
+<!-- Left border indicator for valid -->
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary"></div>
+<div class="flex justify-between items-start mb-3 pl-2">
+<div>
+<h3 class="text-lg font-bold">Polska</h3>
+<div class="flex items-center gap-2 mt-1">
+<div class="flex -space-x-2">
+<div class="size-6 rounded-full bg-purple-500 flex items-center justify-center text-[10px] text-white font-bold border-2 border-surface-light dark:border-surface-dark">K</div>
+<div class="size-6 rounded-full bg-teal-500 flex items-center justify-center text-[10px] text-white font-bold border-2 border-surface-light dark:border-surface-dark">T</div>
+</div>
+<p class="text-sm text-gray-500 dark:text-gray-400">Kasia, Tomek</p>
+</div>
+</div>
+<div class="flex items-center gap-1 bg-primary/10 px-2 py-1 rounded-lg text-primary text-xs font-bold">
+<span class="material-symbols-outlined text-base">check_circle</span>
+<span>Auto-verified</span>
+</div>
+</div>
+<!-- Actions -->
+<div class="flex gap-2 pl-2">
+<button class="flex-1 h-10 rounded-lg bg-primary text-white text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-transform active:scale-[0.98]">
+<span class="material-symbols-outlined text-[20px]">thumb_up</span>
+                                Valid (4)
+                            </button>
+<button class="flex-1 h-10 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-bold flex items-center justify-center gap-2 transition-colors">
+<span class="material-symbols-outlined text-[20px]">thumb_down</span>
+</button>
+</div>
+</article>
+<!-- Answer Card 2: Invalid/Contested -->
+<article class="bg-surface-light dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 relative overflow-hidden">
+<!-- Left border indicator for contested/neutral -->
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-orange-400"></div>
+<div class="flex justify-between items-start mb-3 pl-2">
+<div>
+<h3 class="text-lg font-bold">Paryż</h3>
+<div class="flex items-center gap-2 mt-1">
+<div class="flex -space-x-2">
+<div class="size-6 rounded-full bg-blue-500 flex items-center justify-center text-[10px] text-white font-bold border-2 border-surface-light dark:border-surface-dark">J</div>
+</div>
+<p class="text-sm text-gray-500 dark:text-gray-400">Jan</p>
+</div>
+</div>
+<div class="flex items-center gap-1 bg-orange-500/10 px-2 py-1 rounded-lg text-orange-500 text-xs font-bold">
+<span class="material-symbols-outlined text-base">warning</span>
+<span>Contested</span>
+</div>
+</div>
+<!-- Actions -->
+<div class="flex gap-2 pl-2">
+<button class="flex-1 h-10 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-primary hover:bg-primary/10 text-sm font-bold flex items-center justify-center gap-2 transition-colors">
+<span class="material-symbols-outlined text-[20px]">thumb_up</span>
+                                Valid (1)
+                            </button>
+<button class="flex-1 h-10 rounded-lg bg-red-500 text-white text-sm font-bold flex items-center justify-center gap-2 shadow-sm transition-transform active:scale-[0.98]">
+<span class="material-symbols-outlined text-[20px]">thumb_down</span>
+                                Invalid (3)
+                            </button>
+</div>
+<p class="mt-2 pl-2 text-xs text-red-400 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">info</span>
+                            City, not a country.
+                        </p>
+</article>
+</div>
+</section>
+<!-- Category: Zwierzęta -->
+<section>
+<header class="flex items-center gap-3 mb-4">
+<div class="size-8 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-lg">pets</span>
+</div>
+<h2 class="text-xl font-bold">Zwierzęta (Animals)</h2>
+<span class="ml-auto text-xs font-bold uppercase tracking-wider text-gray-500 bg-gray-200 dark:bg-gray-800 px-2 py-1 rounded">1 Answer</span>
+</header>
+<div class="flex flex-col gap-4">
+<!-- Answer Card 3: Neutral -->
+<article class="bg-surface-light dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-gray-300 dark:bg-gray-700"></div>
+<div class="flex justify-between items-start mb-3 pl-2">
+<div>
+<h3 class="text-lg font-bold">Puma</h3>
+<div class="flex items-center gap-2 mt-1">
+<div class="flex -space-x-2">
+<div class="size-6 rounded-full bg-purple-500 flex items-center justify-center text-[10px] text-white font-bold border-2 border-surface-light dark:border-surface-dark">K</div>
+</div>
+<p class="text-sm text-gray-500 dark:text-gray-400">Kasia</p>
+</div>
+</div>
+</div>
+<!-- Actions (Unvoted State) -->
+<div class="flex gap-2 pl-2">
+<button class="flex-1 h-10 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-primary hover:text-white text-sm font-bold flex items-center justify-center gap-2 transition-all group">
+<span class="material-symbols-outlined text-[20px] group-hover:scale-110 transition-transform">thumb_up</span>
+                                Valid
+                            </button>
+<button class="flex-1 h-10 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-red-500 hover:text-white text-sm font-bold flex items-center justify-center gap-2 transition-all group">
+<span class="material-symbols-outlined text-[20px] group-hover:scale-110 transition-transform">thumb_down</span>
+                                Invalid
+                            </button>
+</div>
+</article>
+</div>
+</section>
+<!-- Category: Miasta -->
+<section>
+<header class="flex items-center gap-3 mb-4">
+<div class="size-8 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-lg">location_city</span>
+</div>
+<h2 class="text-xl font-bold">Miasta (Cities)</h2>
+<span class="ml-auto text-xs font-bold uppercase tracking-wider text-gray-500 bg-gray-200 dark:bg-gray-800 px-2 py-1 rounded">2 Answers</span>
+</header>
+<div class="flex flex-col gap-4">
+<!-- Answer Card 4 -->
+<article class="bg-surface-light dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary"></div>
+<div class="flex justify-between items-start mb-3 pl-2">
+<div>
+<h3 class="text-lg font-bold">Poznań</h3>
+<div class="flex items-center gap-2 mt-1">
+<div class="flex -space-x-2">
+<div class="size-6 rounded-full bg-teal-500 flex items-center justify-center text-[10px] text-white font-bold border-2 border-surface-light dark:border-surface-dark">T</div>
+<div class="size-6 rounded-full bg-blue-500 flex items-center justify-center text-[10px] text-white font-bold border-2 border-surface-light dark:border-surface-dark">J</div>
+</div>
+<p class="text-sm text-gray-500 dark:text-gray-400">Tomek, Jan</p>
+</div>
+</div>
+</div>
+<div class="flex gap-2 pl-2">
+<button class="flex-1 h-10 rounded-lg bg-primary text-white text-sm font-bold flex items-center justify-center gap-2 shadow-sm">
+<span class="material-symbols-outlined text-[20px]">thumb_up</span>
+                                Valid (3)
+                            </button>
+<button class="flex-1 h-10 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-red-500 text-sm font-bold flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[20px]">thumb_down</span>
+</button>
+</div>
+</article>
+<!-- Answer Card 5: Pcim (Obscure but valid) -->
+<article class="bg-surface-light dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-gray-300 dark:bg-gray-700"></div>
+<div class="flex justify-between items-start mb-3 pl-2">
+<div>
+<h3 class="text-lg font-bold">Pcim</h3>
+<div class="flex items-center gap-2 mt-1">
+<div class="flex -space-x-2">
+<div class="size-6 rounded-full bg-purple-500 flex items-center justify-center text-[10px] text-white font-bold border-2 border-surface-light dark:border-surface-dark">K</div>
+</div>
+<p class="text-sm text-gray-500 dark:text-gray-400">Kasia</p>
+</div>
+</div>
+<div class="flex items-center gap-1 bg-gray-200 dark:bg-gray-700 px-2 py-1 rounded-lg text-gray-600 dark:text-gray-300 text-xs font-bold">
+<span>?</span>
+<span>Unverified</span>
+</div>
+</div>
+<div class="flex gap-2 pl-2">
+<button class="flex-1 h-10 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-primary hover:text-white text-sm font-bold flex items-center justify-center gap-2 transition-all">
+<span class="material-symbols-outlined text-[20px]">thumb_up</span>
+                                Valid (1)
+                            </button>
+<button class="flex-1 h-10 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-red-500 hover:text-white text-sm font-bold flex items-center justify-center gap-2 transition-all">
+<span class="material-symbols-outlined text-[20px]">thumb_down</span>
+                                Invalid (1)
+                            </button>
+</div>
+</article>
+</div>
+</section>
+</main>
+<!-- Floating Host Action Bar -->
+<div class="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background-light dark:from-background-dark to-transparent z-40">
+<div class="max-w-lg mx-auto w-full">
+<button class="w-full bg-primary hover:bg-blue-600 text-white font-bold h-14 rounded-xl shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
+<span>Finalize Validation</span>
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<div class="text-center mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    Waiting for 1 player to vote...
+                </div>
+</div>
+</div>
+</div>
+</body></html>

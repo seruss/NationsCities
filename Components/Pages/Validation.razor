@@ -1,0 +1,359 @@
+@page "/validation/{RoomCode}"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.SignalR.Client
+@using NationsCities.Models
+@inject NavigationManager Navigation
+@inject NationsCities.Services.RoomService RoomService
+@inject NationsCities.Services.GameService GameService
+@implements IAsyncDisposable
+
+<PageTitle>Głosowanie - Państwa, Miasta</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="flex items-center justify-center min-h-screen">
+        <div class="flex flex-col items-center gap-4">
+            <span class="material-symbols-outlined text-4xl text-primary animate-spin">progress_activity</span>
+            <p class="text-slate-400">Ładowanie odpowiedzi...</p>
+        </div>
+    </div>
+}
+else if (_error != null)
+{
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="flex flex-col items-center gap-4 text-center">
+            <span class="material-symbols-outlined text-4xl text-red-400">error</span>
+            <p class="text-red-400">@_error</p>
+            <button @onclick="GoHome" class="text-primary hover:underline">Wróć do menu</button>
+        </div>
+    </div>
+}
+else if (_answersForVoting != null)
+{
+    <div class="flex flex-col min-h-screen pb-28">
+        <!-- Header -->
+        <div class="sticky top-0 z-50 bg-bg-dark/95 backdrop-blur-md border-b border-slate-800 transition-colors">
+            <div class="flex items-center px-4 h-16 justify-between max-w-lg mx-auto w-full">
+                <div class="w-10"></div>
+                <h1 class="text-lg font-bold">Runda @_roundNumber: Litera '@_letter'</h1>
+                <div class="w-10"></div>
+            </div>
+            
+            <!-- Info Strip -->
+            <div class="w-full bg-surface-dark border-b border-slate-800">
+                <div class="max-w-lg mx-auto px-4 py-2 flex items-center justify-center gap-2">
+                    <span class="material-symbols-outlined text-primary text-xl">how_to_vote</span>
+                    <span class="text-sm font-medium text-slate-400">
+                        @if (_hasSubmittedVotes)
+                        {
+                            <span>Czekam na innych graczy... (@_votesSubmittedCount/@_totalPlayers)</span>
+                        }
+                        else
+                        {
+                            <span>Głosuj na odpowiedzi innych graczy</span>
+                        }
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Answers by Category (excluding own answers, hiding player names) -->
+        <main class="flex-1 w-full max-w-lg mx-auto px-4 py-6 flex flex-col gap-8">
+            @foreach (var categoryGroup in _filteredAnswers.GroupBy(a => a.Category))
+            {
+                var category = _categories.FirstOrDefault(c => c.Name == categoryGroup.Key);
+                <section>
+                    <header class="flex items-center gap-3 mb-4">
+                        <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+                            <span class="material-symbols-outlined text-lg">@(category?.Icon ?? "category")</span>
+                        </div>
+                        <h2 class="text-xl font-bold">@categoryGroup.Key</h2>
+                        <span class="ml-auto text-xs font-bold uppercase tracking-wider text-slate-500 bg-slate-800 px-2 py-1 rounded">
+                            @categoryGroup.Count() odpowiedzi
+                        </span>
+                    </header>
+                    
+                    <div class="flex flex-col gap-4">
+                        @foreach (var answer in categoryGroup)
+                        {
+                            <article class="bg-surface-dark p-4 rounded-xl shadow-sm border border-slate-800 relative overflow-hidden">
+                                <!-- Status Indicator -->
+                                <div class="absolute left-0 top-0 bottom-0 w-1 @GetStatusColor(answer)"></div>
+                                
+                                <div class="flex justify-between items-start mb-3 pl-2">
+                                    <div>
+                                        <h3 class="text-lg font-bold">@answer.Answer</h3>
+                                        @if (answer.IsDuplicate)
+                                        {
+                                            <span class="text-xs text-yellow-500">Duplikat</span>
+                                        }
+                                    </div>
+                                </div>
+
+                                <!-- Voting Buttons -->
+                                <div class="flex gap-2 pl-2">
+                                    <button @onclick="() => Vote(answer.Id, true)"
+                                            disabled="@_hasSubmittedVotes"
+                                            class="flex-1 h-10 rounded-lg @(HasVotedValid(answer) ? "bg-primary text-white" : "bg-slate-800 text-slate-300 hover:bg-primary hover:text-white") text-sm font-bold flex items-center justify-center gap-2 transition-all btn-press disabled:opacity-50">
+                                        <span class="material-symbols-outlined text-xl">thumb_up</span>
+                                        Poprawna
+                                    </button>
+                                    <button @onclick="() => Vote(answer.Id, false)"
+                                            disabled="@_hasSubmittedVotes"
+                                            class="flex-1 h-10 rounded-lg @(HasVotedInvalid(answer) ? "bg-red-500 text-white" : "bg-slate-800 text-slate-300 hover:bg-red-500 hover:text-white") text-sm font-bold flex items-center justify-center gap-2 transition-all btn-press disabled:opacity-50">
+                                        <span class="material-symbols-outlined text-xl">thumb_down</span>
+                                        Błędna
+                                    </button>
+                                </div>
+                            </article>
+                        }
+                    </div>
+                </section>
+            }
+            
+            @if (!_filteredAnswers.Any())
+            {
+                <div class="text-center py-8">
+                    <span class="material-symbols-outlined text-4xl text-slate-600">inbox</span>
+                    <p class="text-slate-400 mt-2">Brak odpowiedzi do głosowania</p>
+                </div>
+            }
+        </main>
+
+        <!-- Footer -->
+        <div class="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-bg-dark via-bg-dark to-transparent z-40 safe-area-bottom">
+            <div class="max-w-lg mx-auto w-full flex flex-col gap-2">
+                @if (_hasSubmittedVotes)
+                {
+                    <div class="text-center py-4">
+                        <p class="text-lg font-bold text-green-400 flex items-center justify-center gap-2">
+                            <span class="material-symbols-outlined">check_circle</span>
+                            Głosy przesłane!
+                        </p>
+                        <p class="text-sm text-slate-400 mt-1">Czekam na innych graczy... (@_votesSubmittedCount/@_totalPlayers)</p>
+                    </div>
+                    
+                    @if (_isHost)
+                    {
+                        <button @onclick="ForceEndVoting"
+                                class="w-full text-center text-sm font-medium text-slate-400 hover:text-red-400 py-2 transition-colors">
+                            Wymuś zakończenie głosowania
+                        </button>
+                    }
+                }
+                else
+                {
+                    <button @onclick="SubmitVotes"
+                            class="w-full bg-primary hover:bg-primary-dark text-white font-bold h-14 rounded-xl shadow-lg shadow-primary/20 flex items-center justify-center gap-2 transition-all btn-press">
+                        <span>Prześlij głosy</span>
+                        <span class="material-symbols-outlined">send</span>
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string RoomCode { get; set; } = "";
+
+    private HubConnection? _hubConnection;
+    private Room? _room;
+    private List<AnswerForVoting>? _answersForVoting;
+    private List<AnswerForVoting> _filteredAnswers = [];
+    private List<Category> _categories = [];
+    private string? _myConnectionId;
+    private string? _myPlayerId;
+    private string _nickname = "";
+    private string? _error;
+    private bool _isLoading = true;
+    private bool _isHost = false;
+    private bool _hasSubmittedVotes = false;
+    private int _votesSubmittedCount = 0;
+    private int _totalPlayers = 0;
+    
+    private int _roundNumber = 1;
+    private char _letter = 'A';
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Get nickname from URL
+        var uri = new Uri(Navigation.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        _nickname = query["nick"] ?? "";
+
+        if (string.IsNullOrEmpty(_nickname))
+        {
+            _error = "Brak nicku. Wróć do lobby.";
+            _isLoading = false;
+            return;
+        }
+
+        try
+        {
+            // Setup SignalR and join game
+            _hubConnection = new HubConnectionBuilder()
+                .WithUrl(Navigation.ToAbsoluteUri("/gamehub"))
+                .Build();
+
+            SetupHubCallbacks();
+            await _hubConnection.StartAsync();
+            _myConnectionId = _hubConnection.ConnectionId;
+
+            // Join the game (adds to SignalR group)
+            var joined = await _hubConnection.InvokeAsync<bool>("JoinGame", RoomCode, _nickname);
+            if (!joined)
+            {
+                _error = "Nie udało się dołączyć do gry.";
+                _isLoading = false;
+                return;
+            }
+
+            // Get room data
+            _room = RoomService.GetRoom(RoomCode);
+            
+            if (_room?.CurrentGame == null)
+            {
+                _error = "Gra nie istnieje.";
+                _isLoading = false;
+                return;
+            }
+
+            // Find my player ID and check if host
+            var myPlayer = _room.Players.FirstOrDefault(p => p.Nickname.Equals(_nickname, StringComparison.OrdinalIgnoreCase));
+            _myPlayerId = myPlayer?.ConnectionId;
+            _isHost = myPlayer?.IsHost ?? false;
+            _totalPlayers = _room.Players.Count;
+
+            var game = _room.CurrentGame;
+            _roundNumber = game.CurrentRound;
+            _letter = game.CurrentLetter;
+            _categories = game.Categories;
+            _answersForVoting = game.AnswersForVoting;
+            
+            // Filter out empty answers and own answers (by nickname)
+            _filteredAnswers = _answersForVoting
+                .Where(a => !string.IsNullOrWhiteSpace(a.Answer)) // No empty answers
+                .Where(a => !a.SubmitterNicknames.Any(n => n.Equals(_nickname, StringComparison.OrdinalIgnoreCase))) // Hide own answers
+                .ToList();
+
+            _isLoading = false;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Błąd: {ex.Message}";
+            _isLoading = false;
+        }
+    }
+
+    private void SetupHubCallbacks()
+    {
+        if (_hubConnection == null) return;
+
+        _hubConnection.On<string, int, int>("OnVoteCast", (answerId, validCount, invalidCount) =>
+        {
+            var answer = _answersForVoting?.FirstOrDefault(a => a.Id == answerId);
+            if (answer != null)
+            {
+                // Clear existing votes and rebuild based on server counts
+                answer.VotesValid.Clear();
+                answer.VotesInvalid.Clear();
+                
+                // Add placeholder IDs to match the counts (we only care about count for UI)
+                for (int i = 0; i < validCount; i++)
+                {
+                    answer.VotesValid.Add($"vote_{i}");
+                }
+                for (int i = 0; i < invalidCount; i++)
+                {
+                    answer.VotesInvalid.Add($"vote_{i}");
+                }
+                
+                InvokeAsync(StateHasChanged);
+            }
+        });
+
+        _hubConnection.On<int>("OnVotesSubmitted", submittedCount =>
+        {
+            _votesSubmittedCount = submittedCount;
+            InvokeAsync(StateHasChanged);
+        });
+
+        _hubConnection.On("OnVotingEnded", () =>
+        {
+            Navigation.NavigateTo($"/scoreboard/{RoomCode}?nick={Uri.EscapeDataString(_nickname)}");
+        });
+    }
+
+    private async Task Vote(string answerId, bool isValid)
+    {
+        if (_hubConnection != null && !_hasSubmittedVotes)
+        {
+            await _hubConnection.InvokeAsync("VoteAnswer", RoomCode, answerId, isValid);
+            
+            // Optimistic update
+            var answer = _answersForVoting?.FirstOrDefault(a => a.Id == answerId);
+            if (answer != null && _myConnectionId != null)
+            {
+                answer.VotesValid.Remove(_myConnectionId);
+                answer.VotesInvalid.Remove(_myConnectionId);
+                
+                if (isValid)
+                    answer.VotesValid.Add(_myConnectionId);
+                else
+                    answer.VotesInvalid.Add(_myConnectionId);
+                
+                StateHasChanged();
+            }
+        }
+    }
+
+    private async Task SubmitVotes()
+    {
+        if (_hubConnection != null && !_hasSubmittedVotes)
+        {
+            _hasSubmittedVotes = true;
+            await _hubConnection.InvokeAsync("SubmitVotes", RoomCode);
+            StateHasChanged();
+        }
+    }
+
+    private async Task ForceEndVoting()
+    {
+        if (_hubConnection != null && _isHost)
+        {
+            await _hubConnection.InvokeAsync("FinalizeVoting", RoomCode);
+        }
+    }
+
+    private bool HasVotedValid(AnswerForVoting answer)
+    {
+        return _myConnectionId != null && answer.VotesValid.Contains(_myConnectionId);
+    }
+
+    private bool HasVotedInvalid(AnswerForVoting answer)
+    {
+        return _myConnectionId != null && answer.VotesInvalid.Contains(_myConnectionId);
+    }
+
+    private string GetStatusColor(AnswerForVoting answer)
+    {
+        if (answer.VotesValid.Count > answer.VotesInvalid.Count) return "bg-primary";
+        if (answer.VotesInvalid.Count > answer.VotesValid.Count) return "bg-red-500";
+        if (answer.VotesValid.Count > 0 || answer.VotesInvalid.Count > 0) return "bg-yellow-500";
+        return "bg-slate-600";
+    }
+
+    private void GoHome()
+    {
+        Navigation.NavigateTo("/");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection != null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
+    }
+}

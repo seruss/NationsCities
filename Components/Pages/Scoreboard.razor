@@ -1,0 +1,320 @@
+@page "/scoreboard/{RoomCode}"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.SignalR.Client
+@using NationsCities.Models
+@inject NavigationManager Navigation
+@inject NationsCities.Services.RoomService RoomService
+@inject NationsCities.Services.GameService GameService
+@implements IAsyncDisposable
+
+<PageTitle>Wyniki - Państwa, Miasta</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="flex items-center justify-center min-h-screen">
+        <div class="flex flex-col items-center gap-4">
+            <span class="material-symbols-outlined text-4xl text-primary animate-spin">progress_activity</span>
+            <p class="text-slate-400">Ładowanie wyników...</p>
+        </div>
+    </div>
+}
+else if (_error != null)
+{
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="flex flex-col items-center gap-4 text-center">
+            <span class="material-symbols-outlined text-4xl text-red-400">error</span>
+            <p class="text-red-400">@_error</p>
+            <button @onclick="GoHome" class="text-primary hover:underline">Wróć do menu</button>
+        </div>
+    </div>
+}
+else if (_room != null)
+{
+    <div class="flex flex-col min-h-screen pb-24">
+        <!-- Header -->
+        <header class="flex items-center justify-between px-4 py-4 sticky top-0 z-10 bg-bg-dark/95 backdrop-blur-sm border-b border-slate-800">
+            <div class="w-8"></div>
+            <h1 class="text-xl font-bold">Wyniki rundy @_currentRound</h1>
+            <div class="w-8"></div>
+        </header>
+
+        <!-- Game Stats -->
+        <section class="px-4 py-4">
+            <div class="flex gap-3">
+                <div class="flex flex-1 flex-col items-center justify-center gap-1 rounded-xl bg-surface-dark p-4 shadow-sm border border-slate-800">
+                    <div class="flex items-center gap-2 text-primary">
+                        <span class="material-symbols-outlined text-lg">flag</span>
+                        <span class="text-sm font-medium uppercase tracking-wide opacity-80">Runda</span>
+                    </div>
+                    <p class="text-3xl font-black">@_currentRound/@_totalRounds</p>
+                </div>
+                <div class="flex flex-1 flex-col items-center justify-center gap-1 rounded-xl bg-surface-dark p-4 shadow-sm border border-slate-800">
+                    <div class="flex items-center gap-2 text-primary">
+                        <span class="material-symbols-outlined text-lg">sort_by_alpha</span>
+                        <span class="text-sm font-medium uppercase tracking-wide opacity-80">Litera</span>
+                    </div>
+                    <p class="text-3xl font-black">@_letter</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Leader Card -->
+        @if (_leader != null)
+        {
+            <section class="px-4 mb-2">
+                <div class="flex items-center justify-between mb-2 px-1">
+                    <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400">Lider</h2>
+                    <span class="material-symbols-outlined text-yellow-500">emoji_events</span>
+                </div>
+                <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-surface-dark to-bg-dark border border-yellow-500/30 p-5 shadow-lg">
+                    <div class="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-yellow-500/10 blur-3xl"></div>
+                    <div class="relative z-10 flex items-center gap-4">
+                        <div class="relative">
+                            <div class="h-16 w-16 rounded-full flex items-center justify-center text-xl font-bold text-white border-2 border-yellow-500 shadow-lg avatar-initials"
+                                 style="background-color: @_leader.AvatarColor">
+                                @_leader.GetInitials()
+                            </div>
+                            <div class="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-yellow-500 text-black shadow-sm">
+                                <span class="text-xs font-bold">1</span>
+                            </div>
+                        </div>
+                        <div class="flex flex-1 flex-col">
+                            <h3 class="text-lg font-bold text-white">@_leader.Nickname</h3>
+                            <p class="text-sm text-slate-400">Łączny wynik</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-2xl font-black text-white">@_leader.TotalScore</p>
+                            <p class="text-sm font-bold text-green-400">+@_leader.RoundScore pkt</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        }
+
+        <!-- Other Players -->
+        <section class="flex flex-col px-4 pt-2">
+            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400 mb-3 px-1">Pozostali gracze</h2>
+            <div class="flex flex-col gap-3">
+                @foreach (var (player, index) in _otherPlayers.Select((p, i) => (p, i + 2)))
+                {
+                    <div class="flex items-center justify-between rounded-xl bg-surface-dark p-3 pr-4 border border-slate-800 shadow-sm">
+                        <div class="flex items-center gap-3">
+                            <div class="flex h-6 w-6 items-center justify-center rounded-full bg-slate-700 text-xs font-bold text-slate-400">@index</div>
+                            <div class="h-12 w-12 rounded-full flex items-center justify-center text-sm font-bold text-white avatar-initials"
+                                 style="background-color: @player.AvatarColor">
+                                @player.GetInitials()
+                            </div>
+                            <div class="flex flex-col">
+                                <div class="flex items-center gap-1">
+                                    <p class="font-bold text-white">@player.Nickname</p>
+                                    @if (player.Violations.Any(v => v.Penalty > 0))
+                                    {
+                                        <span class="material-symbols-outlined text-sm text-red-500">warning</span>
+                                    }
+                                </div>
+                                <p class="text-xs text-slate-400">Łącznie: <span class="font-semibold text-slate-300">@player.TotalScore</span></p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="inline-block rounded-full bg-primary/10 px-2 py-1 text-xs font-bold text-primary">+@player.RoundScore</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        </section>
+
+        <div class="h-8"></div>
+    </div>
+
+    <!-- Footer Actions -->
+    <div class="fixed bottom-0 left-0 w-full bg-surface-dark/90 backdrop-blur-md border-t border-slate-800 px-4 py-4 pb-8 z-50 safe-area-bottom">
+        <div class="flex flex-col gap-3 max-w-md mx-auto">
+            @if (_hasNextRound)
+            {
+                @if (_isHost)
+                {
+                    <button @onclick="NextRound"
+                            disabled="@_isStartingRound"
+                            class="flex w-full items-center justify-center gap-2 rounded-xl @(_isStartingRound ? "bg-slate-700" : "bg-primary hover:bg-primary-dark") px-6 py-4 text-base font-bold text-white shadow-lg shadow-primary/20 transition-transform btn-press">
+                        @if (_isStartingRound)
+                        {
+                            <span class="material-symbols-outlined animate-spin">progress_activity</span>
+                            <span>Rozpoczynam...</span>
+                        }
+                        else
+                        {
+                            <span>Następna runda (@(_currentRound + 1))</span>
+                            <span class="material-symbols-outlined">arrow_forward</span>
+                        }
+                    </button>
+                }
+                else
+                {
+                    <div class="text-center py-4">
+                        <p class="text-lg font-bold text-slate-400 flex items-center justify-center gap-2">
+                            <span class="material-symbols-outlined animate-spin">progress_activity</span>
+                            Czekam na hosta...
+                        </p>
+                    </div>
+                }
+            }
+            else
+            {
+                <button @onclick="ShowFinalResults"
+                        class="flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 px-6 py-4 text-base font-bold text-white shadow-lg transition-transform btn-press hover:bg-green-700">
+                    <span class="material-symbols-outlined">emoji_events</span>
+                    <span>Koniec gry!</span>
+                </button>
+            }
+            @if (_isHost)
+            {
+                <button @onclick="EndGame"
+                        class="w-full text-center text-sm font-medium text-slate-400 hover:text-red-400 py-2 transition-colors">
+                    Zakończ grę
+                </button>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string RoomCode { get; set; } = "";
+
+    private HubConnection? _hubConnection;
+    private Room? _room;
+    private Player? _leader;
+    private List<Player> _otherPlayers = [];
+    private string _nickname = "";
+    private string? _error;
+    private bool _isLoading = true;
+    private bool _isHost = false;
+    private bool _isStartingRound = false;
+    
+    private int _currentRound = 1;
+    private int _totalRounds = 10;
+    private char _letter = 'A';
+    private bool _hasNextRound = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Get nickname from URL
+        var uri = new Uri(Navigation.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        _nickname = query["nick"] ?? "";
+
+        if (string.IsNullOrEmpty(_nickname))
+        {
+            _error = "Brak nicku.";
+            _isLoading = false;
+            return;
+        }
+
+        try
+        {
+            // Setup SignalR and join game
+            _hubConnection = new HubConnectionBuilder()
+                .WithUrl(Navigation.ToAbsoluteUri("/gamehub"))
+                .Build();
+
+            SetupHubCallbacks();
+            await _hubConnection.StartAsync();
+
+            // Join the game (adds to SignalR group)
+            var joined = await _hubConnection.InvokeAsync<bool>("JoinGame", RoomCode, _nickname);
+            if (!joined)
+            {
+                _error = "Nie udało się dołączyć do gry.";
+                _isLoading = false;
+                return;
+            }
+
+            // Get room data
+            _room = RoomService.GetRoom(RoomCode);
+            
+            if (_room == null)
+            {
+                _error = "Gra nie istnieje.";
+                _isLoading = false;
+                return;
+            }
+
+            // Check if host by nickname (more reliable after reconnects)
+            var myPlayer = _room.Players.FirstOrDefault(p => p.Nickname.Equals(_nickname, StringComparison.OrdinalIgnoreCase));
+            _isHost = myPlayer?.IsHost ?? false;
+
+            var game = _room.CurrentGame;
+            if (game != null)
+            {
+                _currentRound = game.CurrentRound;
+                _totalRounds = game.TotalRounds;
+                _letter = game.CurrentLetter;
+                _hasNextRound = _currentRound < _totalRounds;
+            }
+
+            // Sort players by total score
+            var sortedPlayers = _room.Players.OrderByDescending(p => p.TotalScore).ToList();
+            _leader = sortedPlayers.FirstOrDefault();
+            _otherPlayers = sortedPlayers.Skip(1).ToList();
+
+            _isLoading = false;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Błąd: {ex.Message}";
+            _isLoading = false;
+        }
+    }
+
+    private void SetupHubCallbacks()
+    {
+        if (_hubConnection == null) return;
+
+        _hubConnection.On<char, int>("OnRoundStarted", (letter, roundNumber) =>
+        {
+            Navigation.NavigateTo($"/game/{RoomCode}?nick={Uri.EscapeDataString(_nickname)}");
+        });
+
+        _hubConnection.On("OnGameEnded", () =>
+        {
+            Navigation.NavigateTo("/");
+        });
+    }
+
+    private async Task NextRound()
+    {
+        if (_hubConnection != null && _isHost && !_isStartingRound)
+        {
+            _isStartingRound = true;
+            StateHasChanged();
+            
+            await _hubConnection.InvokeAsync("StartNextRound", RoomCode);
+        }
+    }
+
+    private async Task EndGame()
+    {
+        if (_hubConnection != null && _isHost)
+        {
+            await _hubConnection.InvokeAsync("EndGame", RoomCode);
+        }
+    }
+
+    private void ShowFinalResults()
+    {
+        // Final results - just go home for now
+        GoHome();
+    }
+
+    private void GoHome()
+    {
+        Navigation.NavigateTo("/");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection != null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
+    }
+}

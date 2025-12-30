@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Scoreboard - Państwa, miasta</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;700;900&amp;family=Noto+Sans:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Theme Configuration -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#258cf4",
+                        "background-light": "#f5f7f8",
+                        "background-dark": "#101922",
+                        "surface-dark": "#1b2127",
+                        "surface-light": "#ffffff",
+                    },
+                    fontFamily: {
+                        "display": ["Be Vietnam Pro", "sans-serif"],
+                        "body": ["Noto Sans", "sans-serif"],
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "2xl": "1rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        /* Custom scrollbar hiding for clean UI */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-[#111418] dark:text-white antialiased">
+<div class="relative flex h-full min-h-screen w-full flex-col overflow-x-hidden pb-24">
+<!-- Header -->
+<header class="flex items-center justify-between px-4 py-4 sticky top-0 z-10 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
+<div class="w-8"></div> <!-- Spacer for centering -->
+<h1 class="text-xl font-bold leading-tight tracking-tight">Scoreboard</h1>
+<div class="w-8 flex justify-end">
+<span class="material-symbols-outlined text-gray-500 cursor-pointer">settings</span>
+</div>
+</header>
+<!-- Game Stats Section -->
+<section class="px-4 py-4">
+<div class="flex gap-3">
+<!-- Round Card -->
+<div class="flex flex-1 flex-col items-center justify-center gap-1 rounded-xl bg-surface-light dark:bg-surface-dark p-4 shadow-sm border border-gray-200 dark:border-gray-800">
+<div class="flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined text-lg">flag</span>
+<span class="text-sm font-medium uppercase tracking-wide opacity-80">Round</span>
+</div>
+<p class="text-3xl font-black">3/10</p>
+</div>
+<!-- Letter Card -->
+<div class="flex flex-1 flex-col items-center justify-center gap-1 rounded-xl bg-surface-light dark:bg-surface-dark p-4 shadow-sm border border-gray-200 dark:border-gray-800">
+<div class="flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined text-lg">sort_by_alpha</span>
+<span class="text-sm font-medium uppercase tracking-wide opacity-80">Letter</span>
+</div>
+<p class="text-3xl font-black">K</p>
+</div>
+</div>
+</section>
+<!-- Leaderboard: Top Player -->
+<section class="px-4 mb-2">
+<div class="flex items-center justify-between mb-2 px-1">
+<h2 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Current Leader</h2>
+<span class="material-symbols-outlined text-yellow-500 fill-1">emoji_events</span>
+</div>
+<div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-900 to-gray-800 dark:from-surface-dark dark:to-[#161b21] border border-yellow-500/30 p-5 shadow-lg">
+<!-- Decorative Glow -->
+<div class="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-yellow-500/10 blur-3xl"></div>
+<div class="relative z-10 flex items-center gap-4">
+<div class="relative">
+<div class="h-16 w-16 rounded-full bg-cover bg-center border-2 border-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.3)]" data-alt="Portrait of the leading player, a smiling woman" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCTD2b5_lQMrLuBKvyivD-0Ek8VB8y4bV_c0dPlSE8Vy4VenA8cXL7xkOQOagAOcXSt9pnGDXjo2oEeBmEdCK9K9dRlSD45e48gQmUjJIAttaihusKiouohAaJ5PriNRV1x6V6jX4I59zY3NDNYBdTP_H9xSDAtKpH2-f5yPx6lnBSi3IflJStKicWmvZd_8ctnI6PpA6d-M92jvCHX92p0Jrzf1hS1I5efguJQfLt8bJKvVOV6DcA4cDABqg-7XqoAVy5Dj0G9C6w");'></div>
+<div class="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-yellow-500 text-black shadow-sm">
+<span class="text-xs font-bold">1</span>
+</div>
+</div>
+<div class="flex flex-1 flex-col">
+<div class="flex items-center gap-2">
+<h3 class="text-lg font-bold text-white">Kasia</h3>
+<span class="material-symbols-outlined text-[16px] text-green-400" title="Verified answers">verified</span>
+</div>
+<p class="text-sm text-gray-400">Total Score</p>
+</div>
+<div class="text-right">
+<p class="text-2xl font-black text-white">120</p>
+<p class="text-sm font-bold text-green-400">+15 pts</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Player List -->
+<section class="flex flex-col px-4 pt-2">
+<h2 class="text-sm font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3 px-1">Other Players</h2>
+<div class="flex flex-col gap-3">
+<!-- Player 2 -->
+<div class="flex items-center justify-between rounded-xl bg-surface-light dark:bg-surface-dark p-3 pr-4 border border-gray-200 dark:border-gray-800 shadow-sm">
+<div class="flex items-center gap-3">
+<div class="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-xs font-bold text-gray-500 dark:text-gray-400">2</div>
+<div class="h-12 w-12 rounded-full bg-cover bg-center" data-alt="Portrait of Tomek, a male player" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDlaoeBZ85Fc8Atmr1309ZvSZfs1IClP83qEsOBgEy_9qAidtnVU3NpEBb8kvqqFokzAbc1jRpjxVT8FouRxCaCY58TXzTRvP6erf9IC12czAEBzmChwCobncIhtAZYu61gqBF08RPGFnW7iKScXTRbQzOO-J5WaWYR8ltdW-eo5aEeJWM3cazHg-3j4wuzZ9nKBTyxlvt4j7j0wxziSqCnBKgn7DMSFDvGDdizBrMPbZ1fHiw6Hftddqj6Lye0jdoRqQXAuZeZDgI");'></div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1">
+<p class="font-bold text-[#111418] dark:text-white">Tomek</p>
+<span class="material-symbols-outlined text-[14px] text-green-500/70">check_circle</span>
+</div>
+<p class="text-xs text-gray-500 dark:text-gray-400">Total: <span class="font-semibold text-gray-700 dark:text-gray-300">105</span></p>
+</div>
+</div>
+<div class="text-right">
+<span class="inline-block rounded-full bg-primary/10 px-2 py-1 text-xs font-bold text-primary">+10</span>
+</div>
+</div>
+<!-- Player 3 (Flagged) -->
+<div class="flex items-center justify-between rounded-xl bg-surface-light dark:bg-surface-dark p-3 pr-4 border border-red-500/30 shadow-sm relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-red-500"></div>
+<div class="flex items-center gap-3">
+<div class="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-xs font-bold text-gray-500 dark:text-gray-400">3</div>
+<div class="h-12 w-12 rounded-full bg-cover bg-center grayscale" data-alt="Portrait of Ania, a female player" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuD-lQwnQNbzooNMybeXWWttaZilZGE__czc9yw-1zNfWWvWkyhLyXhj0QirKzyy2kt0hez12RNyb7WGWdWzpgc35R7vAG7utZZNd0mmHZG-9AzKsSoQO4gOX9Posfxty1kPFiFZpNuTDkFwN8elhCuEYAz490uumrhX8EWjcWX7mJ51NYQx3qfR_uCxtWdw2e2FsjTkzBTe6cpIsqOUdkwrdnRjGXDOAen1BQu4_z24CTmVKDul5OQjBW1dLQjEpXOvO6DKzh7ZAZ0");'></div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1">
+<p class="font-bold text-[#111418] dark:text-white">Ania</p>
+<span class="material-symbols-outlined text-[16px] text-red-500" title="Flagged for review">warning</span>
+</div>
+<p class="text-xs text-red-500 font-medium">Flagged Answer</p>
+</div>
+</div>
+<div class="text-right flex flex-col items-end">
+<span class="inline-block rounded-full bg-gray-200 dark:bg-gray-800 px-2 py-1 text-xs font-bold text-gray-500">+0</span>
+<span class="text-[10px] text-gray-400 mt-1">Total: 90</span>
+</div>
+</div>
+<!-- Player 4 -->
+<div class="flex items-center justify-between rounded-xl bg-surface-light dark:bg-surface-dark p-3 pr-4 border border-gray-200 dark:border-gray-800 shadow-sm">
+<div class="flex items-center gap-3">
+<div class="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-xs font-bold text-gray-500 dark:text-gray-400">4</div>
+<div class="h-12 w-12 rounded-full bg-cover bg-center" data-alt="Portrait of Marek, a male player" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAXSaB79VU6AxVzu6APlqGY5_UMnQJO7HXUwCj3838vTL14e6RE72ldTYPFBaYjXBzyTMw14UGN3-n_aQtZEh6LkqVKre-zIraoJZHatevzdphfQj9kcXiOWfClonBIJCTvKhQXXIYL4FW56Vi0zUWAJZLv5LjhF9FFgeaEw3DglTc5ZwNzC4Pa9Bshg1sq7MyvRTxpvFSp2mxVSESTypMY9-ItOxj0QBmBCLz123L_Wf8KkaXBijyZ5oLqSXlGoikH4dKHYEDjAso");'></div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1">
+<p class="font-bold text-[#111418] dark:text-white">Marek</p>
+<span class="material-symbols-outlined text-[14px] text-green-500/70">check_circle</span>
+</div>
+<p class="text-xs text-gray-500 dark:text-gray-400">Total: <span class="font-semibold text-gray-700 dark:text-gray-300">85</span></p>
+</div>
+</div>
+<div class="text-right">
+<span class="inline-block rounded-full bg-primary/10 px-2 py-1 text-xs font-bold text-primary">+8</span>
+</div>
+</div>
+<!-- Player 5 -->
+<div class="flex items-center justify-between rounded-xl bg-surface-light dark:bg-surface-dark p-3 pr-4 border border-gray-200 dark:border-gray-800 shadow-sm opacity-80">
+<div class="flex items-center gap-3">
+<div class="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-xs font-bold text-gray-500 dark:text-gray-400">5</div>
+<div class="h-12 w-12 rounded-full bg-cover bg-center" data-alt="Portrait of Piotr, a male player" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBAXA9sPH6YaajCXcmnKJrGW_yz3GW2ZWD9_oSucuWupPW0M-2EFyB9JpxpNXVN7OeikoaV3NPaB5tIQfjbceh3x8ArrezIwFCao-w10pLdj_lmX0VirOfg-GLTe8M7ftcg48PawaAit5mw_h7KKzsdVnAxeojxqw1ynuA5gU-rZCTyfQFpE40xM9_J_cqFNA3EmdalwNVasCTMOIlXi1m9WAz0PWTglN7Z1YouFx9Y_Y9a8uewP_WYkF6x69vQaxZvqPz8gOzl7pc");'></div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1">
+<p class="font-bold text-[#111418] dark:text-white">Piotr</p>
+<span class="material-symbols-outlined text-[14px] text-green-500/70">check_circle</span>
+</div>
+<p class="text-xs text-gray-500 dark:text-gray-400">Total: <span class="font-semibold text-gray-700 dark:text-gray-300">72</span></p>
+</div>
+</div>
+<div class="text-right">
+<span class="inline-block rounded-full bg-primary/10 px-2 py-1 text-xs font-bold text-primary">+12</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Spacer for scrolling behind footer -->
+<div class="h-8"></div>
+</div>
+<!-- Sticky Footer Action Bar -->
+<div class="fixed bottom-0 left-0 w-full bg-surface-light/80 dark:bg-surface-dark/90 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 px-4 py-4 pb-8 z-50">
+<div class="flex flex-col gap-3 max-w-md mx-auto">
+<button class="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-base font-bold text-white shadow-lg shadow-primary/20 transition-transform active:scale-[0.98] hover:bg-primary/90">
+<span>Start Round 4</span>
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<button class="w-full text-center text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 py-2 transition-colors">
+                End Game
+            </button>
+</div>
+</div>
+</body></html>

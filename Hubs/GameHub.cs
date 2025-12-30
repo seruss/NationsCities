@@ -1,0 +1,542 @@
+using Microsoft.AspNetCore.SignalR;
+using NationsCities.Models;
+using NationsCities.Services;
+
+namespace NationsCities.Hubs;
+
+/// <summary>
+/// Hub SignalR do komunikacji w czasie rzeczywistym między graczami.
+/// </summary>
+public class GameHub : Hub
+{
+    private readonly RoomService _roomService;
+    private readonly GameService _gameService;
+
+    public GameHub(RoomService roomService, GameService gameService)
+    {
+        _roomService = roomService;
+        _gameService = gameService;
+    }
+
+    #region Połączenia
+
+    public override async Task OnDisconnectedAsync(Exception? exception)
+    {
+        var result = _roomService.LeaveRoom(Context.ConnectionId);
+        if (result.Room != null && !result.RoomDeleted)
+        {
+            await Clients.Group(result.Room.Code).SendAsync("OnPlayerLeft", Context.ConnectionId);
+            
+            if (result.NewHostId != null)
+            {
+                await Clients.Group(result.Room.Code).SendAsync("OnNewHost", result.NewHostId);
+            }
+        }
+        await base.OnDisconnectedAsync(exception);
+    }
+
+    #endregion
+
+    #region Pokój
+
+    /// <summary>
+    /// Tworzy nowy pokój.
+    /// </summary>
+    public async Task CreateRoom(string nickname)
+    {
+        var room = _roomService.CreateRoom(Context.ConnectionId, nickname);
+        await Groups.AddToGroupAsync(Context.ConnectionId, room.Code);
+        await Clients.Caller.SendAsync("OnRoomCreated", room.Code);
+    }
+
+    /// <summary>
+    /// Dołącza do pokoju.
+    /// </summary>
+    public async Task JoinRoom(string roomCode, string nickname)
+    {
+        var result = _roomService.JoinRoom(roomCode, Context.ConnectionId, nickname);
+        
+        if (!result.Success)
+        {
+            await Clients.Caller.SendAsync("OnJoinError", result.Error);
+            return;
+        }
+
+        await Groups.AddToGroupAsync(Context.ConnectionId, roomCode.ToUpperInvariant());
+        await Clients.Caller.SendAsync("OnRoomCreated", roomCode.ToUpperInvariant()); // Reuse for join
+        await Clients.Group(roomCode.ToUpperInvariant()).SendAsync("OnPlayerJoined", nickname, Context.ConnectionId);
+    }
+
+    /// <summary>
+    /// Pobiera listę dostępnych pokoi publicznych.
+    /// </summary>
+    public List<PublicRoomInfo> GetPublicRooms()
+    {
+        return _roomService.GetPublicRooms();
+    }
+
+    /// <summary>
+    /// Ustawia pokój jako publiczny lub prywatny (tylko host).
+    /// </summary>
+    public async Task SetRoomPublic(string roomCode, bool isPublic)
+    {
+        var room = _roomService.GetRoom(roomCode);
+        if (room == null)
+        {
+            await Clients.Caller.SendAsync("OnError", "Pokój nie istnieje.");
+            return;
+        }
+
+        var caller = room.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+        if (caller?.IsHost != true)
+        {
+            await Clients.Caller.SendAsync("OnError", "Tylko host może zmienić widoczność pokoju.");
+            return;
+        }
+
+        _roomService.SetRoomPublic(roomCode, isPublic);
+        await Clients.Group(roomCode).SendAsync("OnRoomVisibilityChanged", isPublic);
+    }
+
+    /// <summary>
+    /// Opuszcza pokój.
+    /// </summary>
+    public async Task LeaveRoom(string roomCode)
+    {
+        var result = _roomService.LeaveRoom(Context.ConnectionId);
+        if (result.Room != null)
+        {
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, roomCode);
+            
+            if (!result.RoomDeleted)
+            {
+                await Clients.Group(roomCode).SendAsync("OnPlayerLeft", Context.ConnectionId);
+                
+                if (result.NewHostId != null)
+                {
+                    await Clients.Group(roomCode).SendAsync("OnNewHost", result.NewHostId);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Wyrzuca gracza (tylko host).
+    /// </summary>
+    public async Task KickPlayer(string roomCode, string playerId)
+    {
+        var result = _roomService.KickPlayer(Context.ConnectionId, playerId);
+        
+        if (!result.Success)
+        {
+            await Clients.Caller.SendAsync("OnError", result.Error);
+            return;
+        }
+
+        await Clients.Client(playerId).SendAsync("OnKicked");
+        await Groups.RemoveFromGroupAsync(playerId, roomCode);
+        await Clients.Group(roomCode).SendAsync("OnPlayerKicked", playerId);
+    }
+
+    /// <summary>
+    /// Dołącza do gry (używane przy nawigacji do strony gry).
+    /// </summary>
+    public async Task<bool> JoinGame(string roomCode, string nickname)
+    {
+        var room = _roomService.GetRoom(roomCode);
+        if (room == null)
+        {
+            return false;
+        }
+
+        // Find player by nickname and update their connection ID
+        var player = room.Players.FirstOrDefault(p => p.Nickname.Equals(nickname, StringComparison.OrdinalIgnoreCase));
+        if (player != null)
+        {
+            // Update connection ID if reconnecting
+            var oldConnectionId = player.ConnectionId;
+            player.ConnectionId = Context.ConnectionId;
+            
+            // Add to SignalR group
+            await Groups.AddToGroupAsync(Context.ConnectionId, roomCode);
+            return true;
+        }
+
+        return false;
+    }
+
+    #endregion
+
+    #region Stan gotowości
+
+    /// <summary>
+    /// Ustawia gotowość gracza.
+    /// </summary>
+    public async Task SetReady(string roomCode, bool isReady)
+    {
+        if (_roomService.SetPlayerReady(Context.ConnectionId, isReady))
+        {
+            await Clients.Group(roomCode).SendAsync("OnPlayerReadyChanged", Context.ConnectionId, isReady);
+        }
+    }
+
+    #endregion
+
+    #region Ustawienia
+
+    /// <summary>
+    /// Aktualizuje ustawienia gry (tylko host).
+    /// </summary>
+    public async Task UpdateGameSettings(string roomCode, List<string> categoryNames, int roundCount)
+    {
+        var room = _roomService.GetRoom(roomCode);
+        if (room == null)
+        {
+            await Clients.Caller.SendAsync("OnError", "Pokój nie istnieje.");
+            return;
+        }
+
+        // Check if caller is host
+        var caller = room.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+        if (caller?.IsHost != true)
+        {
+            await Clients.Caller.SendAsync("OnError", "Tylko host może zmieniać ustawienia.");
+            return;
+        }
+
+        // Validate input
+        if (categoryNames == null || categoryNames.Count == 0)
+        {
+            await Clients.Caller.SendAsync("OnError", "Wybierz co najmniej jedną kategorię.");
+            return;
+        }
+
+        if (roundCount < 1 || roundCount > 20)
+        {
+            await Clients.Caller.SendAsync("OnError", "Liczba rund musi być między 1 a 20.");
+            return;
+        }
+
+        // Update settings - include both standard and custom categories
+        var selectedCategories = new List<Category>();
+        foreach (var name in categoryNames)
+        {
+            var standardCat = Category.StandardCategories.FirstOrDefault(c => c.Name == name);
+            if (standardCat != null)
+            {
+                selectedCategories.Add(standardCat);
+            }
+            else
+            {
+                // Custom category
+                selectedCategories.Add(new Category { Name = name, Icon = "star", IsCustom = true });
+            }
+        }
+
+        room.Settings.SelectedCategories = selectedCategories;
+        room.Settings.RoundCount = roundCount;
+
+        // Notify all players in the room
+        await Clients.Group(roomCode).SendAsync("OnSettingsUpdated", 
+            selectedCategories.Select(c => c.Name).ToList(), 
+            roundCount);
+    }
+
+    #endregion
+
+    #region Gra
+
+    /// <summary>
+    /// Rozpoczyna grę (tylko host).
+    /// </summary>
+    public async Task StartGame(string roomCode)
+    {
+        var result = _gameService.StartGame(Context.ConnectionId);
+        
+        if (!result.Success)
+        {
+            await Clients.Caller.SendAsync("OnError", result.Error);
+            return;
+        }
+
+        var room = _roomService.GetRoom(roomCode);
+        if (room?.CurrentGame != null)
+        {
+            // Start first round
+            var roundResult = _gameService.StartRound(roomCode);
+            
+            await Clients.Group(roomCode).SendAsync("OnGameStarted", 
+                room.CurrentGame.Categories.Select(c => c.Name).ToList(),
+                room.CurrentGame.TotalRounds);
+            
+            if (roundResult.Success)
+            {
+                await Clients.Group(roomCode).SendAsync("OnRoundStarted", 
+                    roundResult.Letter, 
+                    room.CurrentGame.CurrentRound);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gracz wciska STOP.
+    /// </summary>
+    public async Task TriggerStop(string roomCode, Dictionary<string, string> answers)
+    {
+        var room = _roomService.GetRoom(roomCode);
+        var countdownSeconds = room?.Settings.CountdownSeconds ?? 10;
+        
+        var result = _gameService.TriggerStop(roomCode, Context.ConnectionId, countdownSeconds);
+        
+        if (result.Success)
+        {
+            // Auto-submit answers for the player who triggered STOP
+            _gameService.SubmitAnswers(roomCode, Context.ConnectionId, answers);
+            await Clients.Caller.SendAsync("OnAnswersSubmitted");
+            
+            // Notify all players about STOP
+            await Clients.Group(roomCode).SendAsync("OnStopTriggered", Context.ConnectionId, result.EndTime);
+            await Clients.Group(roomCode).SendAsync("OnPlayerSubmitted", Context.ConnectionId);
+        }
+    }
+
+    /// <summary>
+    /// Dodaje czas (tylko gracz który wcisnął STOP).
+    /// </summary>
+    public async Task AddTime(string roomCode, int additionalSeconds)
+    {
+        var result = _gameService.AddTime(roomCode, Context.ConnectionId, additionalSeconds);
+        
+        if (result.Success)
+        {
+            await Clients.Group(roomCode).SendAsync("OnTimeAdded", result.NewEndTime);
+        }
+    }
+
+    /// <summary>
+    /// Wysyła odpowiedzi.
+    /// </summary>
+    public async Task SubmitAnswers(string roomCode, Dictionary<string, string> answers)
+    {
+        if (_gameService.SubmitAnswers(roomCode, Context.ConnectionId, answers))
+        {
+            await Clients.Caller.SendAsync("OnAnswersSubmitted");
+            await Clients.Group(roomCode).SendAsync("OnPlayerSubmitted", Context.ConnectionId);
+            
+            // Check if all players submitted
+            var room = _roomService.GetRoom(roomCode);
+            if (room?.CurrentGame != null)
+            {
+                var allSubmitted = room.Players.All(p => 
+                    room.CurrentGame.RoundAnswers.ContainsKey(p.ConnectionId));
+                
+                if (allSubmitted)
+                {
+                    await EndRound(roomCode);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Kończy rundę i przechodzi do głosowania.
+    /// </summary>
+    public async Task EndRound(string roomCode)
+    {
+        var answersForVoting = _gameService.EndRoundAndPrepareVoting(roomCode);
+        
+        // Notify all players to go to voting
+        await Clients.Group(roomCode).SendAsync("OnRoundEnded", answersForVoting.Count);
+    }
+
+    /// <summary>
+    /// Rozpoczyna następną rundę (tylko host).
+    /// </summary>
+    public async Task StartNextRound(string roomCode)
+    {
+        var room = _roomService.GetRoom(roomCode);
+        if (room == null) return;
+        
+        // Find player by connection ID and check IsHost
+        var caller = room.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+        if (caller?.IsHost != true)
+        {
+            await Clients.Caller.SendAsync("OnError", "Tylko host może rozpocząć następną rundę.");
+            return;
+        }
+
+        // Increment round number
+        if (room.CurrentGame != null)
+        {
+            room.CurrentGame.CurrentRound++;
+        }
+
+        var roundResult = _gameService.StartRound(roomCode);
+        
+        if (roundResult.Success)
+        {
+            await Clients.Group(roomCode).SendAsync("OnRoundStarted", 
+                roundResult.Letter, 
+                room.CurrentGame?.CurrentRound ?? 1);
+        }
+        else
+        {
+            await Clients.Caller.SendAsync("OnError", roundResult.Error);
+        }
+    }
+
+    #endregion
+
+    #region Głosowanie
+
+    /// <summary>
+    /// Głosuje na odpowiedź.
+    /// </summary>
+    public async Task VoteAnswer(string roomCode, string answerId, bool isValid)
+    {
+        var room = _roomService.GetRoom(roomCode);
+        var answer = room?.CurrentGame?.AnswersForVoting.FirstOrDefault(a => a.Id == answerId);
+        
+        if (answer != null)
+        {
+            // Usuń poprzedni głos
+            answer.VotesValid.Remove(Context.ConnectionId);
+            answer.VotesInvalid.Remove(Context.ConnectionId);
+            
+            // Dodaj nowy
+            if (isValid)
+            {
+                answer.VotesValid.Add(Context.ConnectionId);
+            }
+            else
+            {
+                answer.VotesInvalid.Add(Context.ConnectionId);
+            }
+
+            await Clients.Group(roomCode).SendAsync("OnVoteCast", answerId, 
+                answer.VotesValid.Count, answer.VotesInvalid.Count);
+        }
+    }
+
+    /// <summary>
+    /// Gracz przesyła swoje głosy.
+    /// </summary>
+    public async Task SubmitVotes(string roomCode)
+    {
+        var room = _roomService.GetRoom(roomCode);
+        if (room?.CurrentGame == null) return;
+
+        // Find player by current connection
+        var player = room.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+        if (player == null) return;
+
+        // Mark votes as submitted
+        room.CurrentGame.VotesSubmittedBy.Add(Context.ConnectionId);
+
+        var submittedCount = room.CurrentGame.VotesSubmittedBy.Count;
+        var totalPlayers = room.Players.Count;
+
+        // Notify all players of progress
+        await Clients.Group(roomCode).SendAsync("OnVotesSubmitted", submittedCount);
+
+        // Auto-end if all players have submitted
+        if (submittedCount >= totalPlayers)
+        {
+            await FinalizeVoting(roomCode);
+        }
+    }
+
+    /// <summary>
+    /// Kończy głosowanie i przechodzi do tabeli wyników.
+    /// </summary>
+    public async Task FinalizeVoting(string roomCode)
+    {
+        _gameService.FinalizeVotingAndCalculateScores(roomCode);
+        
+        // Notify all players to go to scoreboard
+        await Clients.Group(roomCode).SendAsync("OnVotingEnded");
+    }
+
+    /// <summary>
+    /// Kończy grę i usuwa pokój (tylko host).
+    /// </summary>
+    public async Task EndGame(string roomCode)
+    {
+        var room = _roomService.GetRoom(roomCode);
+        
+        // Only host can end game
+        if (room == null) return;
+        
+        var hostPlayer = room.Players.FirstOrDefault(p => p.IsHost);
+        var caller = room.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+        
+        if (caller?.IsHost != true)
+        {
+            await Clients.Caller.SendAsync("OnError", "Tylko host może zakończyć grę.");
+            return;
+        }
+
+        // Notify all players game is ending
+        await Clients.Group(roomCode).SendAsync("OnGameEnded");
+        
+        // Delete the room
+        _roomService.DeleteRoom(roomCode);
+    }
+
+    #endregion
+
+    #region Chat
+
+    /// <summary>
+    /// Wysyła wiadomość na czacie.
+    /// </summary>
+    public async Task SendChatMessage(string roomCode, string message)
+    {
+        if (string.IsNullOrWhiteSpace(message)) return;
+        
+        // Limit długości
+        if (message.Length > 200)
+        {
+            message = message[..200];
+        }
+
+        await Clients.Group(roomCode).SendAsync("OnChatMessage", Context.ConnectionId, message);
+    }
+
+    #endregion
+
+    #region Anty-cheat
+
+    /// <summary>
+    /// Raportuje naruszenie.
+    /// </summary>
+    public async Task ReportViolation(string roomCode, string violationType, double durationSeconds)
+    {
+        var room = _roomService.GetRoom(roomCode);
+        var player = room?.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+        
+        if (player != null && Enum.TryParse<ViolationType>(violationType, out var type))
+        {
+            var penalty = Violation.CalculatePenalty(player.Violations, type, durationSeconds);
+            
+            var violation = new Violation
+            {
+                Type = type,
+                DurationSeconds = durationSeconds,
+                Penalty = penalty,
+                RoundNumber = room?.CurrentGame?.CurrentRound ?? 0
+            };
+            
+            player.Violations.Add(violation);
+            player.TotalScore -= penalty;
+
+            await Clients.Group(roomCode).SendAsync("OnAntiCheatViolation", 
+                Context.ConnectionId, 
+                violationType, 
+                durationSeconds, 
+                penalty);
+        }
+    }
+
+    #endregion
+}

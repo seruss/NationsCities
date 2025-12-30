@@ -1,0 +1,761 @@
+@page "/lobby"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.SignalR.Client
+@using NationsCities.Models
+@inject NavigationManager Navigation
+@inject NationsCities.Services.RoomService RoomService
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<PageTitle>Lobby - Państwa, Miasta</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="flex items-center justify-center min-h-screen">
+        <div class="flex flex-col items-center gap-4">
+            <span class="material-symbols-outlined text-4xl text-primary animate-spin">progress_activity</span>
+            <p class="text-slate-400">Łączenie...</p>
+        </div>
+    </div>
+}
+else if (_error != null)
+{
+    <div class="flex items-center justify-center min-h-screen p-4">
+        <div class="flex flex-col items-center gap-4 text-center">
+            <span class="material-symbols-outlined text-4xl text-red-400">error</span>
+            <p class="text-red-400">@_error</p>
+            <button @onclick="GoHome" class="text-primary hover:underline">Wróć do menu</button>
+        </div>
+    </div>
+}
+else if (_room != null)
+{
+    <div class="flex flex-col min-h-screen">
+        <!-- Header -->
+        <header class="flex items-center justify-between p-4 bg-surface-dark shadow-sm z-20">
+            <button @onclick="LeaveRoom" class="flex items-center justify-center w-10 h-10 rounded-full hover:bg-white/10 transition-colors">
+                <span class="material-symbols-outlined text-white text-2xl">arrow_back</span>
+            </button>
+            <div class="flex flex-col items-center">
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Kod pokoju</span>
+                <div class="flex items-center gap-2 cursor-pointer group" @onclick="CopyRoomCode">
+                    <h1 class="text-2xl font-bold text-primary">@_room.Code</h1>
+                    <span class="material-symbols-outlined text-base text-slate-400 group-hover:text-primary">content_copy</span>
+                </div>
+            </div>
+            <button class="flex items-center justify-center w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 transition-colors">
+                <span class="material-symbols-outlined text-white">settings</span>
+            </button>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col overflow-y-auto p-4 gap-4 max-w-md mx-auto w-full">
+            
+            <!-- Game Config (Host only) -->
+            @if (IsHost)
+            {
+                <section class="bg-surface-dark rounded-2xl p-4 shadow-sm border border-slate-800">
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">Ustawienia gry</h2>
+                        <span class="px-2 py-0.5 rounded text-xs font-bold bg-primary/10 text-primary uppercase border border-primary/20">Host</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button @onclick="OpenCategoryModal" class="flex flex-col items-start gap-1 p-3 rounded-xl bg-surface-darker hover:bg-slate-800 border border-slate-700 transition-all text-left group">
+                            <div class="flex items-center justify-between w-full">
+                                <span class="material-symbols-outlined text-purple-400">category</span>
+                                <span class="material-symbols-outlined text-base text-slate-400 group-hover:text-purple-400">edit</span>
+                            </div>
+                            <span class="text-xs text-slate-400 font-medium mt-1">Kategorie</span>
+                            <span class="text-sm font-bold text-white">@_room.Settings.SelectedCategories.Count wybrane</span>
+                        </button>
+                        <button @onclick="OpenRoundCountModal" class="flex flex-col items-start gap-1 p-3 rounded-xl bg-surface-darker hover:bg-slate-800 border border-slate-700 transition-all text-left group">
+                            <div class="flex items-center justify-between w-full">
+                                <span class="material-symbols-outlined text-cyan-400">repeat</span>
+                                <span class="material-symbols-outlined text-base text-slate-400 group-hover:text-cyan-400">edit</span>
+                            </div>
+                            <span class="text-xs text-slate-400 font-medium mt-1">Liczba rund</span>
+                            <span class="text-sm font-bold text-white">@_room.Settings.RoundCount rund</span>
+                        </button>
+                    </div>
+                    <!-- Public/Private Toggle -->
+                    <div class="mt-3 flex items-center justify-between p-3 rounded-xl @(_room.IsPublic ? "bg-green-900/20 border-green-700/50" : "bg-surface-darker border-slate-700") border transition-all">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined @(_room.IsPublic ? "text-green-400" : "text-slate-400")">@(_room.IsPublic ? "visibility" : "visibility_off")</span>
+                            <div class="flex flex-col">
+                                <span class="text-sm font-bold @(_room.IsPublic ? "text-green-400" : "text-white")">@(_room.IsPublic ? "Pokój publiczny" : "Pokój prywatny")</span>
+                                <span class="text-xs text-slate-400">@(_room.IsPublic ? "Widoczny dla wszystkich" : "Tylko z kodem")</span>
+                            </div>
+                        </div>
+                        <label class="toggle-switch @(_room.IsPublic ? "checked" : "")" @onclick="ToggleRoomVisibility">
+                            <div class="toggle-slider"></div>
+                        </label>
+                    </div>
+                </section>
+            }
+
+            <!-- Players List -->
+            <div class="flex items-center justify-between px-1">
+                <h3 class="text-lg font-bold text-white">
+                    Gracze <span class="text-slate-400 text-base font-medium ml-1">(@_room.Players.Count/@_room.Settings.MaxPlayers)</span>
+                </h3>
+                <div class="flex items-center gap-1 bg-green-500/10 px-2 py-0.5 rounded-full border border-green-500/20">
+                    <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                    <span class="text-xs text-green-400 font-bold uppercase">Online</span>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-3">
+                @foreach (var player in _room.Players)
+                {
+                    <div class="flex items-center gap-3 p-2 pr-4 bg-surface-dark rounded-full shadow-sm border @(player.IsHost ? "border-primary/20" : "border-slate-800") relative overflow-hidden">
+                        @if (player.IsHost)
+                        {
+                            <div class="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent pointer-events-none"></div>
+                        }
+                        <!-- Avatar -->
+                        <div class="relative z-10">
+                            <div class="h-10 w-10 rounded-full flex items-center justify-center text-sm font-bold text-white avatar-initials"
+                                 style="background-color: @player.AvatarColor">
+                                @player.GetInitials()
+                            </div>
+                            @if (player.IsHost)
+                            {
+                                <div class="absolute -bottom-0.5 -right-0.5 bg-yellow-400 text-black p-0.5 rounded-full border border-surface-dark flex items-center justify-center">
+                                    <span class="material-symbols-outlined text-xs">crown</span>
+                                </div>
+                            }
+                        </div>
+                        <!-- Info -->
+                        <div class="flex-1 flex flex-col z-10">
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm font-bold text-white">@player.Nickname</span>
+                                @if (player.ConnectionId == _myConnectionId)
+                                {
+                                    <span class="text-xs text-slate-400">(Ty)</span>
+                                }
+                                @if (player.IsHost)
+                                {
+                                    <span class="px-1.5 py-0.5 rounded-sm bg-primary/10 text-[9px] font-bold text-primary uppercase">Host</span>
+                                }
+                            </div>
+                        </div>
+                        <!-- Ready Status -->
+                        <div class="z-10 px-3 py-1 @(player.IsReady ? "bg-green-900/30 text-green-400" : "bg-slate-700 text-slate-300") rounded-full text-xs font-bold flex items-center gap-1">
+                            <span class="material-symbols-outlined text-sm">@(player.IsReady ? "check" : "hourglass_empty")</span>
+                            @(player.IsReady ? "Gotowy" : "Czeka")
+                        </div>
+                        <!-- Kick (Host only, not self) -->
+                        @if (IsHost && player.ConnectionId != _myConnectionId)
+                        {
+                            <button @onclick="() => KickPlayer(player.ConnectionId)" 
+                                    class="ml-1 p-1.5 text-slate-400 hover:text-red-500 transition-colors rounded-full hover:bg-red-900/20">
+                                <span class="material-symbols-outlined text-lg">block</span>
+                            </button>
+                        }
+                    </div>
+                }
+
+                <!-- Empty Slot -->
+                @for (var i = _room.Players.Count; i < _room.Settings.MaxPlayers && i < _room.Players.Count + 2; i++)
+                {
+                    <div class="flex items-center gap-3 p-2 pr-4 border border-dashed border-slate-700 rounded-full">
+                        <div class="h-10 w-10 rounded-full bg-slate-800 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-slate-600 text-xl">add</span>
+                        </div>
+                        <span class="text-sm font-medium text-slate-500">Oczekiwanie na gracza...</span>
+                    </div>
+                }
+            </div>
+
+            <!-- Chat (simplified) -->
+            <div class="flex-1 min-h-[120px] bg-surface-dark rounded-2xl p-3 shadow-inner border border-slate-800 flex flex-col justify-end">
+                <div class="flex-1 overflow-y-auto space-y-2 mb-2 pr-1 no-scrollbar">
+                    @foreach (var msg in _chatMessages.TakeLast(10))
+                    {
+                        <div class="flex gap-2 items-start">
+                            <span class="text-xs font-bold @(msg.IsSystem ? "text-primary" : "text-white") shrink-0">@(msg.IsSystem ? "System:" : $"{msg.Nickname}:")</span>
+                            <span class="text-xs text-slate-300">@msg.Text</span>
+                        </div>
+                    }
+                </div>
+                <div class="flex gap-2 items-center bg-surface-darker rounded-full px-4 py-2 border border-slate-700 focus-within:border-primary transition-all">
+                    <input @bind="_chatInput" 
+                           @onkeypress="HandleChatKeyPress"
+                           placeholder="Napisz wiadomość..."
+                           class="flex-1 bg-transparent text-sm text-white placeholder-slate-400 border-none p-0 focus:ring-0 focus:outline-none" />
+                    <button @onclick="SendChat" class="text-slate-400 hover:text-primary transition-colors">
+                        <span class="material-symbols-outlined text-xl">send</span>
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer Actions -->
+        <footer class="p-4 bg-surface-dark border-t border-slate-800 z-20 w-full max-w-md mx-auto safe-area-bottom">
+            <div class="flex justify-between items-center mb-3 text-xs px-1">
+                <span class="text-slate-400">Gotowość: <span class="font-bold text-white">@ReadyCount/@_room.Players.Count</span></span>
+                @if (!AllReady)
+                {
+                    <span class="text-orange-400 font-medium flex items-center gap-1">
+                        <span class="material-symbols-outlined text-sm">info</span>
+                        Czeka na @(_room.Players.Count - ReadyCount) graczy
+                    </span>
+                }
+            </div>
+            <div class="flex gap-3">
+                <button @onclick="LeaveRoom" class="w-12 h-12 flex items-center justify-center rounded-xl bg-slate-800 text-slate-400 hover:text-red-400 hover:bg-red-900/20 transition-colors">
+                    <span class="material-symbols-outlined">logout</span>
+                </button>
+                @if (IsHost)
+                {
+                    <button @onclick="StartGame" 
+                            disabled="@(!CanStart)"
+                            class="flex-1 h-12 @(CanStart ? "bg-primary hover:bg-primary-dark" : "bg-slate-700 cursor-not-allowed") text-white rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-primary/20 transition-all btn-press">
+                        <span class="text-base font-bold uppercase">Rozpocznij grę</span>
+                        <span class="material-symbols-outlined">play_arrow</span>
+                    </button>
+                }
+                else
+                {
+                    <button @onclick="ToggleReady"
+                            class="flex-1 h-12 @(AmIReady ? "bg-green-600 hover:bg-green-700" : "bg-primary hover:bg-primary-dark") text-white rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all btn-press">
+                        <span class="text-base font-bold uppercase">@(AmIReady ? "Gotowy ✓" : "Jestem gotowy")</span>
+                    </button>
+                }
+            </div>
+        </footer>
+    </div>
+
+    <!-- Category Selection Modal (Blueprint Design) -->
+    @if (_showCategoryModal)
+    {
+        <div class="modal-backdrop" @onclick="CloseCategoryModal">
+            <div class="modal-content category-list-modal" @onclick:stopPropagation="true">
+                <!-- Modal Header -->
+                <div class="modal-header">
+                    <button @onclick="CloseCategoryModal" class="text-slate-400 hover:text-white transition-colors">
+                        <span class="material-symbols-outlined text-2xl">arrow_back</span>
+                    </button>
+                    <h2 class="text-lg font-bold text-white flex-1 text-center">Wybierz Kategorie</h2>
+                    <button @onclick="SelectAllCategories" class="text-primary text-sm font-bold hover:text-blue-400 transition-colors px-2">
+                        Zaznacz wszystkie
+                    </button>
+                </div>
+
+                <!-- Modal Body with scrollable list -->
+                <div class="modal-body category-modal-body">
+                    <!-- Headline -->
+                    <div class="pb-3">
+                        <h1 class="text-white text-2xl font-bold pb-2">Dostosuj rundę</h1>
+                        <p class="text-slate-400 text-sm">
+                            Wybierz tematy dla tej gry lub dodaj własne kategorie.
+                        </p>
+                    </div>
+
+                    <!-- Custom Category Input -->
+                    <div class="py-3">
+                        <div class="flex items-center gap-3 bg-surface-dark rounded-xl p-2 pl-4 shadow-sm border border-slate-700">
+                            <span class="material-symbols-outlined text-slate-400">edit</span>
+                            <input @bind="_customCategoryInput" class="bg-transparent border-none text-base text-white placeholder-slate-400 flex-1 focus:ring-0 p-0" placeholder="Dodaj własną kategorię..." type="text" />
+                            <button @onclick="AddCustomCategory" class="bg-primary/20 hover:bg-primary/30 text-primary rounded-lg w-10 h-10 flex items-center justify-center transition-colors">
+                                <span class="material-symbols-outlined">add</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="h-px bg-slate-700 mb-3"></div>
+
+                    <!-- Category List -->
+                    <div class="flex flex-col">
+                        @foreach (var item in _categoriesWithColors)
+                        {
+                            var isSelected = _selectedCategoryNames.Contains(item.Category.Name);
+                            <div @onclick="() => ToggleCategorySelection(item.Category.Name)" 
+                                 class="group flex items-center gap-4 px-2 py-3 cursor-pointer hover:bg-slate-800/50 transition-colors border-b border-slate-800/50 rounded">
+                                <div class="flex items-center justify-center w-10 h-10 rounded-full @item.BgClass @item.TextClass">
+                                    <span class="material-symbols-outlined">@item.Category.Icon</span>
+                                </div>
+                                <div class="flex flex-col flex-1 overflow-hidden">
+                                    <p class="text-white text-base font-semibold leading-normal truncate">@item.Category.Name</p>
+                                </div>
+                                <div class="shrink-0">
+                                    <label class="toggle-switch @(isSelected ? "checked" : "")">
+                                        <div class="toggle-slider"></div>
+                                    </label>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="modal-footer">
+                    <div class="flex items-center justify-between w-full mb-3">
+                        <span class="text-slate-400 text-sm">@_selectedCategoryNames.Count kategorii zaznaczonych</span>
+                    </div>
+                    <button @onclick="SaveCategorySettings" 
+                            disabled="@(_selectedCategoryNames.Count == 0)"
+                            class="w-full h-12 bg-primary hover:bg-blue-600 text-white rounded-xl font-bold transition-colors shadow-lg shadow-blue-500/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">
+                        Potwierdź Wybór
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Round Count Modal -->
+    @if (_showRoundCountModal)
+    {
+        <div class="modal-backdrop" @onclick="CloseRoundCountModal">
+            <div class="modal-content" @onclick:stopPropagation="true">
+                <div class="modal-header">
+                    <h2 class="text-xl font-bold text-white">Liczba rund</h2>
+                    <button @onclick="CloseRoundCountModal" class="text-slate-400 hover:text-white transition-colors">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-sm text-slate-400 mb-4">Wybierz liczbę rund w grze (od 1 do 20)</p>
+                    <div class="number-input-wrapper">
+                        <button @onclick="DecrementRounds" disabled="@(_tempRoundCount <= 1)" class="number-input-button">
+                            <span class="material-symbols-outlined">remove</span>
+                        </button>
+                        <input type="number" 
+                               min="1" 
+                               max="20" 
+                               @bind="_tempRoundCount" 
+                               @bind:event="oninput" />
+                        <button @onclick="IncrementRounds" disabled="@(_tempRoundCount >= 20)" class="number-input-button">
+                            <span class="material-symbols-outlined">add</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button @onclick="CloseRoundCountModal" class="flex-1 h-12 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-bold transition-colors">
+                        Anuluj
+                    </button>
+                    <button @onclick="SaveRoundCountSettings" class="flex-1 h-12 bg-primary hover:bg-primary-dark text-white rounded-xl font-bold transition-colors">
+                        Zapisz
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private HubConnection? _hubConnection;
+    private Room? _room;
+    private string? _myConnectionId;
+    private string? _error;
+    private bool _isLoading = true;
+    private string _chatInput = "";
+    private List<ChatMessage> _chatMessages = new();
+    
+    // Modal state
+    private bool _showCategoryModal = false;
+    private bool _showRoundCountModal = false;
+    private HashSet<string> _selectedCategoryNames = new();
+    private int _tempRoundCount = 10;
+    private string _customCategoryInput = "";
+
+    private record CategoryWithColor(Category Category, string BgClass, string TextClass);
+    private List<CategoryWithColor> _categoriesWithColors = new();
+
+    private bool IsHost => _room?.HostConnectionId == _myConnectionId;
+    private bool AmIReady => _room?.Players.FirstOrDefault(p => p.ConnectionId == _myConnectionId)?.IsReady ?? false;
+    private int ReadyCount => _room?.Players.Count(p => p.IsReady) ?? 0;
+    private bool AllReady => _room?.Players.All(p => p.IsReady) ?? false;
+    private bool CanStart => AllReady && (_room?.Players.Count ?? 0) >= 2;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var uri = new Uri(Navigation.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        var isCreate = query["create"] == "true";
+        var roomCode = query["code"];
+        var nickname = query["nick"];
+
+        if (string.IsNullOrEmpty(nickname))
+        {
+            _error = "Brak nicku.";
+            _isLoading = false;
+            return;
+        }
+
+        // Initialize category colors
+        var colorSchemes = new[]
+        {
+            ("bg-blue-100 dark:bg-blue-900/30", "text-blue-600 dark:text-blue-400"),
+            ("bg-purple-100 dark:bg-purple-900/30", "text-purple-600 dark:text-purple-400"),
+            ("bg-green-100 dark:bg-green-900/30", "text-green-600 dark:text-green-400"),
+            ("bg-emerald-100 dark:bg-emerald-900/30", "text-emerald-600 dark:text-emerald-400"),
+            ("bg-orange-100 dark:bg-orange-900/30", "text-orange-600 dark:text-orange-400"),
+            ("bg-red-100 dark:bg-red-900/30", "text-red-600 dark:text-red-400"),
+            ("bg-teal-100 dark:bg-teal-900/30", "text-teal-600 dark:text-teal-400"),
+            ("bg-pink-100 dark:bg-pink-900/30", "text-pink-600 dark:text-pink-400"),
+            ("bg-yellow-100 dark:bg-yellow-900/30", "text-yellow-600 dark:text-yellow-400"),
+            ("bg-indigo-100 dark:bg-indigo-900/30", "text-indigo-600 dark:text-indigo-400"),
+        };
+
+        _categoriesWithColors = Category.StandardCategories
+            .Select((cat, index) => new CategoryWithColor(cat, colorSchemes[index % colorSchemes.Length].Item1, colorSchemes[index % colorSchemes.Length].Item2))
+            .ToList();
+
+        try
+        {
+            _hubConnection = new HubConnectionBuilder()
+                .WithUrl(Navigation.ToAbsoluteUri("/gamehub"))
+                .Build();
+
+            SetupHubCallbacks();
+            await _hubConnection.StartAsync();
+            _myConnectionId = _hubConnection.ConnectionId;
+
+            if (isCreate)
+            {
+                await _hubConnection.InvokeAsync("CreateRoom", nickname);
+            }
+            else if (!string.IsNullOrEmpty(roomCode))
+            {
+                await _hubConnection.InvokeAsync("JoinRoom", roomCode, nickname);
+            }
+            else
+            {
+                _error = "Brak kodu pokoju.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Błąd połączenia: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void SetupHubCallbacks()
+    {
+        if (_hubConnection == null) return;
+
+        _hubConnection.On<string>("OnRoomCreated", roomCode =>
+        {
+            _room = RoomService.GetRoom(roomCode);
+            AddSystemMessage($"Pokój {roomCode} utworzony!");
+            InvokeAsync(StateHasChanged);
+        });
+
+        _hubConnection.On<string, string>("OnPlayerJoined", (nickname, connectionId) =>
+        {
+            if (_room != null)
+            {
+                _room = RoomService.GetRoom(_room.Code);
+                AddSystemMessage($"{nickname} dołączył/a do pokoju.");
+                InvokeAsync(StateHasChanged);
+            }
+        });
+
+        _hubConnection.On<string>("OnPlayerLeft", connectionId =>
+        {
+            if (_room != null)
+            {
+                var player = _room.Players.FirstOrDefault(p => p.ConnectionId == connectionId);
+                _room = RoomService.GetRoom(_room.Code);
+                if (player != null)
+                {
+                    AddSystemMessage($"{player.Nickname} opuścił/a pokój.");
+                }
+                InvokeAsync(StateHasChanged);
+            }
+        });
+
+        _hubConnection.On<string, bool>("OnPlayerReadyChanged", (connectionId, isReady) =>
+        {
+            var player = _room?.Players.FirstOrDefault(p => p.ConnectionId == connectionId);
+            if (player != null)
+            {
+                player.IsReady = isReady;
+                InvokeAsync(StateHasChanged);
+            }
+        });
+
+        _hubConnection.On<string, string>("OnChatMessage", (senderId, message) =>
+        {
+            var sender = _room?.Players.FirstOrDefault(p => p.ConnectionId == senderId);
+            _chatMessages.Add(new ChatMessage(sender?.Nickname ?? "?", message, false));
+            InvokeAsync(StateHasChanged);
+        });
+
+        _hubConnection.On("OnKicked", () =>
+        {
+            _error = "Zostałeś/aś wyrzucony/a z pokoju.";
+            _room = null;
+            InvokeAsync(StateHasChanged);
+        });
+
+        _hubConnection.On<string>("OnPlayerKicked", connectionId =>
+        {
+            if (_room != null)
+            {
+                _room = RoomService.GetRoom(_room.Code);
+                InvokeAsync(StateHasChanged);
+            }
+        });
+
+        _hubConnection.On<List<string>, int>("OnGameStarted", (categories, totalRounds) =>
+        {
+            if (_room != null)
+            {
+                var myPlayer = _room.Players.FirstOrDefault(p => p.ConnectionId == _myConnectionId);
+                var nick = myPlayer?.Nickname ?? "";
+                Navigation.NavigateTo($"/game/{_room.Code}?nick={Uri.EscapeDataString(nick)}");
+            }
+        });
+
+        _hubConnection.On<List<string>, int>("OnSettingsUpdated", (categoryNames, roundCount) =>
+        {
+            if (_room != null)
+            {
+                // Build category list including custom categories
+                var updatedCategories = new List<Category>();
+                foreach (var name in categoryNames)
+                {
+                    var standardCat = Category.StandardCategories.FirstOrDefault(c => c.Name == name);
+                    if (standardCat != null)
+                    {
+                        updatedCategories.Add(standardCat);
+                    }
+                    else
+                    {
+                        // Custom category - add to updatedCategories
+                        var customCat = new Category { Name = name, Icon = "star", IsCustom = true };
+                        updatedCategories.Add(customCat);
+                        
+                        // Also ensure it's in _categoriesWithColors for display
+                        if (!_categoriesWithColors.Any(c => c.Category.Name == name))
+                        {
+                            _categoriesWithColors.Add(new CategoryWithColor(customCat, "bg-primary/20", "text-primary"));
+                        }
+                    }
+                }
+                _room.Settings.SelectedCategories = updatedCategories;
+                _room.Settings.RoundCount = roundCount;
+                InvokeAsync(StateHasChanged);
+            }
+        });
+
+        _hubConnection.On<bool>("OnRoomVisibilityChanged", isPublic =>
+        {
+            if (_room != null)
+            {
+                _room.IsPublic = isPublic;
+                InvokeAsync(StateHasChanged);
+            }
+        });
+    }
+
+    private void AddSystemMessage(string text)
+    {
+        _chatMessages.Add(new ChatMessage("System", text, true));
+    }
+
+    private async Task ToggleReady()
+    {
+        if (_hubConnection != null && _room != null)
+        {
+            await _hubConnection.InvokeAsync("SetReady", _room.Code, !AmIReady);
+        }
+    }
+
+    private async Task ToggleRoomVisibility()
+    {
+        if (_hubConnection != null && _room != null && IsHost)
+        {
+            await _hubConnection.InvokeAsync("SetRoomPublic", _room.Code, !_room.IsPublic);
+        }
+    }
+
+    private async Task SendChat()
+    {
+        if (!string.IsNullOrWhiteSpace(_chatInput) && _hubConnection != null && _room != null)
+        {
+            await _hubConnection.InvokeAsync("SendChatMessage", _room.Code, _chatInput);
+            _chatInput = "";
+        }
+    }
+
+    private async Task HandleChatKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SendChat();
+        }
+    }
+
+    private async Task LeaveRoom()
+    {
+        if (_hubConnection != null && _room != null)
+        {
+            await _hubConnection.InvokeAsync("LeaveRoom", _room.Code);
+        }
+        GoHome();
+    }
+
+    private async Task KickPlayer(string connectionId)
+    {
+        if (_hubConnection != null && _room != null)
+        {
+            await _hubConnection.InvokeAsync("KickPlayer", _room.Code, connectionId);
+        }
+    }
+
+    private async Task StartGame()
+    {
+        if (_hubConnection != null && _room != null)
+        {
+            await _hubConnection.InvokeAsync("StartGame", _room.Code);
+        }
+    }
+
+    private async Task CopyRoomCode()
+    {
+        if (_room != null)
+        {
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("copyToClipboard", _room.Code);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to copy: {ex.Message}");
+            }
+        }
+    }
+
+    // Modal methods
+    private void OpenCategoryModal()
+    {
+        _selectedCategoryNames = _room?.Settings.SelectedCategories.Select(c => c.Name).ToHashSet() ?? new();
+        _showCategoryModal = true;
+    }
+
+    private void CloseCategoryModal()
+    {
+        _showCategoryModal = false;
+    }
+
+    private void ToggleCategorySelection(string categoryName)
+    {
+        if (_selectedCategoryNames.Contains(categoryName))
+        {
+            _selectedCategoryNames.Remove(categoryName);
+        }
+        else
+        {
+            _selectedCategoryNames.Add(categoryName);
+        }
+    }
+
+    private void SelectAllCategories()
+    {
+        _selectedCategoryNames = Category.StandardCategories.Select(c => c.Name).ToHashSet();
+    }
+
+    private async Task SaveCategorySettings()
+    {
+        if (_selectedCategoryNames.Count == 0 || _hubConnection == null || _room == null)
+        {
+            return;
+        }
+
+        await _hubConnection.InvokeAsync("UpdateGameSettings", 
+            _room.Code, 
+            _selectedCategoryNames.ToList(), 
+            _room.Settings.RoundCount);
+        
+        _showCategoryModal = false;
+    }
+
+    private void AddCustomCategory()
+    {
+        if (string.IsNullOrWhiteSpace(_customCategoryInput))
+        {
+            return;
+        }
+
+        // Check if category already exists
+        if (_categoriesWithColors.Any(c => c.Category.Name.Equals(_customCategoryInput.Trim(), StringComparison.OrdinalIgnoreCase)))
+        {
+            _customCategoryInput = "";
+            return;
+        }
+
+        // Create custom category
+        var customCategory = new Category
+        {
+            Name = _customCategoryInput.Trim(),
+            Icon = "star",
+            IsCustom = true
+        };
+
+        // Add to list with primary color scheme
+        var customColorScheme = ("bg-primary/20", "text-primary");
+        _categoriesWithColors.Add(new CategoryWithColor(customCategory, customColorScheme.Item1, customColorScheme.Item2));
+
+        // Automatically select it
+        _selectedCategoryNames.Add(customCategory.Name);
+
+        // Clear input
+        _customCategoryInput = "";
+    }
+
+    private void OpenRoundCountModal()
+    {
+        _tempRoundCount = _room?.Settings.RoundCount ?? 10;
+        _showRoundCountModal = true;
+    }
+
+    private void CloseRoundCountModal()
+    {
+        _showRoundCountModal = false;
+    }
+
+    private void IncrementRounds()
+    {
+        if (_tempRoundCount < 20) _tempRoundCount++;
+    }
+
+    private void DecrementRounds()
+    {
+        if (_tempRoundCount > 1) _tempRoundCount--;
+    }
+
+    private async Task SaveRoundCountSettings()
+    {
+        if (_hubConnection != null && _room != null)
+        {
+            var categoryNames = _room.Settings.SelectedCategories.Select(c => c.Name).ToList();
+            await _hubConnection.InvokeAsync("UpdateGameSettings", 
+                _room.Code, 
+                categoryNames, 
+                _tempRoundCount);
+        }
+        _showRoundCountModal = false;
+    }
+
+    private void GoHome()
+    {
+        Navigation.NavigateTo("/");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection != null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
+    }
+
+    private record ChatMessage(string Nickname, string Text, bool IsSystem);
+}
