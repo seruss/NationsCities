@@ -41,7 +41,7 @@ jobs:
           rm -rf ${{ secrets.VPS_TARGET_DIR }}/*
 
     - name: Copy files via SCP
-      uses: appleboy/scp-action@v0.1.8
+      uses: appleboy/scp-action@v0.1.7
       with:
         host: ${{ secrets.VPS_HOST }}
         username: ${{ secrets.VPS_USERNAME }}
@@ -50,7 +50,6 @@ jobs:
         source: "./publish/*"
         target: ${{ secrets.VPS_TARGET_DIR }}
         strip_components: 1
-        rm: false
 
     - name: Start Service
       uses: appleboy/ssh-action@v1.0.3
