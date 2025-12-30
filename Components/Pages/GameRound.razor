@@ -441,23 +441,8 @@ else if (_room != null && _game != null)
                 // Start tracking
                 await JSRuntime.InvokeVoidAsync("antiCheatTracker.startTracking", RoomCode);
                 
-                // Register event handler that calls back to this instance 
-                await JSRuntime.InvokeVoidAsync("eval", $@"
-                    if (!window._antiCheatHandlerRegistered) {{
-                        window.addEventListener('anticheat-report', async (e) => {{
-                            const report = e.detail;
-                            try {{
-                                const dotNetHelper = {System.Text.Json.JsonSerializer.Serialize(_dotNetHelper)};
-                                await dotNetHelper.invokeMethodAsync('ReportViolationFromJS', 
-                                    report.violationType,
-                                    report.durationSeconds);
-                            }} catch (err) {{
-                                console.error('[AntiCheat] Callback failed:', err);
-                            }}
-                        }});
-                        window._antiCheatHandlerRegistered = true;
-                    }}
-                ");
+                // Register event handler that calls back to this instance
+                await JSRuntime.InvokeVoidAsync("registerAntiCheatHandler", _dotNetHelper);
                 
                 Console.WriteLine("[GameRound] Anti-cheat tracking started");
             }
@@ -472,7 +457,10 @@ else if (_room != null && _game != null)
     {
         try
         {
+            await JSRuntime.InvokeVoidAsync("unregisterAntiCheatHandler");
             await JSRuntime.InvokeVoidAsync("antiCheatTracker.stopTracking");
+            _dotNetHelper?.Dispose();
+            _dotNetHelper = null;
             Console.WriteLine("[GameRound] Anti-cheat tracking stopped");
         }
         catch (Exception ex)

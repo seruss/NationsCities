@@ -64,7 +64,7 @@ public class GameHub : Hub
 
         await Groups.AddToGroupAsync(Context.ConnectionId, roomCode.ToUpperInvariant());
         await Clients.Caller.SendAsync("OnRoomCreated", roomCode.ToUpperInvariant()); // Reuse for join
-        await Clients.Group(roomCode.ToUpperInvariant()).SendAsync("OnPlayerJoined", nickname, Context.ConnectionId);
+        await Clients.OthersInGroup(roomCode.ToUpperInvariant()).SendAsync("OnPlayerJoined", nickname, Context.ConnectionId);
     }
 
     /// <summary>

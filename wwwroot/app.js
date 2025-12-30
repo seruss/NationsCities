@@ -261,3 +261,41 @@ window.AntiCheatTracker = class {
 
 // Create global instance
 window.antiCheatTracker = new window.AntiCheatTracker();
+
+/**
+ * Register the anti-cheat event handler with a DotNetObjectReference
+ * This must be called from Blazor to properly pass the reference
+ * @param {object} dotNetHelper - DotNetObjectReference from Blazor
+ */
+window.registerAntiCheatHandler = function (dotNetHelper) {
+    // Remove any existing handler first
+    if (window._antiCheatHandler) {
+        window.removeEventListener('anticheat-report', window._antiCheatHandler);
+    }
+
+    // Create new handler with the dotNetHelper
+    window._antiCheatHandler = async (e) => {
+        const report = e.detail;
+        try {
+            await dotNetHelper.invokeMethodAsync('ReportViolationFromJS',
+                report.violationType,
+                report.durationSeconds);
+        } catch (err) {
+            console.error('[AntiCheat] Callback failed:', err);
+        }
+    };
+
+    window.addEventListener('anticheat-report', window._antiCheatHandler);
+    console.log('[AntiCheat] Handler registered');
+};
+
+/**
+ * Unregister the anti-cheat event handler
+ */
+window.unregisterAntiCheatHandler = function () {
+    if (window._antiCheatHandler) {
+        window.removeEventListener('anticheat-report', window._antiCheatHandler);
+        window._antiCheatHandler = null;
+        console.log('[AntiCheat] Handler unregistered');
+    }
+};
