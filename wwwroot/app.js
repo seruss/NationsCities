@@ -6,7 +6,7 @@
  * @param {string} text - Text to copy to clipboard
  * @returns {Promise<boolean>} - True if successful, false otherwise
  */
-window.copyToClipboard = async function(text) {
+window.copyToClipboard = async function (text) {
     try {
         // Try modern Clipboard API first
         if (navigator.clipboard && window.isSecureContext) {
@@ -22,7 +22,7 @@ window.copyToClipboard = async function(text) {
             document.body.appendChild(textArea);
             textArea.focus();
             textArea.select();
-            
+
             const successful = document.execCommand('copy');
             textArea.remove();
             return successful;
@@ -32,3 +32,235 @@ window.copyToClipboard = async function(text) {
         return false;
     }
 };
+
+// ======================================
+// Anti-Cheat System
+// ======================================
+
+/**
+ * Anti-cheat tracker for detecting focus loss, tab switches, and suspicious behavior
+ * Designed for mobile browsers with adaptive thresholds
+ */
+window.AntiCheatTracker = class {
+    constructor() {
+        this._isTracking = false;
+        this._roomCode = null;
+        this._hubConnection = null;
+        this._violationStartTime = null;
+        this._isCurrentlyViolating = false;
+        this._lastVisibilityState = document.visibilityState;
+        this._totalViolations = 0;
+
+        // Thresholds (in milliseconds)
+        this.NOTICE_THRESHOLD = 2000;      // < 2s = notice only
+        this.WARNING_THRESHOLD = 10000;    // 2-10s = warning
+        this.PENALTY_THRESHOLD = 30000;    // > 30s = severe penalty
+
+        // Bind event handlers
+        this._handleVisibilityChange = this._handleVisibilityChange.bind(this);
+        this._handleBlur = this._handleBlur.bind(this);
+        this._handleFocus = this._handleFocus.bind(this);
+    }
+
+    /**
+     * Start tracking violations for a room
+     * @param {string} roomCode - Room code
+     * @param {object} hubConnection - SignalR hub connection
+     */
+    startTracking(roomCode, hubConnection) {
+        if (this._isTracking) {
+            console.warn('[AntiCheat] Already tracking');
+            return;
+        }
+
+        this._roomCode = roomCode;
+        this._hubConnection = hubConnection;
+        this._isTracking = true;
+
+        // Page Visibility API (primary method for mobile)
+        document.addEventListener('visibilitychange', this._handleVisibilityChange);
+
+        // Window blur/focus (backup for tab switches)
+        window.addEventListener('blur', this._handleBlur);
+        window.addEventListener('focus', this._handleFocus);
+
+        console.log(`[AntiCheat] Tracking started for room ${roomCode}`);
+    }
+
+    /**
+     * Stop tracking violations
+     */
+    stopTracking() {
+        if (!this._isTracking) {
+            return;
+        }
+
+        // Finalize any ongoing violation
+        if (this._isCurrentlyViolating) {
+            this._endViolation('FocusLost');
+        }
+
+        // Remove event listeners
+        document.removeEventListener('visibilitychange', this._handleVisibilityChange);
+        window.removeEventListener('blur', this._handleBlur);
+        window.removeEventListener('focus', this._handleFocus);
+
+        this._isTracking = false;
+        this._roomCode = null;
+        this._hubConnection = null;
+        this._totalViolations = 0;
+
+        console.log('[AntiCheat] Tracking stopped');
+    }
+
+    /**
+     * Handle page visibility change (mobile-friendly)
+     */
+    _handleVisibilityChange() {
+        if (!this._isTracking) return;
+
+        const isHidden = document.hidden;
+
+        if (isHidden && !this._isCurrentlyViolating) {
+            // Page became hidden - start tracking violation
+            this._startViolation();
+            this._lastVisibilityState = 'hidden';
+        } else if (!isHidden && this._isCurrentlyViolating) {
+            // Page became visible again - end violation
+            this._endViolation('FocusLost');
+            this._lastVisibilityState = 'visible';
+        }
+    }
+
+    /**
+     * Handle window blur (tab switch or minimize)
+     */
+    _handleBlur() {
+        if (!this._isTracking || this._isCurrentlyViolating) return;
+
+        // Only start violation if page is still "visible" according to Page Visibility API
+        // This prevents double-counting when both events fire
+        if (!document.hidden) {
+            this._startViolation();
+        }
+    }
+
+    /**
+     * Handle window focus (tab restored)
+     */
+    _handleFocus() {
+        if (!this._isTracking || !this._isCurrentlyViolating) return;
+
+        this._endViolation('TabSwitch');
+    }
+
+    /**
+     * Start tracking a violation
+     */
+    _startViolation() {
+        this._violationStartTime = performance.now();
+        this._isCurrentlyViolating = true;
+        console.log('[AntiCheat] Violation started');
+    }
+
+    /**
+     * End tracking a violation and report to server
+     * @param {string} violationType - Type of violation (FocusLost, TabSwitch)
+     */
+    _endViolation(violationType) {
+        if (!this._violationStartTime) return;
+
+        const durationMs = performance.now() - this._violationStartTime;
+        const durationSeconds = durationMs / 1000;
+
+        // Reset state
+        this._isCurrentlyViolating = false;
+        this._violationStartTime = null;
+        this._totalViolations++;
+
+        console.log(`[AntiCheat] Violation ended: ${violationType}, duration: ${durationSeconds.toFixed(2)}s`);
+
+        // Report to server (even short violations, server decides penalty)
+        this._reportViolation(violationType, durationSeconds);
+
+        // Show immediate UI feedback if above notice threshold
+        if (durationMs >= this.NOTICE_THRESHOLD) {
+            this._showViolationFeedback(violationType, durationSeconds);
+        }
+    }
+
+    /**
+     * Report violation to server via SignalR
+     */
+    async _reportViolation(violationType, durationSeconds) {
+        if (!this._hubConnection || !this._roomCode) {
+            console.error('[AntiCheat] Cannot report - no hub connection');
+            return;
+        }
+
+        try {
+            await this._hubConnection.invoke('ReportViolation',
+                this._roomCode,
+                violationType,
+                durationSeconds
+            );
+            console.log(`[AntiCheat] Violation reported to server`);
+        } catch (err) {
+            console.error('[AntiCheat] Failed to report violation:', err);
+        }
+    }
+
+    /**
+     * Show visual feedback to player
+     */
+    _showViolationFeedback(violationType, durationSeconds) {
+        let severity = 'notice';
+        let message = '⚠️ Utrata fokusu wykryta';
+        let penalty = 0;
+
+        // Determine severity based on duration
+        if (durationSeconds >= this.PENALTY_THRESHOLD / 1000) {
+            severity = 'severe';
+            penalty = -15;
+            message = `🚨 Długa nieobecność (-${Math.abs(penalty)} pkt)`;
+        } else if (durationSeconds >= this.WARNING_THRESHOLD / 1000) {
+            severity = 'warning';
+            penalty = -10;
+            message = `⚠️ Nieobecność wykryta (-${Math.abs(penalty)} pkt)`;
+        } else if (durationSeconds >= this.NOTICE_THRESHOLD / 1000) {
+            severity = 'warning';
+            penalty = -5;
+            message = `⚠️ Utrata fokusu (-${Math.abs(penalty)} pkt)`;
+        }
+
+        // Dispatch custom event that Blazor components can listen to
+        const event = new CustomEvent('anticheat-violation', {
+            detail: {
+                type: violationType,
+                duration: durationSeconds,
+                severity: severity,
+                message: message,
+                penalty: penalty,
+                timestamp: new Date().toISOString()
+            }
+        });
+        window.dispatchEvent(event);
+    }
+
+    /**
+     * Get current tracking status
+     */
+    isTracking() {
+        return this._isTracking;
+    }
+
+    /**
+     * Get total violations in current session
+     */
+    getTotalViolations() {
+        return this._totalViolations;
+    }
+};
+
+// Create global instance
+window.antiCheatTracker = new window.AntiCheatTracker();

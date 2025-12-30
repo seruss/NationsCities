@@ -5,6 +5,7 @@
 @inject NavigationManager Navigation
 @inject NationsCities.Services.RoomService RoomService
 @inject NationsCities.Services.GameService GameService
+@inject IJSRuntime JSRuntime
 @implements IAsyncDisposable
 
 <PageTitle>Runda @_currentRound - Państwa, Miasta</PageTitle>
@@ -160,6 +161,22 @@ else if (_room != null && _game != null)
             }
         </footer>
     </div>
+    
+    @* Anti-Cheat Violation Toast *@
+    @if (!string.IsNullOrEmpty(_violationMessage))
+    {
+        <div class="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50">
+            <div class="@GetViolationToastClass() rounded-xl px-6 py-4 shadow-2xl backdrop-blur-md border flex items-center gap-3 min-w-[300px] max-w-sm">
+                <span class="material-symbols-outlined text-2xl">@GetViolationIcon()</span>
+                <div class="flex-1">
+                    <p class="font-bold text-sm">@_violationMessage</p>
+                </div>
+                <button @onclick="DismissViolation" class="opacity-70 hover:opacity-100">
+                    <span class="material-symbols-outlined text-lg">close</span>
+                </button>
+            </div>
+        </div>
+    }
 }
 
 @code {
@@ -182,6 +199,11 @@ else if (_room != null && _game != null)
     private string? _stopTriggeredById;
 
     private System.Timers.Timer? _timer;
+    
+    // Anti-cheat tracking
+    private string? _violationMessage;
+    private string _violationSeverity = "notice";
+    private System.Timers.Timer? _violationToastTimer;
     
     // Can only click STOP if all answers are filled
     private bool CanStop => _game?.Categories.All(c => !string.IsNullOrWhiteSpace(GetAnswer(c.Name))) ?? false;
@@ -251,6 +273,9 @@ else if (_room != null && _game != null)
             }
 
             _isLoading = false;
+            
+            // Start anti-cheat tracking if in answering phase
+            await StartAntiCheatTracking();
         }
         catch (Exception ex)
         {
@@ -301,7 +326,20 @@ else if (_room != null && _game != null)
         _hubConnection.On<int>("OnRoundEnded", answerCount =>
         {
             _timer?.Stop();
+            _ = StopAntiCheatTracking(); // Stop tracking before navigating
             Navigation.NavigateTo($"/validation/{RoomCode}?nick={Uri.EscapeDataString(_nickname)}");
+        });
+        
+        _hubConnection.On<string, string, double, int>("OnAntiCheatViolation", 
+            (connectionId, violationType, durationSeconds, penalty) =>
+        {
+            // Update UI if this is my violation
+            var myPlayer = _room?.Players.FirstOrDefault(p => p.Nickname.Equals(_nickname, StringComparison.OrdinalIgnoreCase));
+            if (myPlayer?.ConnectionId == connectionId && penalty > 0)
+            {
+                ShowViolationToast(violationType, penalty);
+            }
+            InvokeAsync(StateHasChanged);
         });
     }
 
@@ -368,11 +406,112 @@ else if (_room != null && _game != null)
     {
         Navigation.NavigateTo("/");
     }
+    
+    // Anti-Cheat Methods
+    private async Task StartAntiCheatTracking()
+    {
+        if (_game == null || _hubConnection == null) return;
+        
+        // Only track during answering and countdown phases
+        if (_game.Phase == RoundPhase.Answering || _game.Phase == RoundPhase.Countdown)
+        {
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("antiCheatTracker.startTracking", RoomCode, DotNetObjectReference.Create(_hubConnection));
+                Console.WriteLine("[GameRound] Anti-cheat tracking started");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[GameRound] Failed to start anti-cheat tracking: {ex.Message}");
+            }
+        }
+    }
+    
+    private async Task StopAntiCheatTracking()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("antiCheatTracker.stopTracking");
+            Console.WriteLine("[GameRound] Anti-cheat tracking stopped");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[GameRound] Failed to stop anti-cheat tracking: {ex.Message}");
+        }
+    }
+    
+    private void ShowViolationToast(string violationType, int penalty)
+    {
+        // Determine message based on penalty
+        if (penalty >= 15)
+        {
+            _violationMessage = $"🚨 Długa nieobecność ({penalty} pkt)";
+            _violationSeverity = "severe";
+        }
+        else if (penalty >= 10)
+        {
+            _violationMessage = $"⚠️ Nieobecność ({penalty} pkt)";
+            _violationSeverity = "warning";
+        }
+        else if (penalty >= 5)
+        {
+            _violationMessage = $"⚠️ Utrata fokusu ({penalty} pkt)";
+            _violationSeverity = "warning";
+        }
+        else
+        {
+            _violationMessage = "ℹ️ Ostrzeżenie - pozostań w grze";
+            _violationSeverity = "notice";
+        }
+        
+        // Auto-dismiss after 5 seconds
+        _violationToastTimer?.Stop();
+        _violationToastTimer = new System.Timers.Timer(5000);
+        _violationToastTimer.Elapsed += (s, e) =>
+        {
+            _violationMessage = null;
+            _violationToastTimer?.Stop();
+            InvokeAsync(StateHasChanged);
+        };
+        _violationToastTimer.Start();
+    }
+    
+    private void DismissViolation()
+    {
+        _violationMessage = null;
+        _violationToastTimer?.Stop();
+    }
+    
+    private string GetViolationToastClass()
+    {
+        return _violationSeverity switch
+        {
+            "severe" => "bg-red-900/90 border-red-500/50 text-white",
+            "warning" => "bg-orange-900/90 border-orange-500/50 text-white",
+            _ => "bg-blue-900/90 border-blue-500/50 text-white"
+        };
+    }
+    
+    private string GetViolationIcon()
+    {
+        return _violationSeverity switch
+        {
+            "severe" => "error",
+            "warning" => "warning",
+            _ => "info"
+        };
+    }
 
     public async ValueTask DisposeAsync()
     {
         _timer?.Stop();
         _timer?.Dispose();
+        _violationToastTimer?.Stop();
+        _violationToastTimer?.Dispose();
+        
+        // Stop anti-cheat tracking
+        await StopAntiCheatTracking();
+        
         if (_hubConnection != null)
         {
             await _hubConnection.DisposeAsync();
