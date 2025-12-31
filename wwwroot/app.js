@@ -224,6 +224,12 @@ window.AntiCheatTracker = class {
     }
 
     _reportViolation(violationType, durationSeconds) {
+        // Safety guard: don't report if tracking has been stopped
+        if (!this._isTracking) {
+            console.warn('[AntiCheat] Cannot report - tracking stopped');
+            return;
+        }
+
         if (!this._roomCode) {
             console.error('[AntiCheat] Cannot report - no room code');
             return;
@@ -290,14 +296,31 @@ window.registerAntiCheatHandler = function (dotNetHelper) {
         window.removeEventListener('anticheat-report', window._antiCheatHandler);
     }
 
+    // Store reference for cleanup
+    window._antiCheatDotNetRef = dotNetHelper;
+
     window._antiCheatHandler = async (e) => {
+        // Safety guard: verify tracking is still active
+        if (!window.antiCheatTracker || !window.antiCheatTracker.isTracking()) {
+            console.warn('[AntiCheat] Handler called but tracking is stopped - ignoring');
+            return;
+        }
+
+        // Safety guard: verify we still have a valid .NET reference
+        if (!window._antiCheatDotNetRef) {
+            console.warn('[AntiCheat] Handler called but .NET reference is null - ignoring');
+            return;
+        }
+
         const report = e.detail;
         try {
-            await dotNetHelper.invokeMethodAsync('ReportViolationFromJS',
+            await window._antiCheatDotNetRef.invokeMethodAsync('ReportViolationFromJS',
                 report.violationType,
                 report.durationSeconds);
         } catch (err) {
-            console.error('[AntiCheat] Callback failed:', err);
+            // Likely the Blazor circuit is disposed - stop tracking to prevent further errors
+            console.error('[AntiCheat] Callback failed, stopping tracking:', err.message);
+            window.antiCheatTracker?.stopTracking();
         }
     };
 
@@ -309,6 +332,8 @@ window.unregisterAntiCheatHandler = function () {
     if (window._antiCheatHandler) {
         window.removeEventListener('anticheat-report', window._antiCheatHandler);
         window._antiCheatHandler = null;
-        console.log('[AntiCheat] Handler unregistered');
     }
+    // Clear the .NET reference to prevent stale calls
+    window._antiCheatDotNetRef = null;
+    console.log('[AntiCheat] Handler unregistered');
 };

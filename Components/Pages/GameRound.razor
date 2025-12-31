@@ -258,6 +258,9 @@ else if (_room != null && _game != null)
     private int _currentPenalty = 0;
     private System.Timers.Timer? _blockTimer;
     
+    // Disposal flag to prevent reporting after game ends
+    private bool _isDisposed = false;
+    
 
     
     // Anti-cheat
@@ -382,11 +385,15 @@ else if (_room != null && _game != null)
             InvokeAsync(StateHasChanged);
         });
 
-        _hubConnection.On<int>("OnRoundEnded", answerCount =>
+        _hubConnection.On<int>("OnRoundEnded", async answerCount =>
         {
             _timer?.Stop();
             _blockTimer?.Stop();
             _isBlocked = false;
+            
+            // Stop anti-cheat tracking before navigation
+            await StopAntiCheatTracking();
+            
             Navigation.NavigateTo($"/validation/{RoomCode}?nick={Uri.EscapeDataString(_nickname)}");
         });
         
@@ -407,7 +414,12 @@ else if (_room != null && _game != null)
     [JSInvokable]
     public async Task ReportViolationFromJS(string violationType, double durationSeconds)
     {
-        if (_hubConnection == null || string.IsNullOrEmpty(RoomCode)) return;
+        // Safety guard: don't report if we're disposed or hub is gone
+        if (_isDisposed || _hubConnection == null || string.IsNullOrEmpty(RoomCode)) 
+        {
+            Console.WriteLine("[AntiCheat] Ignoring report - component disposed or no connection");
+            return;
+        }
         
         try  
         {
@@ -495,7 +507,7 @@ else if (_room != null && _game != null)
     // Anti-Cheat Methods
     private async Task StartAntiCheatTracking()
     {
-        if (_game == null || _hubConnection == null) return;
+        if (_game == null || _hubConnection == null || _isDisposed) return;
         
         if (_game.Phase == RoundPhase.Answering || _game.Phase == RoundPhase.Countdown)
         {
@@ -509,6 +521,20 @@ else if (_room != null && _game != null)
             {
                 Console.WriteLine($"[AntiCheat] Start failed: {ex.Message}");
             }
+        }
+    }
+    
+    private async Task StopAntiCheatTracking()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("antiCheatTracker.stopTracking");
+            await JSRuntime.InvokeVoidAsync("unregisterAntiCheatHandler");
+        }
+        catch (Exception ex)
+        {
+            // JS calls may fail during circuit disconnect - that's fine
+            Console.WriteLine($"[AntiCheat] Stop failed (likely circuit disposed): {ex.Message}");
         }
     }
     
@@ -573,12 +599,17 @@ else if (_room != null && _game != null)
 
     public async ValueTask DisposeAsync()
     {
+        _isDisposed = true;
+        
         _timer?.Stop();
         _timer?.Dispose();
         _blockTimer?.Stop();
         _blockTimer?.Dispose();
         
-        // Dispose .NET references only - no JS calls during dispose
+        // Stop anti-cheat tracking before disposing
+        await StopAntiCheatTracking();
+        
+        // Dispose .NET reference
         _antiCheatRef?.Dispose();
         
         if (_hubConnection != null)
