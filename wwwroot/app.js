@@ -140,10 +140,14 @@ window.AntiCheatTracker = class {
         const session = this._getSession();
 
         if (document.hidden) {
-            // Page is being hidden - heartbeat will stop naturally when JS freezes
-            console.log('[AntiCheat] Page hidden');
+            // Page is being hidden - store the timestamp
+            if (session && session.isActive) {
+                session.hiddenAt = Date.now();
+                this._saveSession(session);
+                console.log('[AntiCheat] Page hidden, timestamp stored');
+            }
         } else {
-            // Page became visible - check for gap in heartbeat
+            // Page became visible - check for violation
             console.log('[AntiCheat] Page visible, checking for violations');
 
             if (!session || !session.isActive) {
@@ -151,8 +155,15 @@ window.AntiCheatTracker = class {
                 return;
             }
 
-            const gap = Date.now() - session.lastActiveAt;
-            console.log(`[AntiCheat] Heartbeat gap: ${(gap / 1000).toFixed(2)}s`);
+            // Calculate gap from hiddenAt (preferred) or lastActiveAt (fallback for mobile)
+            const hiddenAt = session.hiddenAt || session.lastActiveAt;
+            const gap = Date.now() - hiddenAt;
+            console.log(`[AntiCheat] Absence duration: ${(gap / 1000).toFixed(2)}s`);
+
+            // Clear hiddenAt
+            session.hiddenAt = null;
+            session.lastActiveAt = Date.now();
+            this._saveSession(session);
 
             if (gap > this.NOTICE_THRESHOLD_MS) {
                 this._handleViolation(gap, session);
