@@ -270,7 +270,8 @@ window.AntiCheatTracker = class {
 
             if (remaining <= 0) {
                 clearInterval(countdownInterval);
-                this._hideBlockOverlay();
+                // Wait for animation to complete before hiding
+                setTimeout(() => this._hideBlockOverlay(), 900);
             }
         }, 1000);
     }
