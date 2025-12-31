@@ -572,7 +572,7 @@ textarea:focus {
 }
 
 .anticheat-progress {
-    transition: stroke-dasharray 1s ease-linear;
+    transition: stroke-dasharray 0.9s linear;
 }
 
 .anticheat-circle-number {

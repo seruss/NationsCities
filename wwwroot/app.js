@@ -57,13 +57,12 @@ window.AntiCheatTracker = class {
 
     startTracking(roomCode) {
         const existing = this._getSession();
-        if (existing && existing.roomCode === roomCode && existing.isActive) {
-            console.log('[AntiCheat] Already tracking this room, resuming heartbeat');
-            this._startHeartbeat();
-            return;
-        }
 
-        // Create new session
+        // Always reset for a fresh game session (even if same room)
+        // Clear old session to reset violation count
+        this._clearSession();
+
+        // Create new session with fresh violation count
         this._saveSession({
             roomCode: roomCode,
             isActive: true,
@@ -73,7 +72,7 @@ window.AntiCheatTracker = class {
         });
 
         this._startHeartbeat();
-        console.log(`[AntiCheat] Tracking started for room ${roomCode}`);
+        console.log(`[AntiCheat] Tracking started for room ${roomCode}, violation count reset to 0`);
     }
 
     stopTracking() {

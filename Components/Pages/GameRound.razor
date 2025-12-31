@@ -212,6 +212,8 @@ else if (_room != null && _game != null)
     // Disposal flag to prevent reporting after game ends
     private bool _isDisposed = false;
     
+    // Anti-cheat tracking flag
+    private bool _antiCheatStarted = false;
 
     
     // Anti-cheat
@@ -289,11 +291,11 @@ else if (_room != null && _game != null)
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && !_isLoading && _error == null)
+        // Start anti-cheat after loading is complete
+        // Using flag-based approach instead of firstRender to handle async loading
+        if (!_antiCheatStarted && !_isLoading && !_isDisposed && _game != null && _hubConnection != null)
         {
-
-            
-            // Start anti-cheat tracking
+            _antiCheatStarted = true;
             await StartAntiCheatTracking();
         }
     }
