@@ -559,19 +559,38 @@ textarea:focus {
     text-align: center;
 }
 
-.anticheat-countdown {
-    font-size: 4rem;
-    font-weight: 900;
-    font-family: 'SF Mono', 'Menlo', monospace;
-    line-height: 1;
-    animation: anticheat-pulse 1s ease-in-out infinite;
+.anticheat-circle-wrapper {
+    position: relative;
+    width: 128px;
+    height: 128px;
 }
 
-.bg-warning .anticheat-countdown {
+.anticheat-circle-svg {
+    width: 128px;
+    height: 128px;
+    transform: rotate(-90deg);
+}
+
+.anticheat-progress {
+    transition: stroke-dasharray 1s ease-linear;
+}
+
+.anticheat-circle-number {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    font-weight: 900;
+    font-family: 'SF Mono', 'Menlo', monospace;
+}
+
+.bg-warning .anticheat-circle-number {
     color: #78350f;
 }
 
-.bg-block .anticheat-countdown {
+.bg-block .anticheat-circle-number {
     color: white;
 }
 
@@ -637,5 +656,78 @@ textarea:focus {
     50% {
         opacity: 0.8;
         transform: scale(0.98);
+    }
+}
+
+/* ===========================================
+   Blazor Reconnect Modal (Custom)
+   =========================================== */
+
+#components-reconnect-modal {
+    display: none;
+}
+
+#components-reconnect-modal.components-reconnect-show {
+    display: flex;
+}
+
+#components-reconnect-modal.components-reconnect-hide {
+    display: none;
+}
+
+#components-reconnect-modal.components-reconnect-failed,
+#components-reconnect-modal.components-reconnect-rejected {
+    display: flex;
+}
+
+.reconnect-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(16, 25, 34, 0.95);
+    backdrop-filter: blur(8px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: reconnect-fade-in 0.3s ease-out;
+}
+
+.reconnect-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 2rem;
+}
+
+.reconnect-spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid #334155;
+    border-top-color: #258cf4;
+    border-radius: 50%;
+    animation: reconnect-spin 1s linear infinite;
+}
+
+.reconnect-text {
+    color: #94a3b8;
+    font-size: 1rem;
+    font-weight: 500;
+    margin: 0;
+}
+
+@keyframes reconnect-fade-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes reconnect-spin {
+    to {
+        transform: rotate(360deg);
     }
 }

@@ -214,11 +214,30 @@ window.AntiCheatTracker = class {
             ? 'Pozostań w grze! Kolejne naruszenia spowodują kary czasowe.'
             : `Opuściłeś grę podczas rundy. Kara: ${penalty} pkt i blokada na ${blockSeconds}s.`;
         const icon = isWarning ? 'warning' : 'block';
+        const circleColor = isWarning ? '#eab308' : 'url(#blockGradient)';
+        const bgCircleColor = isWarning ? '#78350f' : '#1e293b';
 
         this._blockOverlay.className = `anticheat-overlay ${bgClass}`;
         this._blockOverlay.innerHTML = `
             <div class="anticheat-overlay-content">
-                <div class="anticheat-countdown" id="anticheat-countdown">${blockSeconds}</div>
+                <div class="anticheat-circle-wrapper">
+                    <svg class="anticheat-circle-svg" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="45" fill="none" stroke="${bgCircleColor}" stroke-width="8"/>
+                        <circle id="anticheat-progress-circle" cx="50" cy="50" r="45" fill="none" 
+                                stroke="${circleColor}" 
+                                stroke-width="8" 
+                                stroke-linecap="round"
+                                stroke-dasharray="283 283"
+                                class="anticheat-progress"/>
+                        <defs>
+                            <linearGradient id="blockGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stop-color="#ef4444"/>
+                                <stop offset="100%" stop-color="#f97316"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <div class="anticheat-circle-number" id="anticheat-countdown">${blockSeconds}</div>
+                </div>
                 <div class="anticheat-icon">
                     <span class="material-symbols-outlined" style="font-size: 48px; color: ${isWarning ? '#854d0e' : '#ef4444'}">${icon}</span>
                 </div>
@@ -233,12 +252,23 @@ window.AntiCheatTracker = class {
 
         this._blockOverlay.style.display = 'flex';
 
-        // Countdown timer
+        // Countdown timer with progress animation
         let remaining = blockSeconds;
         const countdownEl = document.getElementById('anticheat-countdown');
+        const progressCircle = document.getElementById('anticheat-progress-circle');
+        const circumference = 2 * Math.PI * 45; // 283
+
         const countdownInterval = setInterval(() => {
             remaining--;
             if (countdownEl) countdownEl.textContent = remaining;
+
+            // Update circle progress
+            if (progressCircle) {
+                const progress = remaining / blockSeconds;
+                const dashLength = progress * circumference;
+                progressCircle.style.strokeDasharray = `${dashLength} ${circumference}`;
+            }
+
             if (remaining <= 0) {
                 clearInterval(countdownInterval);
                 this._hideBlockOverlay();

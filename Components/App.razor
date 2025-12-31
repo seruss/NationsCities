@@ -56,7 +56,18 @@
 
 <body class="bg-bg-light dark:bg-bg-dark font-sans text-slate-900 dark:text-white antialiased min-h-screen touch-manipulation">
     <Routes />
-    <script src="app.js?v=14"></script>
+    
+    <!-- Custom Blazor Reconnect Modal -->
+    <div id="components-reconnect-modal" class="components-reconnect-hide">
+        <div class="reconnect-overlay">
+            <div class="reconnect-content">
+                <div class="reconnect-spinner"></div>
+                <p class="reconnect-text">Ponowne łączenie...</p>
+            </div>
+        </div>
+    </div>
+    
+    <script src="app.js?v=15"></script>
     <script src="_framework/blazor.web.js"></script>
 </body>
 
