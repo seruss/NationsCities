@@ -459,18 +459,16 @@ else if (_room != null && _game != null)
     {
         if (_game == null || _hubConnection == null || _isDisposed) return;
         
-        if (_game.Phase == RoundPhase.Answering || _game.Phase == RoundPhase.Countdown)
+        try
         {
-            try
-            {
-                _antiCheatRef = DotNetObjectReference.Create(this);
-                await JSRuntime.InvokeVoidAsync("antiCheatTracker.startTracking", RoomCode);
-                await JSRuntime.InvokeVoidAsync("registerAntiCheatHandler", _antiCheatRef);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[AntiCheat] Start failed: {ex.Message}");
-            }
+            _antiCheatRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("antiCheatTracker.startTracking", RoomCode);
+            await JSRuntime.InvokeVoidAsync("registerAntiCheatHandler", _antiCheatRef);
+            Console.WriteLine($"[AntiCheat] Tracking started for room {RoomCode}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[AntiCheat] Start failed: {ex.Message}");
         }
     }
     
