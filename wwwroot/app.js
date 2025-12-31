@@ -182,8 +182,10 @@ window.AntiCheatTracker = class {
 
     _isOnGameRoundPage(roomCode) {
         const path = window.location.pathname.toLowerCase();
-        // Check if we're on a game round page
-        return path.includes('/gameround/') || path.includes('/game/');
+        // Check if we're on a game round page (/game/{roomCode})
+        const isGamePage = path.startsWith('/game/');
+        console.log(`[AntiCheat] URL check: path="${path}", isGamePage=${isGamePage}`);
+        return isGamePage;
     }
 
     _handleViolation(gapMs, session) {
