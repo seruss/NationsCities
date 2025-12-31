@@ -46,6 +46,7 @@ window.AntiCheatTracker = class {
         this.PENALTY_THRESHOLD = 30000;
 
         this._storageKey = 'anticheat_violation_start';
+        this._pendingViolationsKey = 'anticheat_pending_violations';
 
         this._handleVisibilityChange = this._handleVisibilityChange.bind(this);
         this._handleBlur = this._handleBlur.bind(this);
@@ -166,15 +167,24 @@ window.AntiCheatTracker = class {
     }
 
     _handleVisibilityChange() {
-        if (!this._isTracking) return;
-
         const isHidden = document.hidden;
 
-        if (isHidden && !this._isCurrentlyViolating) {
+        if (isHidden && this._isTracking && !this._isCurrentlyViolating) {
             this._startViolation();
             this._lastVisibilityState = 'hidden';
-        } else if (!isHidden && this._isCurrentlyViolating) {
-            this._endViolation('FocusLost');
+        } else if (!isHidden) {
+            // Page became visible - ALWAYS check for suspended violation from localStorage
+            // This handles the case where SignalR disconnected and reconnected,
+            // even if tracking was temporarily stopped
+            this._checkSuspendedViolation();
+
+            // Also flush any pending violations that were queued
+            this.flushPendingViolations();
+
+            // End any in-memory violation if we're still tracking
+            if (this._isTracking && this._isCurrentlyViolating) {
+                this._endViolation('FocusLost');
+            }
             this._lastVisibilityState = 'visible';
         }
     }
@@ -224,9 +234,10 @@ window.AntiCheatTracker = class {
     }
 
     _reportViolation(violationType, durationSeconds) {
-        // Safety guard: don't report if tracking has been stopped
+        // Safety guard: don't report if tracking has been stopped - queue instead
         if (!this._isTracking) {
-            console.warn('[AntiCheat] Cannot report - tracking stopped');
+            console.warn('[AntiCheat] Cannot report - tracking stopped, queuing violation');
+            this._queuePendingViolation(violationType, durationSeconds);
             return;
         }
 
@@ -245,6 +256,56 @@ window.AntiCheatTracker = class {
         window.dispatchEvent(event);
 
         console.log(`[AntiCheat] Violation event dispatched: ${violationType}, ${durationSeconds.toFixed(2)}s`);
+    }
+
+    _queuePendingViolation(violationType, durationSeconds) {
+        try {
+            const key = this._pendingViolationsKey;
+            const existing = localStorage.getItem(key);
+            const pending = existing ? JSON.parse(existing) : [];
+
+            pending.push({
+                type: violationType,
+                duration: durationSeconds,
+                timestamp: Date.now()
+            });
+
+            localStorage.setItem(key, JSON.stringify(pending));
+            console.log(`[AntiCheat] Queued pending violation: ${violationType}, ${durationSeconds.toFixed(2)}s`);
+        } catch (e) {
+            console.error('[AntiCheat] Error queuing violation:', e);
+        }
+    }
+
+    flushPendingViolations() {
+        if (!this._isTracking || !this._roomCode) return;
+
+        try {
+            const key = this._pendingViolationsKey;
+            const stored = localStorage.getItem(key);
+            if (!stored) return;
+
+            const pending = JSON.parse(stored);
+            localStorage.removeItem(key);
+
+            console.log(`[AntiCheat] Flushing ${pending.length} pending violation(s)`);
+
+            for (const violation of pending) {
+                // Only report violations from the last 5 minutes
+                if (Date.now() - violation.timestamp < 5 * 60 * 1000) {
+                    const event = new CustomEvent('anticheat-report', {
+                        detail: {
+                            roomCode: this._roomCode,
+                            violationType: violation.type,
+                            durationSeconds: violation.duration
+                        }
+                    });
+                    window.dispatchEvent(event);
+                }
+            }
+        } catch (e) {
+            console.error('[AntiCheat] Error flushing pending violations:', e);
+        }
     }
 
     _showViolationFeedback(violationType, durationSeconds) {
@@ -326,6 +387,11 @@ window.registerAntiCheatHandler = function (dotNetHelper) {
 
     window.addEventListener('anticheat-report', window._antiCheatHandler);
     console.log('[AntiCheat] Handler registered');
+
+    // Flush any pending violations that were queued during reconnection
+    setTimeout(() => {
+        window.antiCheatTracker?.flushPendingViolations();
+    }, 100);
 };
 
 window.unregisterAntiCheatHandler = function () {
