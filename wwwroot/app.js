@@ -124,8 +124,22 @@ window.AntiCheatTracker = class {
         const session = this._getSession();
         if (!session || !session.isActive) return;
 
+        // Only process on game page
+        if (!this._isOnGameRoundPage(session.roomCode)) {
+            console.log('[AntiCheat] Page load: Not on game page, clearing stale session');
+            this._clearSession();
+            return;
+        }
+
         const gap = Date.now() - session.lastActiveAt;
         console.log(`[AntiCheat] Page load check: gap = ${(gap / 1000).toFixed(2)}s`);
+
+        // If gap is too large (>30 min), session is stale - clear it
+        if (gap > 30 * 60 * 1000) {
+            console.log('[AntiCheat] Session is stale (>30 min), clearing');
+            this._clearSession();
+            return;
+        }
 
         if (gap > this.NOTICE_THRESHOLD_MS) {
             this._handleViolation(gap, session);
