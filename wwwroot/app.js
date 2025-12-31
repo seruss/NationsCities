@@ -55,10 +55,15 @@ window.AntiCheatTracker = class {
         this.WARNING_THRESHOLD = 10000;    // 2-10s = warning
         this.PENALTY_THRESHOLD = 30000;    // > 30s = severe penalty
 
+        // Storage key for persisting violation start time across browser suspend
+        this._storageKey = 'anticheat_violation_start';
+
         // Bind event handlers
         this._handleVisibilityChange = this._handleVisibilityChange.bind(this);
         this._handleBlur = this._handleBlur.bind(this);
         this._handleFocus = this._handleFocus.bind(this);
+        this._handlePageHide = this._handlePageHide.bind(this);
+        this._handlePageShow = this._handlePageShow.bind(this);
     }
 
     /**
@@ -74,12 +79,19 @@ window.AntiCheatTracker = class {
         this._roomCode = roomCode;
         this._isTracking = true;
 
+        // Check if we were in a violation before page suspend (mobile)
+        this._checkSuspendedViolation();
+
         // Page Visibility API (primary method for mobile)
         document.addEventListener('visibilitychange', this._handleVisibilityChange);
 
         // Window blur/focus (backup for tab switches)
         window.addEventListener('blur', this._handleBlur);
         window.addEventListener('focus', this._handleFocus);
+
+        // Page lifecycle events (mobile browser suspend/resume)
+        window.addEventListener('pagehide', this._handlePageHide);
+        window.addEventListener('pageshow', this._handlePageShow);
 
         console.log(`[AntiCheat] Tracking started for room ${roomCode}`);
     }
@@ -97,16 +109,108 @@ window.AntiCheatTracker = class {
             this._endViolation('FocusLost');
         }
 
+        // Clear stored violation time
+        this._clearStoredViolation();
+
         // Remove event listeners
         document.removeEventListener('visibilitychange', this._handleVisibilityChange);
         window.removeEventListener('blur', this._handleBlur);
         window.removeEventListener('focus', this._handleFocus);
+        window.removeEventListener('pagehide', this._handlePageHide);
+        window.removeEventListener('pageshow', this._handlePageShow);
 
         this._isTracking = false;
         this._roomCode = null;
         this._totalViolations = 0;
 
         console.log('[AntiCheat] Tracking stopped');
+    }
+
+    /**
+     * Check if there was a violation in progress when the page was suspended
+     */
+    _checkSuspendedViolation() {
+        try {
+            const stored = localStorage.getItem(this._storageKey);
+            if (stored) {
+                const data = JSON.parse(stored);
+                const suspendTime = data.timestamp;
+                const now = Date.now();
+                const durationMs = now - suspendTime;
+
+                console.log(`[AntiCheat] Found suspended violation, duration: ${(durationMs / 1000).toFixed(2)}s`);
+
+                // Clear stored data
+                this._clearStoredViolation();
+
+                // Report the violation if significant
+                if (durationMs > this.NOTICE_THRESHOLD) {
+                    this._reportViolation('FocusLost', durationMs / 1000);
+                }
+            }
+        } catch (e) {
+            console.error('[AntiCheat] Error checking suspended violation:', e);
+        }
+    }
+
+    /**
+     * Store violation start time in localStorage (survives browser suspend)
+     */
+    _storeViolationStart() {
+        try {
+            localStorage.setItem(this._storageKey, JSON.stringify({
+                timestamp: Date.now(),
+                roomCode: this._roomCode
+            }));
+        } catch (e) {
+            console.error('[AntiCheat] Error storing violation start:', e);
+        }
+    }
+
+    /**
+     * Clear stored violation data
+     */
+    _clearStoredViolation() {
+        try {
+            localStorage.removeItem(this._storageKey);
+        } catch (e) {
+            console.error('[AntiCheat] Error clearing stored violation:', e);
+        }
+    }
+
+    /**
+     * Handle page hide (more reliable than visibilitychange on some mobile browsers)
+     */
+    _handlePageHide(event) {
+        if (!this._isTracking) return;
+
+        console.log('[AntiCheat] Page hide event');
+
+        if (!this._isCurrentlyViolating) {
+            this._startViolation();
+        }
+
+        // Store in localStorage so we can detect duration after resume
+        this._storeViolationStart();
+    }
+
+    /**
+     * Handle page show (fires when returning from bfcache or suspend)
+     */
+    _handlePageShow(event) {
+        if (!this._isTracking) return;
+
+        console.log(`[AntiCheat] Page show event, persisted: ${event.persisted}`);
+
+        // If coming from bfcache (frozen state), check for suspended violation
+        if (event.persisted) {
+            this._checkSuspendedViolation();
+        }
+
+        // End any ongoing violation
+        if (this._isCurrentlyViolating) {
+            this._endViolation('FocusLost');
+        }
     }
 
     /**
@@ -156,6 +260,10 @@ window.AntiCheatTracker = class {
     _startViolation() {
         this._violationStartTime = performance.now();
         this._isCurrentlyViolating = true;
+
+        // Also store in localStorage for mobile suspend detection
+        this._storeViolationStart();
+
         console.log('[AntiCheat] Violation started');
     }
 
@@ -173,6 +281,9 @@ window.AntiCheatTracker = class {
         this._isCurrentlyViolating = false;
         this._violationStartTime = null;
         this._totalViolations++;
+
+        // Clear stored violation data
+        this._clearStoredViolation();
 
         console.log(`[AntiCheat] Violation ended: ${violationType}, duration: ${durationSeconds.toFixed(2)}s`);
 
