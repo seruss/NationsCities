@@ -38,7 +38,8 @@ public class Violation
         // Krótkie naruszenia (<2s) = tylko notice
         if (durationSeconds < 2) return 0;
 
-        var previousCount = previousViolations.Count(v => v.Penalty > 0);
+        // Count ALL previous violations (not just those with penalty > 0)
+        var previousCount = previousViolations.Count;
 
         // Progresywna kara: 1st=0 (warning), 2nd=-5, 3rd=-10, 4th+=-15
         return previousCount switch

@@ -159,21 +159,55 @@ else if (_room != null && _game != null)
                     <p class="text-center text-xs text-slate-500 mt-2">Zatrzymujesz rundę - inni dostają 10 sekund</p>
                 }
             }
-        </footer>
+    </footer>
     </div>
     
-    @* Anti-Cheat Violation Toast *@
-    @if (!string.IsNullOrEmpty(_violationMessage))
+    
+    @* Block Penalty Overlay *@
+    @if (_isBlocked)
     {
-        <div class="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50">
-            <div class="@GetViolationToastClass() rounded-xl px-6 py-4 shadow-2xl backdrop-blur-md border flex items-center gap-3 min-w-[300px] max-w-sm">
-                <span class="material-symbols-outlined text-2xl">@GetViolationIcon()</span>
-                <div class="flex-1">
-                    <p class="font-bold text-sm">@_violationMessage</p>
+        <div class="fixed inset-0 z-[100] flex items-center justify-center @GetBlockOverlayClass()">
+            <div class="flex flex-col items-center gap-6 p-8 max-w-sm text-center">
+                @* Circular countdown animation *@
+                <div class="relative w-32 h-32">
+                    @* Background circle *@
+                    <svg class="w-32 h-32 transform -rotate-90" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="45" fill="none" stroke="@(_isWarningOnly ? "#78350f" : "#1e293b")" stroke-width="8"/>
+                        <circle cx="50" cy="50" r="45" fill="none" 
+                                stroke="@(_isWarningOnly ? "#eab308" : "url(#blockGradient)")" 
+                                stroke-width="8" 
+                                stroke-linecap="round"
+                                stroke-dasharray="@GetBlockCircleProgress()"
+                                class="transition-all duration-1000 ease-linear"/>
+                        <defs>
+                            <linearGradient id="blockGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stop-color="#ef4444"/>
+                                <stop offset="100%" stop-color="#f97316"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    @* Center countdown number *@
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <span class="text-4xl font-black @(_isWarningOnly ? "text-yellow-900" : "text-white") tabular-nums">@_blockSecondsRemaining</span>
+                    </div>
                 </div>
-                <button @onclick="DismissViolation" class="opacity-70 hover:opacity-100">
-                    <span class="material-symbols-outlined text-lg">close</span>
-                </button>
+                
+                @* Warning icon with pulse animation *@
+                <div class="flex items-center justify-center w-16 h-16 rounded-full @(_isWarningOnly ? "bg-yellow-900/30" : "bg-red-500/20") animate-pulse">
+                    <span class="material-symbols-outlined text-4xl @GetBlockIconColor()">@GetBlockIcon()</span>
+                </div>
+                
+                @* Message *@
+                <div class="space-y-2">
+                    <h2 class="text-2xl font-black @(_isWarningOnly ? "text-yellow-900" : "text-white")">@GetBlockTitle()</h2>
+                    <p class="@(_isWarningOnly ? "text-yellow-900/80" : "text-slate-300") text-sm leading-relaxed">
+                        @GetBlockMessage()
+                    </p>
+                    <div class="flex items-center justify-center gap-2 mt-3 px-3 py-1.5 @(_isWarningOnly ? "bg-yellow-900/20 border-yellow-900/30" : "bg-red-500/10 border-red-500/30") rounded-full border">
+                        <span class="material-symbols-outlined text-sm @(_isWarningOnly ? "text-yellow-900" : "text-red-400")">@(_isWarningOnly ? "info" : "warning")</span>
+                        <span class="text-xs font-bold @(_isWarningOnly ? "text-yellow-900" : "text-red-400")">Naruszenie nr @_violationCount</span>
+                    </div>
+                </div>
             </div>
         </div>
     }
@@ -200,10 +234,14 @@ else if (_room != null && _game != null)
 
     private System.Timers.Timer? _timer;
     
-    // Anti-cheat tracking
-    private string? _violationMessage;
-    private string _violationSeverity = "notice";
-    private System.Timers.Timer? _violationToastTimer;
+    // Block penalty state
+    private bool _isBlocked = false;
+    private bool _isWarningOnly = false;  // For first violation (no block, just warning)
+    private int _blockSecondsRemaining = 0;
+    private int _blockTotalSeconds = 0;
+    private int _violationCount = 0;  // Track locally, increment on each violation
+    private int _currentPenalty = 0;  // Current penalty points
+    private System.Timers.Timer? _blockTimer;
     
     // Can only click STOP if all answers are filled
     private bool CanStop => _game?.Categories.All(c => !string.IsNullOrWhiteSpace(GetAnswer(c.Name))) ?? false;
@@ -326,6 +364,8 @@ else if (_room != null && _game != null)
         _hubConnection.On<int>("OnRoundEnded", answerCount =>
         {
             _timer?.Stop();
+            _blockTimer?.Stop();
+            _isBlocked = false;
             _ = StopAntiCheatTracking(); // Stop tracking before navigating
             Navigation.NavigateTo($"/validation/{RoomCode}?nick={Uri.EscapeDataString(_nickname)}");
         });
@@ -335,9 +375,14 @@ else if (_room != null && _game != null)
         {
             // Update UI if this is my violation
             var myPlayer = _room?.Players.FirstOrDefault(p => p.Nickname.Equals(_nickname, StringComparison.OrdinalIgnoreCase));
-            if (myPlayer?.ConnectionId == connectionId && penalty > 0)
+            if (myPlayer?.ConnectionId == connectionId)
             {
-                ShowViolationToast(violationType, penalty);
+                // Increment local violation count FIRST
+                _violationCount++;
+                _currentPenalty = penalty;
+                
+                // Show block penalty overlay (exponential duration)
+                StartBlockPenalty(_violationCount, penalty);
             }
             InvokeAsync(StateHasChanged);
         });
@@ -388,6 +433,12 @@ else if (_room != null && _game != null)
         {
             _hasSubmitted = true; // Mark as submitted immediately
             _stopTriggeredByMe = true;
+            
+            // Deactivate anti-cheat after submission
+            await StopAntiCheatTracking();
+            _isBlocked = false;
+            _blockTimer?.Stop();
+            
             await _hubConnection.InvokeAsync("TriggerStop", RoomCode, _answers);
             await InvokeAsync(StateHasChanged);
         }
@@ -405,6 +456,11 @@ else if (_room != null && _game != null)
     {
         if (_hasSubmitted) return;
         _hasSubmitted = true;
+        
+        // Deactivate anti-cheat after submission
+        await StopAntiCheatTracking();
+        _isBlocked = false;
+        _blockTimer?.Stop();
         
         if (_hubConnection != null)
         {
@@ -469,74 +525,91 @@ else if (_room != null && _game != null)
         }
     }
     
-    private void ShowViolationToast(string violationType, int penalty)
+    private void StartBlockPenalty(int violationNumber, int penalty)
     {
-        // Determine message based on penalty
-        if (penalty >= 15)
-        {
-            _violationMessage = $"🚨 Długa nieobecność ({penalty} pkt)";
-            _violationSeverity = "severe";
-        }
-        else if (penalty >= 10)
-        {
-            _violationMessage = $"⚠️ Nieobecność ({penalty} pkt)";
-            _violationSeverity = "warning";
-        }
-        else if (penalty >= 5)
-        {
-            _violationMessage = $"⚠️ Utrata fokusu ({penalty} pkt)";
-            _violationSeverity = "warning";
-        }
-        else
-        {
-            _violationMessage = "ℹ️ Ostrzeżenie - pozostań w grze";
-            _violationSeverity = "notice";
-        }
+        _violationCount = violationNumber;
+        _currentPenalty = penalty;
         
-        // Auto-dismiss after 5 seconds
-        _violationToastTimer?.Stop();
-        _violationToastTimer = new System.Timers.Timer(5000);
-        _violationToastTimer.Elapsed += (s, e) =>
+        // Calculate block duration (exponential)
+        _blockTotalSeconds = violationNumber switch
         {
-            _violationMessage = null;
-            _violationToastTimer?.Stop();
-            InvokeAsync(StateHasChanged);
+            1 => 2,   // First violation = brief warning (2s, no real block)
+            2 => 3,   // 3 seconds
+            3 => 6,   // 6 seconds
+            4 => 12,  // 12 seconds
+            _ => 20   // 20 seconds max
         };
-        _violationToastTimer.Start();
+        
+        _isWarningOnly = (violationNumber == 1);
+        _blockSecondsRemaining = _blockTotalSeconds;
+        _isBlocked = true;
+        
+        // Start countdown timer
+        _blockTimer?.Stop();
+        _blockTimer = new System.Timers.Timer(1000);
+        _blockTimer.Elapsed += async (s, e) =>
+        {
+            _blockSecondsRemaining--;
+            
+            // Let 0 show for one tick before hiding
+            if (_blockSecondsRemaining < 0)
+            {
+                _isBlocked = false;
+                _isWarningOnly = false;
+                _blockTimer?.Stop();
+            }
+            
+            await InvokeAsync(StateHasChanged);
+        };
+        _blockTimer.Start();
     }
     
-    private void DismissViolation()
+    private string GetBlockCircleProgress()
     {
-        _violationMessage = null;
-        _violationToastTimer?.Stop();
+        if (_blockTotalSeconds <= 0) return "0 283";
+        var progress = (double)_blockSecondsRemaining / _blockTotalSeconds;
+        var circumference = 2 * Math.PI * 45; // radius = 45
+        var dashLength = progress * circumference;
+        return $"{dashLength:F0} {circumference:F0}";
     }
     
-    private string GetViolationToastClass()
+    private string GetBlockMessage()
     {
-        return _violationSeverity switch
+        if (_isWarningOnly)
         {
-            "severe" => "bg-red-900/90 border-red-500/50 text-white",
-            "warning" => "bg-orange-900/90 border-orange-500/50 text-white",
-            _ => "bg-blue-900/90 border-blue-500/50 text-white"
-        };
+            return "Pozostań w grze! Kolejne naruszenia spowodują kary czasowe.";
+        }
+        return $"Opuściłeś grę podczas rundy. Kara: {_currentPenalty} pkt i blokada na {_blockTotalSeconds}s.";
     }
     
-    private string GetViolationIcon()
+    private string GetBlockTitle()
     {
-        return _violationSeverity switch
-        {
-            "severe" => "error",
-            "warning" => "warning",
-            _ => "info"
-        };
+        return _isWarningOnly ? "Ostrzeżenie" : "Kara czasowa";
+    }
+    
+    private string GetBlockOverlayClass()
+    {
+        return _isWarningOnly 
+            ? "bg-yellow-500/80 backdrop-blur-md"  // Warning = yellow, less opaque
+            : "bg-black/80 backdrop-blur-md";      // Block = dark
+    }
+    
+    private string GetBlockIconColor()
+    {
+        return _isWarningOnly ? "text-yellow-900" : "text-red-500";
+    }
+    
+    private string GetBlockIcon()
+    {
+        return _isWarningOnly ? "warning" : "block";
     }
 
     public async ValueTask DisposeAsync()
     {
         _timer?.Stop();
         _timer?.Dispose();
-        _violationToastTimer?.Stop();
-        _violationToastTimer?.Dispose();
+        _blockTimer?.Stop();
+        _blockTimer?.Dispose();
         
         // Stop anti-cheat tracking
         await StopAntiCheatTracking();

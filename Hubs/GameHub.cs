@@ -512,12 +512,18 @@ public class GameHub : Hub
     /// </summary>
     public async Task ReportViolation(string roomCode, string violationType, double durationSeconds)
     {
+        Console.WriteLine($"[AntiCheat] ReportViolation called: room={roomCode}, type={violationType}, duration={durationSeconds}s, connectionId={Context.ConnectionId}");
+        
         var room = _roomService.GetRoom(roomCode);
         var player = room?.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+        
+        Console.WriteLine($"[AntiCheat] Player found: {player?.Nickname ?? "NULL"}, Room found: {room != null}");
         
         if (player != null && Enum.TryParse<ViolationType>(violationType, out var type))
         {
             var penalty = Violation.CalculatePenalty(player.Violations, type, durationSeconds);
+            
+            Console.WriteLine($"[AntiCheat] Penalty calculated: {penalty} points (previous violations: {player.Violations.Count})");
             
             var violation = new Violation
             {
@@ -529,12 +535,20 @@ public class GameHub : Hub
             
             player.Violations.Add(violation);
             player.TotalScore -= penalty;
+            
+            Console.WriteLine($"[AntiCheat] Violation added. Player {player.Nickname} now has TotalScore={player.TotalScore}, Violations={player.Violations.Count}");
 
             await Clients.Group(roomCode).SendAsync("OnAntiCheatViolation", 
                 Context.ConnectionId, 
                 violationType, 
                 durationSeconds, 
                 penalty);
+                
+            Console.WriteLine($"[AntiCheat] OnAntiCheatViolation broadcast sent");
+        }
+        else
+        {
+            Console.WriteLine($"[AntiCheat] Violation not processed - player null: {player == null}, parse failed: {!Enum.TryParse<ViolationType>(violationType, out _)}");
         }
     }
 
