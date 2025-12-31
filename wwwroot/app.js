@@ -301,6 +301,11 @@ window.AntiCheatTracker = class {
                         }
                     });
                     window.dispatchEvent(event);
+
+                    // Also show the UI feedback immediately
+                    if (violation.duration >= this.NOTICE_THRESHOLD / 1000) {
+                        this._showViolationFeedback(violation.type, violation.duration);
+                    }
                 }
             }
         } catch (e) {
@@ -379,9 +384,9 @@ window.registerAntiCheatHandler = function (dotNetHelper) {
                 report.violationType,
                 report.durationSeconds);
         } catch (err) {
-            // Likely the Blazor circuit is disposed - stop tracking to prevent further errors
-            console.error('[AntiCheat] Callback failed, stopping tracking:', err.message);
-            window.antiCheatTracker?.stopTracking();
+            // Blazor circuit might be reconnecting - queue the violation for later
+            console.error('[AntiCheat] Callback failed, queuing violation:', err.message);
+            window.antiCheatTracker?._queuePendingViolation(report.violationType, report.durationSeconds);
         }
     };
 
