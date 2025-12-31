@@ -29,374 +29,301 @@ window.copyToClipboard = async function (text) {
 };
 
 // ======================================
-// Anti-Cheat System
+// Anti-Cheat System (Heartbeat-based)
 // ======================================
 
 window.AntiCheatTracker = class {
     constructor() {
-        this._isTracking = false;
-        this._roomCode = null;
-        this._violationStartTime = null;
-        this._isCurrentlyViolating = false;
-        this._lastVisibilityState = document.visibilityState;
-        this._totalViolations = 0;
+        this._sessionKey = 'anticheat_session';
+        this._heartbeatInterval = null;
+        this._blockOverlay = null;
 
-        this.NOTICE_THRESHOLD = 2000;
-        this.WARNING_THRESHOLD = 10000;
-        this.PENALTY_THRESHOLD = 30000;
+        this.HEARTBEAT_MS = 500;
+        this.NOTICE_THRESHOLD_MS = 2000;
+        this.WARNING_THRESHOLD_MS = 10000;
+        this.PENALTY_THRESHOLD_MS = 30000;
 
-        this._storageKey = 'anticheat_violation_start';
-        this._pendingViolationsKey = 'anticheat_pending_violations';
-
+        // Bind event handlers
         this._handleVisibilityChange = this._handleVisibilityChange.bind(this);
-        this._handleBlur = this._handleBlur.bind(this);
-        this._handleFocus = this._handleFocus.bind(this);
-        this._handlePageHide = this._handlePageHide.bind(this);
-        this._handlePageShow = this._handlePageShow.bind(this);
+
+        // Always listen for visibility changes to detect violations on resume
+        document.addEventListener('visibilitychange', this._handleVisibilityChange);
+
+        // Check for violations on page load (handles page refresh scenario)
+        this._checkForViolationOnLoad();
     }
 
+    // === PUBLIC API ===
+
     startTracking(roomCode) {
-        if (this._isTracking) {
-            console.warn('[AntiCheat] Already tracking');
+        const existing = this._getSession();
+        if (existing && existing.roomCode === roomCode && existing.isActive) {
+            console.log('[AntiCheat] Already tracking this room, resuming heartbeat');
+            this._startHeartbeat();
             return;
         }
 
-        this._roomCode = roomCode;
-        this._isTracking = true;
+        // Create new session
+        this._saveSession({
+            roomCode: roomCode,
+            isActive: true,
+            startedAt: Date.now(),
+            lastActiveAt: Date.now(),
+            violationCount: 0
+        });
 
-        this._checkSuspendedViolation();
-
-        document.addEventListener('visibilitychange', this._handleVisibilityChange);
-        window.addEventListener('blur', this._handleBlur);
-        window.addEventListener('focus', this._handleFocus);
-        window.addEventListener('pagehide', this._handlePageHide);
-        window.addEventListener('pageshow', this._handlePageShow);
-
+        this._startHeartbeat();
         console.log(`[AntiCheat] Tracking started for room ${roomCode}`);
     }
 
     stopTracking() {
-        if (!this._isTracking) {
-            return;
-        }
-
-        if (this._isCurrentlyViolating) {
-            this._endViolation('FocusLost');
-        }
-
-        this._clearStoredViolation();
-
-        document.removeEventListener('visibilitychange', this._handleVisibilityChange);
-        window.removeEventListener('blur', this._handleBlur);
-        window.removeEventListener('focus', this._handleFocus);
-        window.removeEventListener('pagehide', this._handlePageHide);
-        window.removeEventListener('pageshow', this._handlePageShow);
-
-        this._isTracking = false;
-        this._roomCode = null;
-        this._totalViolations = 0;
-
+        this._stopHeartbeat();
+        this._clearSession();
+        this._hideBlockOverlay();
         console.log('[AntiCheat] Tracking stopped');
     }
 
-    _checkSuspendedViolation() {
-        try {
-            const stored = localStorage.getItem(this._storageKey);
-            if (stored) {
-                const data = JSON.parse(stored);
-                const suspendTime = data.timestamp;
-                const now = Date.now();
-                const durationMs = now - suspendTime;
+    isTracking() {
+        const session = this._getSession();
+        return session?.isActive === true;
+    }
 
-                console.log(`[AntiCheat] Found suspended violation, duration: ${(durationMs / 1000).toFixed(2)}s`);
+    getRoomCode() {
+        const session = this._getSession();
+        return session?.roomCode || null;
+    }
 
-                this._clearStoredViolation();
+    // === HEARTBEAT ===
 
-                if (durationMs > this.NOTICE_THRESHOLD) {
-                    this._reportViolation('FocusLost', durationMs / 1000);
-                }
-            }
-        } catch (e) {
-            console.error('[AntiCheat] Error checking suspended violation:', e);
+    _startHeartbeat() {
+        this._stopHeartbeat();
+        this._heartbeatInterval = setInterval(() => {
+            this._updateHeartbeat();
+        }, this.HEARTBEAT_MS);
+        console.log('[AntiCheat] Heartbeat started');
+    }
+
+    _stopHeartbeat() {
+        if (this._heartbeatInterval) {
+            clearInterval(this._heartbeatInterval);
+            this._heartbeatInterval = null;
         }
     }
 
-    _storeViolationStart() {
-        try {
-            localStorage.setItem(this._storageKey, JSON.stringify({
-                timestamp: Date.now(),
-                roomCode: this._roomCode
-            }));
-        } catch (e) {
-            console.error('[AntiCheat] Error storing violation start:', e);
+    _updateHeartbeat() {
+        const session = this._getSession();
+        if (session && session.isActive) {
+            session.lastActiveAt = Date.now();
+            this._saveSession(session);
         }
     }
 
-    _clearStoredViolation() {
-        try {
-            localStorage.removeItem(this._storageKey);
-        } catch (e) {
-            console.error('[AntiCheat] Error clearing stored violation:', e);
-        }
-    }
+    // === VIOLATION DETECTION ===
 
-    _handlePageHide(event) {
-        if (!this._isTracking) return;
+    _checkForViolationOnLoad() {
+        // Check if there was an active session when page loads
+        const session = this._getSession();
+        if (!session || !session.isActive) return;
 
-        console.log('[AntiCheat] Page hide event');
+        const gap = Date.now() - session.lastActiveAt;
+        console.log(`[AntiCheat] Page load check: gap = ${(gap / 1000).toFixed(2)}s`);
 
-        if (!this._isCurrentlyViolating) {
-            this._startViolation();
-        }
-
-        this._storeViolationStart();
-    }
-
-    _handlePageShow(event) {
-        if (!this._isTracking) return;
-
-        console.log(`[AntiCheat] Page show event, persisted: ${event.persisted}`);
-
-        if (event.persisted) {
-            this._checkSuspendedViolation();
-        }
-
-        if (this._isCurrentlyViolating) {
-            this._endViolation('FocusLost');
+        if (gap > this.NOTICE_THRESHOLD_MS) {
+            this._handleViolation(gap, session);
+        } else {
+            // Resume heartbeat if gap is small
+            this._startHeartbeat();
         }
     }
 
     _handleVisibilityChange() {
-        const isHidden = document.hidden;
+        const session = this._getSession();
 
-        if (isHidden && this._isTracking && !this._isCurrentlyViolating) {
-            this._startViolation();
-            this._lastVisibilityState = 'hidden';
-        } else if (!isHidden) {
-            // Page became visible - ALWAYS check for suspended violation from localStorage
-            // This handles the case where SignalR disconnected and reconnected,
-            // even if tracking was temporarily stopped
-            this._checkSuspendedViolation();
+        if (document.hidden) {
+            // Page is being hidden - heartbeat will stop naturally when JS freezes
+            console.log('[AntiCheat] Page hidden');
+        } else {
+            // Page became visible - check for gap in heartbeat
+            console.log('[AntiCheat] Page visible, checking for violations');
 
-            // Also flush any pending violations that were queued
-            this.flushPendingViolations();
-
-            // End any in-memory violation if we're still tracking
-            if (this._isTracking && this._isCurrentlyViolating) {
-                this._endViolation('FocusLost');
+            if (!session || !session.isActive) {
+                console.log('[AntiCheat] No active session');
+                return;
             }
-            this._lastVisibilityState = 'visible';
+
+            const gap = Date.now() - session.lastActiveAt;
+            console.log(`[AntiCheat] Heartbeat gap: ${(gap / 1000).toFixed(2)}s`);
+
+            if (gap > this.NOTICE_THRESHOLD_MS) {
+                this._handleViolation(gap, session);
+            }
+
+            // Resume heartbeat
+            this._startHeartbeat();
         }
     }
 
-    _handleBlur() {
-        if (!this._isTracking || this._isCurrentlyViolating) return;
+    _handleViolation(gapMs, session) {
+        const durationSeconds = gapMs / 1000;
+        session.violationCount = (session.violationCount || 0) + 1;
+        session.lastActiveAt = Date.now();
+        this._saveSession(session);
 
-        if (!document.hidden) {
-            this._startViolation();
+        console.log(`[AntiCheat] Violation #${session.violationCount} detected: ${durationSeconds.toFixed(2)}s`);
+
+        // Show block overlay IMMEDIATELY (don't wait for Blazor)
+        this._showBlockOverlay(session.violationCount, durationSeconds);
+
+        // Try to report to Blazor (may fail if circuit not ready)
+        this._tryReportToBlazor(session.roomCode, 'FocusLost', durationSeconds);
+
+        // Resume heartbeat
+        this._startHeartbeat();
+    }
+
+    // === BLOCK OVERLAY (shown directly in JS) ===
+
+    _showBlockOverlay(violationNumber, durationSeconds) {
+        // Calculate block duration based on violation number
+        const blockSeconds = this._getBlockDuration(violationNumber);
+        const isWarning = violationNumber === 1;
+        const penalty = this._getPenalty(durationSeconds);
+
+        // Create overlay if doesn't exist
+        if (!this._blockOverlay) {
+            this._blockOverlay = document.createElement('div');
+            this._blockOverlay.id = 'anticheat-block-overlay';
+            document.body.appendChild(this._blockOverlay);
+        }
+
+        const bgClass = isWarning ? 'bg-warning' : 'bg-block';
+        const textColor = isWarning ? '#78350f' : 'white';
+        const title = isWarning ? 'Ostrzeżenie' : 'Kara czasowa';
+        const message = isWarning
+            ? 'Pozostań w grze! Kolejne naruszenia spowodują kary czasowe.'
+            : `Opuściłeś grę podczas rundy. Kara: ${penalty} pkt i blokada na ${blockSeconds}s.`;
+        const icon = isWarning ? 'warning' : 'block';
+
+        this._blockOverlay.className = `anticheat-overlay ${bgClass}`;
+        this._blockOverlay.innerHTML = `
+            <div class="anticheat-overlay-content">
+                <div class="anticheat-countdown" id="anticheat-countdown">${blockSeconds}</div>
+                <div class="anticheat-icon">
+                    <span class="material-symbols-outlined" style="font-size: 48px; color: ${isWarning ? '#854d0e' : '#ef4444'}">${icon}</span>
+                </div>
+                <h2 style="color: ${textColor}; font-size: 24px; font-weight: 900; margin: 0;">${title}</h2>
+                <p style="color: ${textColor}; opacity: 0.9; font-size: 14px; margin: 8px 0 0 0; text-align: center; max-width: 280px;">${message}</p>
+                <div class="anticheat-badge ${isWarning ? 'badge-warning' : 'badge-block'}">
+                    <span class="material-symbols-outlined" style="font-size: 14px;">${isWarning ? 'info' : 'warning'}</span>
+                    <span>Naruszenie nr ${violationNumber}</span>
+                </div>
+            </div>
+        `;
+
+        this._blockOverlay.style.display = 'flex';
+
+        // Countdown timer
+        let remaining = blockSeconds;
+        const countdownEl = document.getElementById('anticheat-countdown');
+        const countdownInterval = setInterval(() => {
+            remaining--;
+            if (countdownEl) countdownEl.textContent = remaining;
+            if (remaining <= 0) {
+                clearInterval(countdownInterval);
+                this._hideBlockOverlay();
+            }
+        }, 1000);
+    }
+
+    _hideBlockOverlay() {
+        if (this._blockOverlay) {
+            this._blockOverlay.style.display = 'none';
         }
     }
 
-    _handleFocus() {
-        if (!this._isTracking || !this._isCurrentlyViolating) return;
-
-        this._endViolation('TabSwitch');
-    }
-
-    _startViolation() {
-        this._violationStartTime = performance.now();
-        this._isCurrentlyViolating = true;
-
-        this._storeViolationStart();
-
-        console.log('[AntiCheat] Violation started');
-    }
-
-    _endViolation(violationType) {
-        if (!this._violationStartTime) return;
-
-        const durationMs = performance.now() - this._violationStartTime;
-        const durationSeconds = durationMs / 1000;
-
-        this._isCurrentlyViolating = false;
-        this._violationStartTime = null;
-        this._totalViolations++;
-
-        this._clearStoredViolation();
-
-        console.log(`[AntiCheat] Violation ended: ${violationType}, duration: ${durationSeconds.toFixed(2)}s`);
-
-        this._reportViolation(violationType, durationSeconds);
-
-        if (durationMs >= this.NOTICE_THRESHOLD) {
-            this._showViolationFeedback(violationType, durationSeconds);
+    _getBlockDuration(violationNumber) {
+        switch (violationNumber) {
+            case 1: return 2;
+            case 2: return 3;
+            case 3: return 6;
+            case 4: return 12;
+            default: return 20;
         }
     }
 
-    _reportViolation(violationType, durationSeconds) {
-        // Safety guard: don't report if tracking has been stopped - queue instead
-        if (!this._isTracking) {
-            console.warn('[AntiCheat] Cannot report - tracking stopped, queuing violation');
-            this._queuePendingViolation(violationType, durationSeconds);
-            return;
-        }
+    _getPenalty(durationSeconds) {
+        if (durationSeconds >= this.PENALTY_THRESHOLD_MS / 1000) return 15;
+        if (durationSeconds >= this.WARNING_THRESHOLD_MS / 1000) return 10;
+        return 5;
+    }
 
-        if (!this._roomCode) {
-            console.error('[AntiCheat] Cannot report - no room code');
-            return;
-        }
+    // === BLAZOR COMMUNICATION ===
 
+    _tryReportToBlazor(roomCode, violationType, durationSeconds) {
+        // Dispatch event for Blazor handler (if connected)
         const event = new CustomEvent('anticheat-report', {
-            detail: {
-                roomCode: this._roomCode,
-                violationType: violationType,
-                durationSeconds: durationSeconds
-            }
+            detail: { roomCode, violationType, durationSeconds }
         });
         window.dispatchEvent(event);
-
-        console.log(`[AntiCheat] Violation event dispatched: ${violationType}, ${durationSeconds.toFixed(2)}s`);
+        console.log(`[AntiCheat] Report event dispatched: ${violationType}, ${durationSeconds.toFixed(2)}s`);
     }
 
-    _queuePendingViolation(violationType, durationSeconds) {
+    // === STORAGE ===
+
+    _getSession() {
         try {
-            const key = this._pendingViolationsKey;
-            const existing = localStorage.getItem(key);
-            const pending = existing ? JSON.parse(existing) : [];
-
-            pending.push({
-                type: violationType,
-                duration: durationSeconds,
-                timestamp: Date.now()
-            });
-
-            localStorage.setItem(key, JSON.stringify(pending));
-            console.log(`[AntiCheat] Queued pending violation: ${violationType}, ${durationSeconds.toFixed(2)}s`);
+            const data = localStorage.getItem(this._sessionKey);
+            return data ? JSON.parse(data) : null;
         } catch (e) {
-            console.error('[AntiCheat] Error queuing violation:', e);
+            console.error('[AntiCheat] Error reading session:', e);
+            return null;
         }
     }
 
-    flushPendingViolations() {
-        if (!this._isTracking || !this._roomCode) return;
-
+    _saveSession(session) {
         try {
-            const key = this._pendingViolationsKey;
-            const stored = localStorage.getItem(key);
-            if (!stored) return;
-
-            const pending = JSON.parse(stored);
-            localStorage.removeItem(key);
-
-            console.log(`[AntiCheat] Flushing ${pending.length} pending violation(s)`);
-
-            for (const violation of pending) {
-                // Only report violations from the last 5 minutes
-                if (Date.now() - violation.timestamp < 5 * 60 * 1000) {
-                    const event = new CustomEvent('anticheat-report', {
-                        detail: {
-                            roomCode: this._roomCode,
-                            violationType: violation.type,
-                            durationSeconds: violation.duration
-                        }
-                    });
-                    window.dispatchEvent(event);
-
-                    // Also show the UI feedback immediately
-                    if (violation.duration >= this.NOTICE_THRESHOLD / 1000) {
-                        this._showViolationFeedback(violation.type, violation.duration);
-                    }
-                }
-            }
+            localStorage.setItem(this._sessionKey, JSON.stringify(session));
         } catch (e) {
-            console.error('[AntiCheat] Error flushing pending violations:', e);
+            console.error('[AntiCheat] Error saving session:', e);
         }
     }
 
-    _showViolationFeedback(violationType, durationSeconds) {
-        let severity = 'notice';
-        let message = '⚠️ Utrata fokusu wykryta';
-        let penalty = 0;
-
-        if (durationSeconds >= this.PENALTY_THRESHOLD / 1000) {
-            severity = 'severe';
-            penalty = -15;
-            message = `🚨 Długa nieobecność (-${Math.abs(penalty)} pkt)`;
-        } else if (durationSeconds >= this.WARNING_THRESHOLD / 1000) {
-            severity = 'warning';
-            penalty = -10;
-            message = `⚠️ Nieobecność wykryta (-${Math.abs(penalty)} pkt)`;
-        } else if (durationSeconds >= this.NOTICE_THRESHOLD / 1000) {
-            severity = 'warning';
-            penalty = -5;
-            message = `⚠️ Utrata fokusu (-${Math.abs(penalty)} pkt)`;
+    _clearSession() {
+        try {
+            localStorage.removeItem(this._sessionKey);
+        } catch (e) {
+            console.error('[AntiCheat] Error clearing session:', e);
         }
-
-        const event = new CustomEvent('anticheat-violation', {
-            detail: {
-                type: violationType,
-                duration: durationSeconds,
-                severity: severity,
-                message: message,
-                penalty: penalty,
-                timestamp: new Date().toISOString()
-            }
-        });
-        window.dispatchEvent(event);
-    }
-
-    isTracking() {
-        return this._isTracking;
-    }
-
-    getTotalViolations() {
-        return this._totalViolations;
     }
 };
 
 // Create global instance
 window.antiCheatTracker = new window.AntiCheatTracker();
 
+// Handler registration for Blazor communication
 window.registerAntiCheatHandler = function (dotNetHelper) {
     if (window._antiCheatHandler) {
         window.removeEventListener('anticheat-report', window._antiCheatHandler);
     }
 
-    // Store reference for cleanup
     window._antiCheatDotNetRef = dotNetHelper;
 
     window._antiCheatHandler = async (e) => {
-        // Safety guard: verify tracking is still active
-        if (!window.antiCheatTracker || !window.antiCheatTracker.isTracking()) {
-            console.warn('[AntiCheat] Handler called but tracking is stopped - ignoring');
-            return;
-        }
-
-        // Safety guard: verify we still have a valid .NET reference
-        if (!window._antiCheatDotNetRef) {
-            console.warn('[AntiCheat] Handler called but .NET reference is null - ignoring');
-            return;
-        }
+        if (!window._antiCheatDotNetRef) return;
 
         const report = e.detail;
         try {
             await window._antiCheatDotNetRef.invokeMethodAsync('ReportViolationFromJS',
                 report.violationType,
                 report.durationSeconds);
+            console.log('[AntiCheat] Reported to Blazor successfully');
         } catch (err) {
-            // Blazor circuit might be reconnecting - queue the violation for later
-            console.error('[AntiCheat] Callback failed, queuing violation:', err.message);
-            window.antiCheatTracker?._queuePendingViolation(report.violationType, report.durationSeconds);
+            console.warn('[AntiCheat] Could not report to Blazor (circuit may be reconnecting):', err.message);
         }
     };
 
     window.addEventListener('anticheat-report', window._antiCheatHandler);
-    console.log('[AntiCheat] Handler registered');
-
-    // Flush any pending violations that were queued during reconnection
-    setTimeout(() => {
-        window.antiCheatTracker?.flushPendingViolations();
-    }, 100);
+    console.log('[AntiCheat] Blazor handler registered');
 };
 
 window.unregisterAntiCheatHandler = function () {
@@ -404,7 +331,6 @@ window.unregisterAntiCheatHandler = function () {
         window.removeEventListener('anticheat-report', window._antiCheatHandler);
         window._antiCheatHandler = null;
     }
-    // Clear the .NET reference to prevent stale calls
     window._antiCheatDotNetRef = null;
-    console.log('[AntiCheat] Handler unregistered');
+    console.log('[AntiCheat] Blazor handler unregistered');
 };

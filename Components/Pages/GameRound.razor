@@ -176,56 +176,7 @@ else if (_room != null && _game != null)
         </footer>
     </div>
     
-
-    
-    @* Block Penalty Overlay *@
-    @if (_isBlocked)
-    {
-        <div class="fixed inset-0 z-[100] flex items-center justify-center @GetBlockOverlayClass()">
-            <div class="flex flex-col items-center gap-6 p-8 max-w-sm text-center">
-                @* Circular countdown animation *@
-                <div class="relative w-32 h-32">
-                    @* Background circle *@
-                    <svg class="w-32 h-32 transform -rotate-90" viewBox="0 0 100 100">
-                        <circle cx="50" cy="50" r="45" fill="none" stroke="@(_isWarningOnly ? "#78350f" : "#1e293b")" stroke-width="8"/>
-                        <circle cx="50" cy="50" r="45" fill="none" 
-                                stroke="@(_isWarningOnly ? "#eab308" : "url(#blockGradient)")" 
-                                stroke-width="8" 
-                                stroke-linecap="round"
-                                stroke-dasharray="@GetBlockCircleProgress()"
-                                class="transition-all duration-1000 ease-linear"/>
-                        <defs>
-                            <linearGradient id="blockGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                <stop offset="0%" stop-color="#ef4444"/>
-                                <stop offset="100%" stop-color="#f97316"/>
-                            </linearGradient>
-                        </defs>
-                    </svg>
-                    @* Center countdown number *@
-                    <div class="absolute inset-0 flex items-center justify-center">
-                        <span class="text-4xl font-black @(_isWarningOnly ? "text-yellow-900" : "text-white") tabular-nums">@_blockSecondsRemaining</span>
-                    </div>
-                </div>
-                
-                @* Warning icon with pulse animation *@
-                <div class="flex items-center justify-center w-16 h-16 rounded-full @(_isWarningOnly ? "bg-yellow-900/30" : "bg-red-500/20") animate-pulse">
-                    <span class="material-symbols-outlined text-4xl @GetBlockIconColor()">@GetBlockIcon()</span>
-                </div>
-                
-                @* Message *@
-                <div class="space-y-2">
-                    <h2 class="text-2xl font-black @(_isWarningOnly ? "text-yellow-900" : "text-white")">@GetBlockTitle()</h2>
-                    <p class="@(_isWarningOnly ? "text-yellow-900/80" : "text-slate-300") text-sm leading-relaxed">
-                        @GetBlockMessage()
-                    </p>
-                    <div class="flex items-center justify-center gap-2 mt-3 px-3 py-1.5 @(_isWarningOnly ? "bg-yellow-900/20 border-yellow-900/30" : "bg-red-500/10 border-red-500/30") rounded-full border">
-                        <span class="material-symbols-outlined text-sm @(_isWarningOnly ? "text-yellow-900" : "text-red-400")">@(_isWarningOnly ? "info" : "warning")</span>
-                        <span class="text-xs font-bold @(_isWarningOnly ? "text-yellow-900" : "text-red-400")">Naruszenie nr @_violationCount</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    }
+    @* Block overlay is now rendered directly by JS anti-cheat system *@
 }
 
 @code {
@@ -400,14 +351,13 @@ else if (_room != null && _game != null)
         _hubConnection.On<string, string, double, int>("OnAntiCheatViolation", 
             (connectionId, violationType, durationSeconds, penalty) =>
         {
+            // Just track the violation count - UI overlay is shown by JS
             var myPlayer = _room?.Players.FirstOrDefault(p => p.Nickname.Equals(_nickname, StringComparison.OrdinalIgnoreCase));
             if (myPlayer?.ConnectionId == connectionId)
             {
                 _violationCount++;
-                _currentPenalty = penalty;
-                StartBlockPenalty(_violationCount, penalty);
+                Console.WriteLine($"[AntiCheat] Violation #{_violationCount} recorded from hub");
             }
-            InvokeAsync(StateHasChanged);
         });
     }
 

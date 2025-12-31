@@ -525,3 +525,117 @@ textarea:focus {
 .password-visible-wrapper:focus-within .password-visible-overlay {
     background: rgba(10, 132, 255, 0.05);
 }
+
+/* ===========================================
+   Anti-Cheat Block Overlay (JS-rendered)
+   =========================================== */
+
+.anticheat-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(12px);
+    animation: anticheat-fade-in 0.3s ease-out;
+}
+
+.anticheat-overlay.bg-warning {
+    background: rgba(234, 179, 8, 0.85);
+}
+
+.anticheat-overlay.bg-block {
+    background: rgba(0, 0, 0, 0.9);
+}
+
+.anticheat-overlay-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 2rem;
+    max-width: 320px;
+    text-align: center;
+}
+
+.anticheat-countdown {
+    font-size: 4rem;
+    font-weight: 900;
+    font-family: 'SF Mono', 'Menlo', monospace;
+    line-height: 1;
+    animation: anticheat-pulse 1s ease-in-out infinite;
+}
+
+.bg-warning .anticheat-countdown {
+    color: #78350f;
+}
+
+.bg-block .anticheat-countdown {
+    color: white;
+}
+
+.anticheat-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    animation: anticheat-pulse 2s ease-in-out infinite;
+}
+
+.bg-warning .anticheat-icon {
+    background: rgba(120, 53, 15, 0.2);
+}
+
+.bg-block .anticheat-icon {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+.anticheat-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-top: 0.5rem;
+}
+
+.anticheat-badge.badge-warning {
+    background: rgba(120, 53, 15, 0.2);
+    border: 1px solid rgba(120, 53, 15, 0.3);
+    color: #78350f;
+}
+
+.anticheat-badge.badge-block {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+}
+
+@keyframes anticheat-fade-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes anticheat-pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.8;
+        transform: scale(0.98);
+    }
+}
