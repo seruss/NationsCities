@@ -2,7 +2,6 @@
    Państwa, Miasta - Mobile-First CSS
    =========================================== */
 
-/* Bazowe style dla mobile */
 * {
     -webkit-tap-highlight-color: transparent;
 }
@@ -16,7 +15,6 @@ body {
     overscroll-behavior: none;
 }
 
-/* Safe area padding dla notchy */
 .safe-area-top {
     padding-top: env(safe-area-inset-top);
 }
@@ -25,7 +23,6 @@ body {
     padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* Blazor error UI */
 #blazor-error-ui {
     display: none;
     position: fixed;
@@ -53,7 +50,6 @@ body {
     transform: translateY(-50%);
 }
 
-/* Validation styles */
 .valid.modified:not([type=checkbox]) {
     outline: 2px solid #22c55e;
     outline-offset: -2px;
@@ -70,7 +66,6 @@ body {
     margin-top: 0.25rem;
 }
 
-/* Error boundary */
 .blazor-error-boundary {
     background: #b32121;
     padding: 1rem;
@@ -82,12 +77,10 @@ body {
     content: "Wystąpił błąd. Odśwież stronę.";
 }
 
-/* Material Symbols config */
 .material-symbols-outlined {
     font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 
-/* Custom scrollbar (ukryty na mobile) */
 @media (min-width: 768px) {
     ::-webkit-scrollbar {
         width: 6px;
@@ -103,7 +96,6 @@ body {
     }
 }
 
-/* Hide scrollbar na mobile */
 .no-scrollbar::-webkit-scrollbar {
     display: none;
 }
@@ -113,26 +105,20 @@ body {
     scrollbar-width: none;
 }
 
-/* Button press effect */
 .btn-press:active {
     transform: scale(0.98);
 }
 
-/* Input focus glow */
 input:focus,
 textarea:focus {
     outline: none;
     box-shadow: 0 0 0 2px rgba(37, 140, 244, 0.3);
 }
 
-/* Animacje */
 @keyframes pulse-fast {
-
-    0%,
-    100% {
+    0%, 100% {
         opacity: 1;
     }
-
     50% {
         opacity: 0.5;
     }
@@ -146,13 +132,11 @@ textarea:focus {
     from {
         width: 100%;
     }
-
     to {
         width: 0%;
     }
 }
 
-/* Avatar z inicjałami */
 .avatar-initials {
     display: flex;
     align-items: center;
@@ -162,7 +146,6 @@ textarea:focus {
     user-select: none;
 }
 
-/* Modal styles */
 .modal-backdrop {
     position: fixed;
     inset: 0;
@@ -214,7 +197,6 @@ textarea:focus {
     from {
         opacity: 0;
     }
-
     to {
         opacity: 1;
     }
@@ -225,14 +207,12 @@ textarea:focus {
         opacity: 0;
         transform: translateY(20px) scale(0.95);
     }
-
     to {
         opacity: 1;
         transform: translateY(0) scale(1);
     }
 }
 
-/* Custom checkbox */
 .custom-checkbox {
     display: flex;
     align-items: center;
@@ -269,7 +249,7 @@ textarea:focus {
 }
 
 .custom-checkbox input[type="checkbox"]:checked::after {
-    content: '✓';
+    content: '✔';
     position: absolute;
     top: 50%;
     left: 50%;
@@ -284,7 +264,6 @@ textarea:focus {
     border-color: #258cf4;
 }
 
-/* Number input */
 .number-input-wrapper {
     display: flex;
     align-items: center;
@@ -313,7 +292,6 @@ textarea:focus {
     box-shadow: 0 0 0 3px rgba(37, 140, 244, 0.1);
 }
 
-/* Remove spinner buttons from number input */
 .number-input-wrapper input[type="number"]::-webkit-inner-spin-button,
 .number-input-wrapper input[type="number"]::-webkit-outer-spin-button {
     -webkit-appearance: none;
@@ -353,7 +331,6 @@ textarea:focus {
     opacity: 0.5;
 }
 
-/* Category card styles (blueprint design) */
 .category-modal {
     max-width: 600px;
 }
@@ -432,7 +409,6 @@ textarea:focus {
     font-size: 1.5rem;
 }
 
-/* Category List Modal (Blueprint design) */
 .category-list-modal {
     max-width: 600px;
     max-height: 90vh;
@@ -446,7 +422,6 @@ textarea:focus {
     padding: 1rem;
 }
 
-/* Toggle Switch (Blueprint style) */
 .toggle-switch {
     position: relative;
     display: flex;
@@ -472,4 +447,105 @@ textarea:focus {
     border-radius: 9999px;
     background: white;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* ===========================================
+   Kioskboard iOS Dark Theme Overrides
+   =========================================== */
+
+.kioskboard-wrapper {
+    background: #1c1c1e !important;
+    border-top-left-radius: 12px !important;
+    border-top-right-radius: 12px !important;
+    box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.5) !important;
+    padding-bottom: env(safe-area-inset-bottom, 8px) !important;
+}
+
+.kioskboard-row {
+    gap: 6px !important;
+    padding: 0 4px !important;
+    margin-bottom: 8px !important;
+    justify-content: center !important;
+}
+
+.kioskboard-key {
+    background: #525252 !important;
+    border: none !important;
+    border-radius: 6px !important;
+    box-shadow: 0 1px 0 #1c1c1e !important;
+    color: #fff !important;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif !important;
+    font-size: 22px !important;
+    font-weight: 400 !important;
+    height: 46px !important;
+    min-width: 32px !important;
+    margin: 0 !important;
+    transition: background 0.1s, transform 0.1s !important;
+}
+
+.kioskboard-key:active,
+.kioskboard-key-pressed {
+    background: #787880 !important;
+    transform: scale(0.95) !important;
+}
+
+.kioskboard-key-capslock,
+.kioskboard-key-backspace,
+.kioskboard-key-specialcharacter {
+    background: #3a3a3c !important;
+    font-size: 18px !important;
+    max-width: 55px !important;
+}
+
+.kioskboard-key-space {
+    background: #525252 !important;
+    flex-grow: 4 !important;
+    max-width: 280px !important;
+    font-size: 16px !important;
+}
+
+.kioskboard-key-capslock.capslock-active {
+    background: #fff !important;
+    color: #000 !important;
+}
+
+.kioskboard-row:first-child .kioskboard-key {
+    background: #3a3a3c !important;
+    font-size: 18px !important;
+    height: 40px !important;
+}
+
+.kioskboard-wrapper-close {
+    background: #3a3a3c !important;
+    color: #0a84ff !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+}
+
+.kb-input:focus,
+.kb-input.kioskboard-input-active {
+    box-shadow: 0 0 0 2px #0a84ff !important;
+    background: rgba(10, 132, 255, 0.05) !important;
+}
+
+.kb-input {
+    font-size: 16px !important;
+}
+
+/* Content padding when keyboard visible */
+.kb-content-padding {
+    padding-bottom: calc(300px + env(safe-area-inset-bottom, 0)) !important;
+}
+
+@media (min-width: 500px) {
+    .kioskboard-wrapper {
+        max-width: 500px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+    }
+    
+    .kioskboard-key {
+        height: 50px !important;
+        max-width: 44px !important;
+    }
 }

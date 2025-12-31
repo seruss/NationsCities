@@ -94,6 +94,7 @@ else if (_room != null && _game != null)
             <div class="px-5 py-6 flex flex-col gap-6 pb-32">
                 @foreach (var category in _game.Categories)
                 {
+                    var inputId = $"answer-{category.Name.Replace(" ", "-").ToLowerInvariant()}";
                     <div class="group">
                         <div class="flex justify-between items-center mb-2">
                             <label class="text-sm font-semibold text-slate-300 flex items-center gap-2">
@@ -107,13 +108,17 @@ else if (_room != null && _game != null)
                                 </span>
                             }
                         </div>
-                        <input @bind="_answers[category.Name]" 
+                        <input id="@inputId"
+                               @bind="@_answers[category.Name]"
                                @bind:event="oninput"
-                               placeholder=""
+                               class="kb-input w-full bg-surface-dark border-0 rounded-xl p-4 text-lg font-medium shadow-sm ring-1 ring-slate-700 focus:ring-2 focus:ring-primary focus:outline-none placeholder:text-slate-600 transition-all disabled:opacity-50"
+                               placeholder="Wpisz odpowiedź..."
+                               inputmode="none"
                                autocomplete="off"
-                               autocapitalize="on"
-                               disabled="@_hasSubmitted"
-                               class="w-full bg-surface-dark border-0 rounded-xl p-4 text-lg font-medium shadow-sm ring-1 ring-slate-700 focus:ring-2 focus:ring-primary focus:outline-none placeholder:text-slate-600 transition-all disabled:opacity-50" />
+                               autocorrect="off"
+                               autocapitalize="off"
+                               spellcheck="false"
+                               disabled="@_hasSubmitted" />
                     </div>
                 }
             </div>
@@ -159,9 +164,12 @@ else if (_room != null && _game != null)
                     <p class="text-center text-xs text-slate-500 mt-2">Zatrzymujesz rundę - inni dostają 10 sekund</p>
                 }
             }
-    </footer>
+        </footer>
     </div>
     
+    @* Virtual Keyboard Container *@
+    <div id="keyboard" style="display: none;"></div>
+    <div id="keyboard_numeric" style="display: none;"></div>
     
     @* Block Penalty Overlay *@
     @if (_isBlocked)
@@ -236,19 +244,25 @@ else if (_room != null && _game != null)
     
     // Block penalty state
     private bool _isBlocked = false;
-    private bool _isWarningOnly = false;  // For first violation (no block, just warning)
+    private bool _isWarningOnly = false;
     private int _blockSecondsRemaining = 0;
     private int _blockTotalSeconds = 0;
-    private int _violationCount = 0;  // Track locally, increment on each violation
-    private int _currentPenalty = 0;  // Current penalty points
+    private int _violationCount = 0;
+    private int _currentPenalty = 0;
     private System.Timers.Timer? _blockTimer;
+    
+    // Keyboard state
+    private bool _isKeyboardInitialized = false;
+    private DotNetObjectReference<GameRound>? _keyboardRef;
+    
+    // Anti-cheat
+    private DotNetObjectReference<GameRound>? _antiCheatRef;
     
     // Can only click STOP if all answers are filled
     private bool CanStop => _game?.Categories.All(c => !string.IsNullOrWhiteSpace(GetAnswer(c.Name))) ?? false;
 
     protected override async Task OnInitializedAsync()
     {
-        // Get nickname from URL
         var uri = new Uri(Navigation.Uri);
         var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
         _nickname = query["nick"] ?? "";
@@ -262,7 +276,6 @@ else if (_room != null && _game != null)
 
         try
         {
-            // Setup SignalR and join game
             _hubConnection = new HubConnectionBuilder()
                 .WithUrl(Navigation.ToAbsoluteUri("/gamehub"))
                 .Build();
@@ -271,7 +284,6 @@ else if (_room != null && _game != null)
             await _hubConnection.StartAsync();
             _myConnectionId = _hubConnection.ConnectionId;
 
-            // Join the game (adds to SignalR group)
             var joined = await _hubConnection.InvokeAsync<bool>("JoinGame", RoomCode, _nickname);
             if (!joined)
             {
@@ -280,7 +292,6 @@ else if (_room != null && _game != null)
                 return;
             }
 
-            // Get room data
             _room = RoomService.GetRoom(RoomCode);
             _game = _room?.CurrentGame;
 
@@ -293,13 +304,11 @@ else if (_room != null && _game != null)
 
             _currentRound = _game.CurrentRound;
 
-            // Initialize answers dictionary
             foreach (var category in _game.Categories)
             {
                 _answers[category.Name] = "";
             }
 
-            // Check if countdown is already active
             if (_game.Phase == RoundPhase.Countdown && _game.CountdownEndTime.HasValue)
             {
                 _isCountdownActive = true;
@@ -311,14 +320,35 @@ else if (_room != null && _game != null)
             }
 
             _isLoading = false;
-            
-            // Start anti-cheat tracking if in answering phase
-            await StartAntiCheatTracking();
         }
         catch (Exception ex)
         {
             _error = $"Błąd: {ex.Message}";
             _isLoading = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_isLoading && _error == null)
+        {
+            // Initialize keyboard
+            if (!_isKeyboardInitialized)
+            {
+                try
+                {
+                    _keyboardRef = DotNetObjectReference.Create(this);
+                    await JSRuntime.InvokeVoidAsync("initVirtualKeyboard", _keyboardRef);
+                    _isKeyboardInitialized = true;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[Keyboard] Init failed: {ex.Message}");
+                }
+            }
+            
+            // Start anti-cheat tracking
+            await StartAntiCheatTracking();
         }
     }
 
@@ -331,7 +361,6 @@ else if (_room != null && _game != null)
             _isCountdownActive = true;
             _stopTriggeredById = playerId;
             
-            // Find my player to check if I triggered it
             var myPlayer = _room?.Players.FirstOrDefault(p => p.Nickname.Equals(_nickname, StringComparison.OrdinalIgnoreCase));
             _stopTriggeredByMe = myPlayer?.ConnectionId == playerId;
             
@@ -366,22 +395,17 @@ else if (_room != null && _game != null)
             _timer?.Stop();
             _blockTimer?.Stop();
             _isBlocked = false;
-            _ = StopAntiCheatTracking(); // Stop tracking before navigating
             Navigation.NavigateTo($"/validation/{RoomCode}?nick={Uri.EscapeDataString(_nickname)}");
         });
         
         _hubConnection.On<string, string, double, int>("OnAntiCheatViolation", 
             (connectionId, violationType, durationSeconds, penalty) =>
         {
-            // Update UI if this is my violation
             var myPlayer = _room?.Players.FirstOrDefault(p => p.Nickname.Equals(_nickname, StringComparison.OrdinalIgnoreCase));
             if (myPlayer?.ConnectionId == connectionId)
             {
-                // Increment local violation count FIRST
                 _violationCount++;
                 _currentPenalty = penalty;
-                
-                // Show block penalty overlay (exponential duration)
                 StartBlockPenalty(_violationCount, penalty);
             }
             InvokeAsync(StateHasChanged);
@@ -396,12 +420,18 @@ else if (_room != null && _game != null)
         try  
         {
             await _hubConnection.InvokeAsync("ReportViolation", RoomCode, violationType, durationSeconds);
-            Console.WriteLine($"[GameRound] Violation reported: {violationType}, {durationSeconds}s");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GameRound] Failed to report violation: {ex.Message}");
+            Console.WriteLine($"[AntiCheat] Failed to report: {ex.Message}");
         }
+    }
+    
+    [JSInvokable]
+    public Task OnKeyboardInput(string inputId, string value)
+    {
+        // Kioskboard updates via @bind, this is backup
+        return Task.CompletedTask;
     }
 
     private void StartTimer()
@@ -431,11 +461,9 @@ else if (_room != null && _game != null)
     {
         if (_hubConnection != null && !_hasSubmitted)
         {
-            _hasSubmitted = true; // Mark as submitted immediately
+            _hasSubmitted = true;
             _stopTriggeredByMe = true;
             
-            // Deactivate anti-cheat after submission
-            await StopAntiCheatTracking();
             _isBlocked = false;
             _blockTimer?.Stop();
             
@@ -457,8 +485,6 @@ else if (_room != null && _game != null)
         if (_hasSubmitted) return;
         _hasSubmitted = true;
         
-        // Deactivate anti-cheat after submission
-        await StopAntiCheatTracking();
         _isBlocked = false;
         _blockTimer?.Stop();
         
@@ -480,48 +506,22 @@ else if (_room != null && _game != null)
     }
     
     // Anti-Cheat Methods
-    private DotNetObjectReference<GameRound>? _dotNetHelper;
-    
     private async Task StartAntiCheatTracking()
     {
         if (_game == null || _hubConnection == null) return;
         
-        // Only track during answering and countdown phases
         if (_game.Phase == RoundPhase.Answering || _game.Phase == RoundPhase.Countdown)
         {
             try
             {
-                // Create reference for JavaScript callbacks
-                _dotNetHelper = DotNetObjectReference.Create(this);
-                
-                // Start tracking
+                _antiCheatRef = DotNetObjectReference.Create(this);
                 await JSRuntime.InvokeVoidAsync("antiCheatTracker.startTracking", RoomCode);
-                
-                // Register event handler that calls back to this instance
-                await JSRuntime.InvokeVoidAsync("registerAntiCheatHandler", _dotNetHelper);
-                
-                Console.WriteLine("[GameRound] Anti-cheat tracking started");
+                await JSRuntime.InvokeVoidAsync("registerAntiCheatHandler", _antiCheatRef);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[GameRound] Failed to start anti-cheat tracking: {ex.Message}");
+                Console.WriteLine($"[AntiCheat] Start failed: {ex.Message}");
             }
-        }
-    }
-    
-    private async Task StopAntiCheatTracking()
-    {
-        try
-        {
-            await JSRuntime.InvokeVoidAsync("unregisterAntiCheatHandler");
-            await JSRuntime.InvokeVoidAsync("antiCheatTracker.stopTracking");
-            _dotNetHelper?.Dispose();
-            _dotNetHelper = null;
-            Console.WriteLine("[GameRound] Anti-cheat tracking stopped");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[GameRound] Failed to stop anti-cheat tracking: {ex.Message}");
         }
     }
     
@@ -530,28 +530,25 @@ else if (_room != null && _game != null)
         _violationCount = violationNumber;
         _currentPenalty = penalty;
         
-        // Calculate block duration (exponential)
         _blockTotalSeconds = violationNumber switch
         {
-            1 => 2,   // First violation = brief warning (2s, no real block)
-            2 => 3,   // 3 seconds
-            3 => 6,   // 6 seconds
-            4 => 12,  // 12 seconds
-            _ => 20   // 20 seconds max
+            1 => 2,
+            2 => 3,
+            3 => 6,
+            4 => 12,
+            _ => 20
         };
         
         _isWarningOnly = (violationNumber == 1);
         _blockSecondsRemaining = _blockTotalSeconds;
         _isBlocked = true;
         
-        // Start countdown timer
         _blockTimer?.Stop();
         _blockTimer = new System.Timers.Timer(1000);
         _blockTimer.Elapsed += async (s, e) =>
         {
             _blockSecondsRemaining--;
             
-            // Let 0 show for one tick before hiding
             if (_blockSecondsRemaining < 0)
             {
                 _isBlocked = false;
@@ -568,41 +565,24 @@ else if (_room != null && _game != null)
     {
         if (_blockTotalSeconds <= 0) return "0 283";
         var progress = (double)_blockSecondsRemaining / _blockTotalSeconds;
-        var circumference = 2 * Math.PI * 45; // radius = 45
+        var circumference = 2 * Math.PI * 45;
         var dashLength = progress * circumference;
         return $"{dashLength:F0} {circumference:F0}";
     }
     
-    private string GetBlockMessage()
-    {
-        if (_isWarningOnly)
-        {
-            return "Pozostań w grze! Kolejne naruszenia spowodują kary czasowe.";
-        }
-        return $"Opuściłeś grę podczas rundy. Kara: {_currentPenalty} pkt i blokada na {_blockTotalSeconds}s.";
-    }
+    private string GetBlockMessage() => _isWarningOnly 
+        ? "Pozostań w grze! Kolejne naruszenia spowodują kary czasowe."
+        : $"Opuściłeś grę podczas rundy. Kara: {_currentPenalty} pkt i blokada na {_blockTotalSeconds}s.";
     
-    private string GetBlockTitle()
-    {
-        return _isWarningOnly ? "Ostrzeżenie" : "Kara czasowa";
-    }
+    private string GetBlockTitle() => _isWarningOnly ? "Ostrzeżenie" : "Kara czasowa";
     
-    private string GetBlockOverlayClass()
-    {
-        return _isWarningOnly 
-            ? "bg-yellow-500/80 backdrop-blur-md"  // Warning = yellow, less opaque
-            : "bg-black/80 backdrop-blur-md";      // Block = dark
-    }
+    private string GetBlockOverlayClass() => _isWarningOnly 
+        ? "bg-yellow-500/80 backdrop-blur-md"
+        : "bg-black/80 backdrop-blur-md";
     
-    private string GetBlockIconColor()
-    {
-        return _isWarningOnly ? "text-yellow-900" : "text-red-500";
-    }
+    private string GetBlockIconColor() => _isWarningOnly ? "text-yellow-900" : "text-red-500";
     
-    private string GetBlockIcon()
-    {
-        return _isWarningOnly ? "warning" : "block";
-    }
+    private string GetBlockIcon() => _isWarningOnly ? "warning" : "block";
 
     public async ValueTask DisposeAsync()
     {
@@ -611,8 +591,9 @@ else if (_room != null && _game != null)
         _blockTimer?.Stop();
         _blockTimer?.Dispose();
         
-        // Stop anti-cheat tracking
-        await StopAntiCheatTracking();
+        // Dispose .NET references only - no JS calls during dispose
+        _keyboardRef?.Dispose();
+        _antiCheatRef?.Dispose();
         
         if (_hubConnection != null)
         {

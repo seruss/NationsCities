@@ -1,0 +1,163 @@
+/* ckeyboard iOS-style Virtual Keyboard */
+/* Custom dark theme for Państwa, Miasta */
+
+.cK.cKLine {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    text-align: center;
+    list-style: none !important;
+    list-style-type: none !important;
+    width: 100%;
+    white-space: nowrap;
+    /* Prevent wrapping */
+    line-height: 0;
+    /* Remove line-height spacing */
+}
+
+.cK.cKKey,
+.cK.cKFunction {
+    font-weight: 400;
+    font-size: 18px;
+    /* Reduced from 22px */
+    display: inline-block;
+    vertical-align: top !important;
+    /* FIX: Prevents keys from breaking out of rows */
+    border-radius: 5px;
+    border: none;
+    background-color: #383838;
+    color: #fff;
+    margin: 2px 2px;
+    /* Reduced margins */
+    padding: 0;
+    width: 34px;
+    /* Reduced from 40px */
+    height: 40px;
+    /* Reduced from 42px */
+    box-sizing: border-box;
+    text-align: center;
+    line-height: 40px;
+    overflow: hidden;
+    cursor: pointer;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: -moz-none;
+    -ms-user-select: none;
+    user-select: none;
+    outline: 0;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: all 0.1s ease;
+}
+
+.cK.cKKey:active,
+.cK.cKFunction:active {
+    transform: scale(0.95);
+    background-color: #4a4a4a;
+}
+
+.cK.cKKey.uppercase {
+    text-transform: uppercase;
+}
+
+/* Backspace key */
+.cK.cKey-backspace {
+    width: 52px;
+    font-size: 16px;
+}
+
+.cK.cKey-backspace::before {
+    content: '⌫';
+    font-size: 22px;
+}
+
+/* Shift key */
+.cK.cKey-shift {
+    width: 52px;
+    font-size: 16px;
+}
+
+.cK.cKey-shift::before {
+    content: '⇧';
+    font-size: 22px;
+}
+
+/* Space bar */
+.cK.cKey-space {
+    width: 220px;
+    /* Reduced from 260px to fit screen */
+    font-size: 16px;
+}
+
+/* Return/Enter key */
+.cK.cKey-return {
+    position: relative;
+    width: 70px;
+    color: #fff;
+    background-color: #258cf4;
+    font-weight: 600;
+}
+
+.cK.cKey-return:active {
+    background-color: #1a6fc0;
+}
+
+/* Numeric switch button */
+.cK.cKey-numeric-switch,
+.cK.cKey-abc-switch {
+    width: 52px;
+    background-color: #2a2a2a;
+    font-size: 14px;
+}
+
+/* Keyboard container styling */
+#keyboard,
+#keyboard_numeric {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    /* Below block overlay (z-index: 100) */
+    background: #101922;
+    padding: 8px 4px 8px 4px;
+    /* Minimal padding */
+    border-top: 1px solid #1A2633;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+    min-height: 180px;
+    /* Changed from max-height to min-height */
+    overflow-x: hidden;
+    /* Prevent horizontal scroll */
+    overflow-y: visible;
+}
+
+/* Polish character picker (long-press) */
+.polish-char-picker {
+    position: absolute;
+    background: #2a2a2a;
+    border-radius: 8px;
+    padding: 4px;
+    display: flex;
+    gap: 4px;
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.4);
+    z-index: 60;
+}
+
+.polish-char-option {
+    min-width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #383838;
+    color: #fff;
+    border-radius: 6px;
+    font-size: 22px;
+    cursor: pointer;
+    transition: all 0.1s ease;
+}
+
+.polish-char-option:active {
+    transform: scale(0.95);
+    background: #4a4a4a;
+}

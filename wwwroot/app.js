@@ -3,17 +3,13 @@
 
 /**
  * Copies text to clipboard using modern Clipboard API with fallback
- * @param {string} text - Text to copy to clipboard
- * @returns {Promise<boolean>} - True if successful, false otherwise
  */
 window.copyToClipboard = async function (text) {
     try {
-        // Try modern Clipboard API first
         if (navigator.clipboard && window.isSecureContext) {
             await navigator.clipboard.writeText(text);
             return true;
         } else {
-            // Fallback for older browsers or non-secure contexts
             const textArea = document.createElement("textarea");
             textArea.value = text;
             textArea.style.position = "fixed";
@@ -22,7 +18,6 @@ window.copyToClipboard = async function (text) {
             document.body.appendChild(textArea);
             textArea.focus();
             textArea.select();
-
             const successful = document.execCommand('copy');
             textArea.remove();
             return successful;
@@ -37,10 +32,6 @@ window.copyToClipboard = async function (text) {
 // Anti-Cheat System
 // ======================================
 
-/**
- * Anti-cheat tracker for detecting focus loss, tab switches, and suspicious behavior
- * Designed for mobile browsers with adaptive thresholds
- */
 window.AntiCheatTracker = class {
     constructor() {
         this._isTracking = false;
@@ -50,15 +41,12 @@ window.AntiCheatTracker = class {
         this._lastVisibilityState = document.visibilityState;
         this._totalViolations = 0;
 
-        // Thresholds (in milliseconds)
-        this.NOTICE_THRESHOLD = 2000;      // < 2s = notice only
-        this.WARNING_THRESHOLD = 10000;    // 2-10s = warning
-        this.PENALTY_THRESHOLD = 30000;    // > 30s = severe penalty
+        this.NOTICE_THRESHOLD = 2000;
+        this.WARNING_THRESHOLD = 10000;
+        this.PENALTY_THRESHOLD = 30000;
 
-        // Storage key for persisting violation start time across browser suspend
         this._storageKey = 'anticheat_violation_start';
 
-        // Bind event handlers
         this._handleVisibilityChange = this._handleVisibilityChange.bind(this);
         this._handleBlur = this._handleBlur.bind(this);
         this._handleFocus = this._handleFocus.bind(this);
@@ -66,10 +54,6 @@ window.AntiCheatTracker = class {
         this._handlePageShow = this._handlePageShow.bind(this);
     }
 
-    /**
-     * Start tracking violations for a room
-     * @param {string} roomCode - Room code
-     */
     startTracking(roomCode) {
         if (this._isTracking) {
             console.warn('[AntiCheat] Already tracking');
@@ -79,40 +63,28 @@ window.AntiCheatTracker = class {
         this._roomCode = roomCode;
         this._isTracking = true;
 
-        // Check if we were in a violation before page suspend (mobile)
         this._checkSuspendedViolation();
 
-        // Page Visibility API (primary method for mobile)
         document.addEventListener('visibilitychange', this._handleVisibilityChange);
-
-        // Window blur/focus (backup for tab switches)
         window.addEventListener('blur', this._handleBlur);
         window.addEventListener('focus', this._handleFocus);
-
-        // Page lifecycle events (mobile browser suspend/resume)
         window.addEventListener('pagehide', this._handlePageHide);
         window.addEventListener('pageshow', this._handlePageShow);
 
         console.log(`[AntiCheat] Tracking started for room ${roomCode}`);
     }
 
-    /**
-     * Stop tracking violations
-     */
     stopTracking() {
         if (!this._isTracking) {
             return;
         }
 
-        // Finalize any ongoing violation
         if (this._isCurrentlyViolating) {
             this._endViolation('FocusLost');
         }
 
-        // Clear stored violation time
         this._clearStoredViolation();
 
-        // Remove event listeners
         document.removeEventListener('visibilitychange', this._handleVisibilityChange);
         window.removeEventListener('blur', this._handleBlur);
         window.removeEventListener('focus', this._handleFocus);
@@ -126,9 +98,6 @@ window.AntiCheatTracker = class {
         console.log('[AntiCheat] Tracking stopped');
     }
 
-    /**
-     * Check if there was a violation in progress when the page was suspended
-     */
     _checkSuspendedViolation() {
         try {
             const stored = localStorage.getItem(this._storageKey);
@@ -140,10 +109,8 @@ window.AntiCheatTracker = class {
 
                 console.log(`[AntiCheat] Found suspended violation, duration: ${(durationMs / 1000).toFixed(2)}s`);
 
-                // Clear stored data
                 this._clearStoredViolation();
 
-                // Report the violation if significant
                 if (durationMs > this.NOTICE_THRESHOLD) {
                     this._reportViolation('FocusLost', durationMs / 1000);
                 }
@@ -153,9 +120,6 @@ window.AntiCheatTracker = class {
         }
     }
 
-    /**
-     * Store violation start time in localStorage (survives browser suspend)
-     */
     _storeViolationStart() {
         try {
             localStorage.setItem(this._storageKey, JSON.stringify({
@@ -167,9 +131,6 @@ window.AntiCheatTracker = class {
         }
     }
 
-    /**
-     * Clear stored violation data
-     */
     _clearStoredViolation() {
         try {
             localStorage.removeItem(this._storageKey);
@@ -178,9 +139,6 @@ window.AntiCheatTracker = class {
         }
     }
 
-    /**
-     * Handle page hide (more reliable than visibilitychange on some mobile browsers)
-     */
     _handlePageHide(event) {
         if (!this._isTracking) return;
 
@@ -190,122 +148,87 @@ window.AntiCheatTracker = class {
             this._startViolation();
         }
 
-        // Store in localStorage so we can detect duration after resume
         this._storeViolationStart();
     }
 
-    /**
-     * Handle page show (fires when returning from bfcache or suspend)
-     */
     _handlePageShow(event) {
         if (!this._isTracking) return;
 
         console.log(`[AntiCheat] Page show event, persisted: ${event.persisted}`);
 
-        // If coming from bfcache (frozen state), check for suspended violation
         if (event.persisted) {
             this._checkSuspendedViolation();
         }
 
-        // End any ongoing violation
         if (this._isCurrentlyViolating) {
             this._endViolation('FocusLost');
         }
     }
 
-    /**
-     * Handle page visibility change (mobile-friendly)
-     */
     _handleVisibilityChange() {
         if (!this._isTracking) return;
 
         const isHidden = document.hidden;
 
         if (isHidden && !this._isCurrentlyViolating) {
-            // Page became hidden - start tracking violation
             this._startViolation();
             this._lastVisibilityState = 'hidden';
         } else if (!isHidden && this._isCurrentlyViolating) {
-            // Page became visible again - end violation
             this._endViolation('FocusLost');
             this._lastVisibilityState = 'visible';
         }
     }
 
-    /**
-     * Handle window blur (tab switch or minimize)
-     */
     _handleBlur() {
         if (!this._isTracking || this._isCurrentlyViolating) return;
 
-        // Only start violation if page is still "visible" according to Page Visibility API
-        // This prevents double-counting when both events fire
         if (!document.hidden) {
             this._startViolation();
         }
     }
 
-    /**
-     * Handle window focus (tab restored)
-     */
     _handleFocus() {
         if (!this._isTracking || !this._isCurrentlyViolating) return;
 
         this._endViolation('TabSwitch');
     }
 
-    /**
-     * Start tracking a violation
-     */
     _startViolation() {
         this._violationStartTime = performance.now();
         this._isCurrentlyViolating = true;
 
-        // Also store in localStorage for mobile suspend detection
         this._storeViolationStart();
 
         console.log('[AntiCheat] Violation started');
     }
 
-    /**
-     * End tracking a violation and report to server
-     * @param {string} violationType - Type of violation (FocusLost, TabSwitch)
-     */
     _endViolation(violationType) {
         if (!this._violationStartTime) return;
 
         const durationMs = performance.now() - this._violationStartTime;
         const durationSeconds = durationMs / 1000;
 
-        // Reset state
         this._isCurrentlyViolating = false;
         this._violationStartTime = null;
         this._totalViolations++;
 
-        // Clear stored violation data
         this._clearStoredViolation();
 
         console.log(`[AntiCheat] Violation ended: ${violationType}, duration: ${durationSeconds.toFixed(2)}s`);
 
-        // Report to server (even short violations, server decides penalty)
         this._reportViolation(violationType, durationSeconds);
 
-        // Show immediate UI feedback if above notice threshold
         if (durationMs >= this.NOTICE_THRESHOLD) {
             this._showViolationFeedback(violationType, durationSeconds);
         }
     }
 
-    /**
-     * Report violation via custom event (Blazor will handle hub call)
-     */
     _reportViolation(violationType, durationSeconds) {
         if (!this._roomCode) {
             console.error('[AntiCheat] Cannot report - no room code');
             return;
         }
 
-        // Dispatch event for Blazor to handle
         const event = new CustomEvent('anticheat-report', {
             detail: {
                 roomCode: this._roomCode,
@@ -318,15 +241,11 @@ window.AntiCheatTracker = class {
         console.log(`[AntiCheat] Violation event dispatched: ${violationType}, ${durationSeconds.toFixed(2)}s`);
     }
 
-    /**
-     * Show visual feedback to player
-     */
     _showViolationFeedback(violationType, durationSeconds) {
         let severity = 'notice';
         let message = '⚠️ Utrata fokusu wykryta';
         let penalty = 0;
 
-        // Determine severity based on duration
         if (durationSeconds >= this.PENALTY_THRESHOLD / 1000) {
             severity = 'severe';
             penalty = -15;
@@ -341,7 +260,6 @@ window.AntiCheatTracker = class {
             message = `⚠️ Utrata fokusu (-${Math.abs(penalty)} pkt)`;
         }
 
-        // Dispatch custom event that Blazor components can listen to
         const event = new CustomEvent('anticheat-violation', {
             detail: {
                 type: violationType,
@@ -355,16 +273,10 @@ window.AntiCheatTracker = class {
         window.dispatchEvent(event);
     }
 
-    /**
-     * Get current tracking status
-     */
     isTracking() {
         return this._isTracking;
     }
 
-    /**
-     * Get total violations in current session
-     */
     getTotalViolations() {
         return this._totalViolations;
     }
@@ -373,18 +285,11 @@ window.AntiCheatTracker = class {
 // Create global instance
 window.antiCheatTracker = new window.AntiCheatTracker();
 
-/**
- * Register the anti-cheat event handler with a DotNetObjectReference
- * This must be called from Blazor to properly pass the reference
- * @param {object} dotNetHelper - DotNetObjectReference from Blazor
- */
 window.registerAntiCheatHandler = function (dotNetHelper) {
-    // Remove any existing handler first
     if (window._antiCheatHandler) {
         window.removeEventListener('anticheat-report', window._antiCheatHandler);
     }
 
-    // Create new handler with the dotNetHelper
     window._antiCheatHandler = async (e) => {
         const report = e.detail;
         try {
@@ -400,13 +305,337 @@ window.registerAntiCheatHandler = function (dotNetHelper) {
     console.log('[AntiCheat] Handler registered');
 };
 
-/**
- * Unregister the anti-cheat event handler
- */
 window.unregisterAntiCheatHandler = function () {
     if (window._antiCheatHandler) {
         window.removeEventListener('anticheat-report', window._antiCheatHandler);
         window._antiCheatHandler = null;
         console.log('[AntiCheat] Handler unregistered');
+    }
+};
+
+// ======================================
+// ckeyboard Virtual Keyboard (iOS-style)
+// ======================================
+
+window._kbDotNetRef = null;
+window._kbInitialized = false;
+window._currentInputField = null;
+window._longPressTimer = null;
+window._longPressActive = false;
+
+// Polish character mappings for long-press
+window._polishChars = {
+    'a': ['ą'],
+    'c': ['ć'],
+    'e': ['ę'],
+    'l': ['ł'],
+    'n': ['ń'],
+    'o': ['ó'],
+    's': ['ś'],
+    'z': ['ź', 'ż']
+};
+
+window.initVirtualKeyboard = function (dotNetRef) {
+    if (window._kbInitialized) {
+        console.log('[Keyboard] Already initialized');
+        return;
+    }
+
+    window._kbDotNetRef = dotNetRef;
+
+    // Configure ckeyboard - STANDARD LAYOUT WITHOUT Polish row
+    cKeyboard_config.input_target = '.kb-input';
+    cKeyboard_config.interation_mode = 'click';
+    cKeyboard_config.target = '#keyboard';
+    cKeyboard_config.target_numeric = '#keyboard_numeric';
+
+    // Standard QWERTY layout (no Polish chars row)
+    cKeyboard_config.layout = [
+        {
+            'q': { name: 'q', text: 'q', class: 'cKKey' },
+            'w': { name: 'w', text: 'w', class: 'cKKey' },
+            'e': { name: 'e', text: 'e', class: 'cKKey' },
+            'r': { name: 'r', text: 'r', class: 'cKKey' },
+            't': { name: 't', text: 't', class: 'cKKey' },
+            'y': { name: 'y', text: 'y', class: 'cKKey' },
+            'u': { name: 'u', text: 'u', class: 'cKKey' },
+            'i': { name: 'i', text: 'i', class: 'cKKey' },
+            'o': { name: 'o', text: 'o', class: 'cKKey' },
+            'p': { name: 'p', text: 'p', class: 'cKKey' }
+        },
+        {
+            'a': { name: 'a', text: 'a', class: 'cKKey' },
+            's': { name: 's', text: 's', class: 'cKKey' },
+            'd': { name: 'd', text: 'd', class: 'cKKey' },
+            'f': { name: 'f', text: 'f', class: 'cKKey' },
+            'g': { name: 'g', text: 'g', class: 'cKKey' },
+            'h': { name: 'h', text: 'h', class: 'cKKey' },
+            'j': { name: 'j', text: 'j', class: 'cKKey' },
+            'k': { name: 'k', text: 'k', class: 'cKKey' },
+            'l': { name: 'l', text: 'l', class: 'cKKey' }
+        },
+        {
+            'shift': { name: 'shift', text: '', class: 'cKFunction' },
+            'z': { name: 'z', text: 'z', class: 'cKKey' },
+            'x': { name: 'x', text: 'x', class: 'cKKey' },
+            'c': { name: 'c', text: 'c', class: 'cKKey' },
+            'v': { name: 'v', text: 'v', class: 'cKKey' },
+            'b': { name: 'b', text: 'b', class: 'cKKey' },
+            'n': { name: 'n', text: 'n', class: 'cKKey' },
+            'm': { name: 'm', text: 'm', class: 'cKKey' },
+            'backspace': { name: 'backspace', text: '', class: 'cKFunction' }
+        },
+        {
+            'space': { name: 'space', text: 'spacja', class: 'cKKey' }
+        }
+    ];
+
+    // Initialize ckeyboard
+    cKeyboard();
+
+    // Hide keyboard initially
+    $('#keyboard').hide();
+    $('#keyboard_numeric').hide();
+
+    // Override ALL event handlers from ckeyboard
+    $('body').off('touchstart click', '.cK.cKKey');
+    $('body').off('click', '.cK.cKFunction.cKey-backspace');
+
+    // === FIXED: Key press handler ===
+    $('body').on('click', '.cK.cKKey', function () {
+        if (!window._currentInputField || window._longPressActive) return;
+
+        var $input = $(window._currentInputField);
+        var maxLength = $input.attr('maxlength');
+
+        if (maxLength !== undefined) {
+            if ($input.val().length >= parseInt(maxLength)) {
+                return;
+            }
+        }
+
+        var char = $(this).html();
+        if (cKeyboard_config.capslock_state) {
+            char = char.toUpperCase();
+        }
+
+        var newValue = $input.val() + char;
+        $input.val(newValue);
+
+        // Trigger input event for Blazor binding
+        $input[0].dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    // === FIXED: Backspace handler - uses CURRENT input only ===
+    $('body').on('click', '.cK.cKFunction.cKey-backspace', function () {
+        if (!window._currentInputField) return;
+
+        var $input = $(window._currentInputField);
+        $input.val($input.val().slice(0, -1));
+
+        // Trigger input event for Blazor binding
+        $input[0].dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    // === NEW: Long-press for Polish characters ===
+    $('body').on('mousedown touchstart', '.cK.cKKey', function (e) {
+        var $key = $(this);
+        var char = $key.html().toLowerCase();
+
+        // Check if this key has Polish alternatives
+        if (!window._polishChars[char]) return;
+
+        window._longPressTimer = setTimeout(function () {
+            window._longPressActive = true;
+            showPolishCharPicker($key, char);
+        }, 500); // 500ms for long-press
+    });
+
+    $('body').on('mouseup touchend mouseleave', '.cK.cKKey', function () {
+        if (window._longPressTimer) {
+            clearTimeout(window._longPressTimer);
+            window._longPressTimer = null;
+        }
+        setTimeout(function () {
+            window._longPressActive = false;
+        }, 100);
+    });
+
+    // Attach focus handlers to all kb-input fields
+    $(document).on('focus click', '.kb-input', function (e) {
+        e.preventDefault();
+        e.stopPropagation(); // Prevent triggering document click
+
+        // Remove focus from all inputs first
+        $('.kb-input').removeClass('ring-2 ring-primary');
+        $('.kb-input').addClass('ring-1 ring-slate-700');
+
+        // Add focus styling to this input
+        $(this).removeClass('ring-1 ring-slate-700');
+        $(this).addClass('ring-2 ring-primary');
+
+        // Fully block native keyboard
+        this.blur();
+        setTimeout(() => this.blur(), 10); // Extra safety
+
+        window._currentInputField = this;
+        window._keyboardJustOpened = true; // Flag to prevent immediate closing
+
+        // Show keyboard first to get its height
+        $('#keyboard').fadeIn(200);
+
+        var $input = $(this);
+
+        // Move footer (STOP button) and adjust main area
+        setTimeout(function () {
+            var keyboardHeight = $('#keyboard').outerHeight() || 190;
+            var footerHeight = $('footer').outerHeight() || 70;
+            var totalHeightToReserve = keyboardHeight + footerHeight + 10; // Small buffer
+
+            // Move footer above keyboard
+            $('footer').css('bottom', keyboardHeight + 'px');
+            $('footer').css('transition', 'bottom 0.2s ease');
+
+            // Add padding to main so content is scrollable above keyboard+footer
+            $('main').css('padding-bottom', totalHeightToReserve + 'px');
+
+            // Scroll input into view
+            setTimeout(function () {
+                $input[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                // Clear the flag after scroll completes
+                setTimeout(function () {
+                    window._keyboardJustOpened = false;
+                }, 500);
+            }, 250);
+        }, 50);
+
+        console.log('[Keyboard] Showing keyboard for input:', this.id);
+    });
+
+    // Hide keyboard when clicking outside input or keyboard
+    $(document).on('click', function (e) {
+        // Prevent hiding if keyboard just opened (race condition fix)
+        if (window._keyboardJustOpened) return;
+
+        // Check if keyboard is visible
+        if (!$('#keyboard').is(':visible')) return;
+
+        // Don't hide if clicking on input, keyboard, or Polish char picker
+        if ($(e.target).closest('.kb-input, #keyboard, #keyboard_numeric, .polish-char-picker').length > 0) {
+            return;
+        }
+
+        // Hide keyboard
+        window.hideVirtualKeyboard();
+        console.log('[Keyboard] Hidden by clicking outside');
+    });
+
+    // Prevent keyboard from appearing on input events
+    $(document).on('keydown keypress', '.kb-input', function (e) {
+        e.preventDefault();
+        return false;
+    });
+
+    window._kbInitialized = true;
+    console.log('[Keyboard] ckeyboard initialized with long-press Polish support');
+};
+
+// Show Polish character picker on long-press
+function showPolishCharPicker($key, baseChar) {
+    var polishOptions = window._polishChars[baseChar];
+    if (!polishOptions) return;
+
+    // Create picker popup
+    var $picker = $('<div class="polish-char-picker"></div>');
+
+    polishOptions.forEach(function (polishChar) {
+        var $option = $('<div class="polish-char-option">' + polishChar + '</div>');
+
+        // Use mousedown/touchstart for immediate response
+        $option.on('mousedown touchstart', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            insertPolishChar(polishChar);
+            $('.polish-char-picker').remove();
+            window._longPressActive = false;
+            return false;
+        });
+
+        $picker.append($option);
+    });
+
+    // Position above the key
+    var keyOffset = $key.offset();
+    $picker.css({
+        position: 'absolute',
+        left: keyOffset.left + 'px',
+        bottom: ($(window).height() - keyOffset.top + 10) + 'px'
+    });
+
+    $('body').append($picker);
+
+    // Remove picker if clicking outside (with delay to avoid immediate removal)
+    setTimeout(function () {
+        $(document).one('mousedown touchstart', function (e) {
+            if (!$(e.target).closest('.polish-char-picker').length) {
+                $('.polish-char-picker').remove();
+                window._longPressActive = false;
+            }
+        });
+    }, 100);
+}
+
+function insertPolishChar(char) {
+    if (!window._currentInputField) return;
+
+    var $input = $(window._currentInputField);
+    var maxLength = $input.attr('maxlength');
+
+    if (maxLength !== undefined) {
+        if ($input.val().length >= parseInt(maxLength)) {
+            return;
+        }
+    }
+
+    if (cKeyboard_config.capslock_state) {
+        char = char.toUpperCase();
+    }
+
+    var newValue = $input.val() + char;
+    $input.val(newValue);
+
+    // Trigger input event for Blazor binding
+    $input[0].dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+window.hideVirtualKeyboard = function () {
+    $('#keyboard').fadeOut(200);
+    $('#keyboard_numeric').fadeOut(200);
+
+    // Reset footer position
+    $('footer').css('bottom', '0');
+
+    // Reset main padding
+    $('main').css('padding-bottom', '0');
+
+    // Remove focus styling
+    $('.kb-input').removeClass('ring-2 ring-primary');
+    $('.kb-input').addClass('ring-1 ring-slate-700');
+
+    window._currentInputField = null;
+
+    // Clear any Polish char pickers
+    $('.polish-char-picker').remove();
+};
+
+window.destroyVirtualKeyboard = function () {
+    window._kbDotNetRef = null;
+    window._kbInitialized = false;
+    window._currentInputField = null;
+
+    if (window._longPressTimer) {
+        clearTimeout(window._longPressTimer);
+        window._longPressTimer = null;
     }
 };
