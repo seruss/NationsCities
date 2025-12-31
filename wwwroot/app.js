@@ -154,6 +154,13 @@ window.AntiCheatTracker = class {
                 return;
             }
 
+            // Only process violations on game round page
+            if (!this._isOnGameRoundPage(session.roomCode)) {
+                console.log('[AntiCheat] Not on game round page, clearing session');
+                this._clearSession();
+                return;
+            }
+
             // Calculate gap from hiddenAt (preferred) or lastActiveAt (fallback for mobile)
             const hiddenAt = session.hiddenAt || session.lastActiveAt;
             const gap = Date.now() - hiddenAt;
@@ -171,6 +178,12 @@ window.AntiCheatTracker = class {
             // Resume heartbeat
             this._startHeartbeat();
         }
+    }
+
+    _isOnGameRoundPage(roomCode) {
+        const path = window.location.pathname.toLowerCase();
+        // Check if we're on a game round page
+        return path.includes('/gameround/') || path.includes('/game/');
     }
 
     _handleViolation(gapMs, session) {
