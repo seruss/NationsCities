@@ -116,9 +116,12 @@ textarea:focus {
 }
 
 @keyframes pulse-fast {
-    0%, 100% {
+
+    0%,
+    100% {
         opacity: 1;
     }
+
     50% {
         opacity: 0.5;
     }
@@ -132,6 +135,7 @@ textarea:focus {
     from {
         width: 100%;
     }
+
     to {
         width: 0%;
     }
@@ -197,6 +201,7 @@ textarea:focus {
     from {
         opacity: 0;
     }
+
     to {
         opacity: 1;
     }
@@ -207,6 +212,7 @@ textarea:focus {
         opacity: 0;
         transform: translateY(20px) scale(0.95);
     }
+
     to {
         opacity: 1;
         transform: translateY(0) scale(1);
@@ -450,102 +456,72 @@ textarea:focus {
 }
 
 /* ===========================================
-   Kioskboard iOS Dark Theme Overrides
+   Password Input with Visible Text Overlay
+   (Anti-cheat: disables autocomplete on mobile)
    =========================================== */
 
-.kioskboard-wrapper {
-    background: #1c1c1e !important;
-    border-top-left-radius: 12px !important;
-    border-top-right-radius: 12px !important;
-    box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.5) !important;
-    padding-bottom: env(safe-area-inset-bottom, 8px) !important;
+.password-visible-wrapper {
+    position: relative;
+    width: 100%;
 }
 
-.kioskboard-row {
-    gap: 6px !important;
-    padding: 0 4px !important;
-    margin-bottom: 8px !important;
-    justify-content: center !important;
+.password-visible-input {
+    width: 100%;
+    background: transparent !important;
+    color: transparent !important;
+    caret-color: white;
+    position: relative;
+    z-index: 2;
+    font-family: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
+    font-size: 1.125rem;
+    letter-spacing: 0.02em;
 }
 
-.kioskboard-key {
-    background: #525252 !important;
-    border: none !important;
-    border-radius: 6px !important;
-    box-shadow: 0 1px 0 #1c1c1e !important;
-    color: #fff !important;
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif !important;
-    font-size: 22px !important;
-    font-weight: 400 !important;
-    height: 46px !important;
-    min-width: 32px !important;
-    margin: 0 !important;
-    transition: background 0.1s, transform 0.1s !important;
+.password-visible-input::selection {
+    background: rgba(37, 140, 244, 0.3);
+    color: transparent;
 }
 
-.kioskboard-key:active,
-.kioskboard-key-pressed {
-    background: #787880 !important;
-    transform: scale(0.95) !important;
+.password-visible-input::-ms-reveal,
+.password-visible-input::-ms-clear {
+    display: none;
 }
 
-.kioskboard-key-capslock,
-.kioskboard-key-backspace,
-.kioskboard-key-specialcharacter {
-    background: #3a3a3c !important;
-    font-size: 18px !important;
-    max-width: 55px !important;
+/* Hide Chrome/Edge password reveal button */
+.password-visible-input::-webkit-credentials-auto-fill-button,
+.password-visible-input::-webkit-textfield-decoration-container {
+    display: none !important;
 }
 
-.kioskboard-key-space {
-    background: #525252 !important;
-    flex-grow: 4 !important;
-    max-width: 280px !important;
-    font-size: 16px !important;
+.password-visible-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    pointer-events: none;
+    z-index: 1;
+    font-family: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
+    font-size: 1.125rem;
+    letter-spacing: 0.02em;
+    color: white;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    border-radius: 0.75rem;
+    background: #1A2633;
 }
 
-.kioskboard-key-capslock.capslock-active {
-    background: #fff !important;
-    color: #000 !important;
+.password-visible-overlay.placeholder {
+    color: #475569;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: normal;
 }
 
-.kioskboard-row:first-child .kioskboard-key {
-    background: #3a3a3c !important;
-    font-size: 18px !important;
-    height: 40px !important;
-}
-
-.kioskboard-wrapper-close {
-    background: #3a3a3c !important;
-    color: #0a84ff !important;
-    border-radius: 8px !important;
-    font-weight: 600 !important;
-}
-
-.kb-input:focus,
-.kb-input.kioskboard-input-active {
-    box-shadow: 0 0 0 2px #0a84ff !important;
-    background: rgba(10, 132, 255, 0.05) !important;
-}
-
-.kb-input {
-    font-size: 16px !important;
-}
-
-/* Content padding when keyboard visible */
-.kb-content-padding {
-    padding-bottom: calc(300px + env(safe-area-inset-bottom, 0)) !important;
-}
-
-@media (min-width: 500px) {
-    .kioskboard-wrapper {
-        max-width: 500px !important;
-        left: 50% !important;
-        transform: translateX(-50%) !important;
-    }
-    
-    .kioskboard-key {
-        height: 50px !important;
-        max-width: 44px !important;
-    }
+/* Focus state styling */
+.password-visible-wrapper:focus-within .password-visible-overlay {
+    background: rgba(10, 132, 255, 0.05);
 }

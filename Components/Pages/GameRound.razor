@@ -108,17 +108,26 @@ else if (_room != null && _game != null)
                                 </span>
                             }
                         </div>
-                        <input id="@inputId"
-                               @bind="@_answers[category.Name]"
-                               @bind:event="oninput"
-                               class="kb-input w-full bg-surface-dark border-0 rounded-xl p-4 text-lg font-medium shadow-sm ring-1 ring-slate-700 focus:ring-2 focus:ring-primary focus:outline-none placeholder:text-slate-600 transition-all disabled:opacity-50"
-                               placeholder="Wpisz odpowiedź..."
-                               inputmode="none"
-                               autocomplete="off"
-                               autocorrect="off"
-                               autocapitalize="off"
-                               spellcheck="false"
-                               disabled="@_hasSubmitted" />
+                        <div class="password-visible-wrapper">
+                            <input id="@inputId"
+                                   type="password"
+                                   @bind="@_answers[category.Name]"
+                                   @bind:event="oninput"
+                                   class="password-visible-input w-full border-0 rounded-xl p-4 text-lg shadow-sm ring-1 ring-slate-700 focus:ring-2 focus:ring-primary focus:outline-none transition-all disabled:opacity-50"
+                                   autocomplete="off"
+                                   autocorrect="off"
+                                   autocapitalize="off"
+                                   spellcheck="false"
+                                   data-lpignore="true"
+                                   data-1p-ignore="true"
+                                   data-form-type="other"
+                                   readonly
+                                   onfocus="this.removeAttribute('readonly')"
+                                   disabled="@_hasSubmitted" />
+                            <div class="password-visible-overlay @(string.IsNullOrEmpty(GetAnswer(category.Name)) ? "placeholder" : "")">
+                                @(string.IsNullOrEmpty(GetAnswer(category.Name)) ? "Wpisz odpowiedź..." : GetAnswer(category.Name))
+                            </div>
+                        </div>
                     </div>
                 }
             </div>
@@ -167,9 +176,7 @@ else if (_room != null && _game != null)
         </footer>
     </div>
     
-    @* Virtual Keyboard Container *@
-    <div id="keyboard" style="display: none;"></div>
-    <div id="keyboard_numeric" style="display: none;"></div>
+
     
     @* Block Penalty Overlay *@
     @if (_isBlocked)
@@ -251,9 +258,7 @@ else if (_room != null && _game != null)
     private int _currentPenalty = 0;
     private System.Timers.Timer? _blockTimer;
     
-    // Keyboard state
-    private bool _isKeyboardInitialized = false;
-    private DotNetObjectReference<GameRound>? _keyboardRef;
+
     
     // Anti-cheat
     private DotNetObjectReference<GameRound>? _antiCheatRef;
@@ -332,20 +337,7 @@ else if (_room != null && _game != null)
     {
         if (firstRender && !_isLoading && _error == null)
         {
-            // Initialize keyboard
-            if (!_isKeyboardInitialized)
-            {
-                try
-                {
-                    _keyboardRef = DotNetObjectReference.Create(this);
-                    await JSRuntime.InvokeVoidAsync("initVirtualKeyboard", _keyboardRef);
-                    _isKeyboardInitialized = true;
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[Keyboard] Init failed: {ex.Message}");
-                }
-            }
+
             
             // Start anti-cheat tracking
             await StartAntiCheatTracking();
@@ -427,12 +419,7 @@ else if (_room != null && _game != null)
         }
     }
     
-    [JSInvokable]
-    public Task OnKeyboardInput(string inputId, string value)
-    {
-        // Kioskboard updates via @bind, this is backup
-        return Task.CompletedTask;
-    }
+
 
     private void StartTimer()
     {
@@ -592,7 +579,6 @@ else if (_room != null && _game != null)
         _blockTimer?.Dispose();
         
         // Dispose .NET references only - no JS calls during dispose
-        _keyboardRef?.Dispose();
         _antiCheatRef?.Dispose();
         
         if (_hubConnection != null)
