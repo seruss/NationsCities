@@ -297,6 +297,18 @@ public class GameHub : Hub
             // Notify all players about STOP
             await Clients.Group(roomCode).SendAsync("OnStopTriggered", Context.ConnectionId, result.EndTime);
             await Clients.Group(roomCode).SendAsync("OnPlayerSubmitted", Context.ConnectionId);
+            
+            // Check if all players already submitted (could happen in 2-player game)
+            if (room?.CurrentGame != null)
+            {
+                var allSubmitted = room.Players.All(p => 
+                    room.CurrentGame.RoundAnswers.ContainsKey(p.ConnectionId));
+                
+                if (allSubmitted)
+                {
+                    await EndRound(roomCode);
+                }
+            }
         }
     }
 

@@ -419,6 +419,9 @@ else if (_room != null && _game != null)
             _isBlocked = false;
             _blockTimer?.Stop();
             
+            // Stop anti-cheat tracking immediately when submitting
+            await StopAntiCheatTracking();
+            
             await _hubConnection.InvokeAsync("TriggerStop", RoomCode, _answers);
             await InvokeAsync(StateHasChanged);
         }
@@ -439,6 +442,9 @@ else if (_room != null && _game != null)
         
         _isBlocked = false;
         _blockTimer?.Stop();
+        
+        // Stop anti-cheat tracking immediately when submitting
+        await StopAntiCheatTracking();
         
         if (_hubConnection != null)
         {
