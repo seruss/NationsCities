@@ -507,19 +507,7 @@ else if (_room != null && _game != null)
         }
     }
     
-    private async Task StopAntiCheatTracking()
-    {
-        try
-        {
-            await JSRuntime.InvokeVoidAsync("antiCheatTracker.stopTracking");
-            await JSRuntime.InvokeVoidAsync("unregisterAntiCheatHandler");
-        }
-        catch (Exception ex)
-        {
-            // JS calls may fail during circuit disconnect - that's fine
-            Console.WriteLine($"[AntiCheat] Stop failed (likely circuit disposed): {ex.Message}");
-        }
-    }
+    // NOTE: StopAntiCheatTracking removed - only use PauseAntiCheatTracking to preserve session for next round
     
     private void StartBlockPenalty(int violationNumber, int penalty)
     {
@@ -530,9 +518,9 @@ else if (_room != null && _game != null)
         {
             1 => 2,
             2 => 3,
-            3 => 6,
-            4 => 12,
-            _ => 20
+            3 => 5,
+            4 => 8,
+            _ => 13
         };
         
         _isWarningOnly = (violationNumber == 1);

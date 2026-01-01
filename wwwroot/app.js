@@ -356,9 +356,9 @@ window.AntiCheatTracker = class {
     }
 
     _getPenalty(violationNumber) {
-        // Match server-side Violation.CalculatePenalty (doubled values)
+        // Match server-side Violation.CalculatePenalty - EVERY violation has penalty
         switch (violationNumber) {
-            case 1: return 0;   // Warning
+            case 1: return 5;   // 1st = -5 pkt
             case 2: return 10;  // 2nd = -10 pkt
             case 3: return 20;  // 3rd = -20 pkt
             default: return 30; // 4th+ = -30 pkt
