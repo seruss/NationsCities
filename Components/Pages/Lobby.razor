@@ -576,9 +576,9 @@ else if (_room != null)
     {
         if (_room == null) return;
         
-        // Prevent duplicate consecutive system messages
-        var lastMsg = _room.ChatMessages.LastOrDefault();
-        if (lastMsg != null && lastMsg.IsSystem && lastMsg.Text == text)
+        // Prevent duplicate system messages - check last 3 messages
+        var recentMessages = _room.ChatMessages.TakeLast(3);
+        if (recentMessages.Any(m => m.IsSystem && m.Text == text))
         {
             return; // Don't add duplicate
         }

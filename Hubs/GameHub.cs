@@ -22,6 +22,31 @@ public class GameHub : Hub
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
+        var roomCode = _roomService.GetRoomCode(Context.ConnectionId);
+        if (roomCode == null)
+        {
+            await base.OnDisconnectedAsync(exception);
+            return;
+        }
+        
+        var room = _roomService.GetRoom(roomCode);
+        
+        // DON'T remove players when a game is in progress
+        // They're just navigating between pages (lobby -> game -> scoreboard -> etc)
+        if (room?.CurrentGame != null)
+        {
+            await base.OnDisconnectedAsync(exception);
+            return;
+        }
+        
+        var player = room?.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+        if (player == null)
+        {
+            await base.OnDisconnectedAsync(exception);
+            return;
+        }
+        
+        // Only remove player when they're in the lobby (no active game)
         var result = _roomService.LeaveRoom(Context.ConnectionId);
         if (result.Room != null && !result.RoomDeleted)
         {
