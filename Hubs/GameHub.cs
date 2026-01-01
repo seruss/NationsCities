@@ -283,10 +283,16 @@ public class GameHub : Hub
     /// </summary>
     public async Task TriggerStop(string roomCode, Dictionary<string, string> answers)
     {
+        Console.WriteLine($"[TriggerStop] Called by {Context.ConnectionId}");
+        
         var room = _roomService.GetRoom(roomCode);
         var countdownSeconds = room?.Settings.CountdownSeconds ?? 10;
         
+        Console.WriteLine($"[TriggerStop] Room has {room?.Players.Count ?? 0} players");
+        
         var result = _gameService.TriggerStop(roomCode, Context.ConnectionId, countdownSeconds);
+        
+        Console.WriteLine($"[TriggerStop] GameService.TriggerStop result: Success={result.Success}");
         
         if (result.Success)
         {
@@ -301,35 +307,62 @@ public class GameHub : Hub
             // Check if all players already submitted (could happen in 2-player game)
             if (room?.CurrentGame != null)
             {
+                var submittedCount = room.CurrentGame.RoundAnswers.Count;
+                var playerCount = room.Players.Count;
+                Console.WriteLine($"[TriggerStop] SUCCESS branch: Submitted={submittedCount}, Players={playerCount}");
+                
                 var allSubmitted = room.Players.All(p => 
                     room.CurrentGame.RoundAnswers.ContainsKey(p.ConnectionId));
                 
                 if (allSubmitted)
                 {
+                    Console.WriteLine($"[TriggerStop] All submitted in SUCCESS branch - calling EndRound");
                     await EndRound(roomCode);
                 }
             }
         }
         else
         {
+            Console.WriteLine($"[TriggerStop] ELSE branch - TriggerStop failed, submitting answers anyway");
+            
             // TriggerStop failed (another player already triggered) - but still submit this player's answers
             // This prevents deadlock when both players click STOP simultaneously
             if (_gameService.SubmitAnswers(roomCode, Context.ConnectionId, answers))
             {
+                Console.WriteLine($"[TriggerStop] ELSE branch - SubmitAnswers succeeded");
+                
                 await Clients.Caller.SendAsync("OnAnswersSubmitted");
                 await Clients.Group(roomCode).SendAsync("OnPlayerSubmitted", Context.ConnectionId);
                 
                 // Check if all players submitted
                 if (room?.CurrentGame != null)
                 {
+                    var submittedCount = room.CurrentGame.RoundAnswers.Count;
+                    var playerCount = room.Players.Count;
+                    Console.WriteLine($"[TriggerStop] ELSE branch: Submitted={submittedCount}, Players={playerCount}");
+                    
                     var allSubmitted = room.Players.All(p => 
                         room.CurrentGame.RoundAnswers.ContainsKey(p.ConnectionId));
                     
                     if (allSubmitted)
                     {
+                        Console.WriteLine($"[TriggerStop] All submitted in ELSE branch - calling EndRound");
                         await EndRound(roomCode);
                     }
+                    else
+                    {
+                        Console.WriteLine($"[TriggerStop] NOT all submitted yet in ELSE branch");
+                        foreach (var p in room.Players)
+                        {
+                            var hasAnswers = room.CurrentGame.RoundAnswers.ContainsKey(p.ConnectionId);
+                            Console.WriteLine($"[TriggerStop]   Player {p.Nickname} ({p.ConnectionId}): HasAnswers={hasAnswers}");
+                        }
+                    }
                 }
+            }
+            else
+            {
+                Console.WriteLine($"[TriggerStop] ELSE branch - SubmitAnswers FAILED!");
             }
         }
     }

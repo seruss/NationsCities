@@ -254,7 +254,7 @@ window.AntiCheatTracker = class {
         // Calculate block duration based on violation number
         const blockSeconds = this._getBlockDuration(violationNumber);
         const isWarning = violationNumber === 1;
-        const penalty = this._getPenalty(durationSeconds);
+        const penalty = this._getPenalty(violationNumber);
 
         // Create overlay if doesn't exist
         if (!this._blockOverlay) {
@@ -349,10 +349,14 @@ window.AntiCheatTracker = class {
         }
     }
 
-    _getPenalty(durationSeconds) {
-        if (durationSeconds >= this.PENALTY_THRESHOLD_MS / 1000) return 15;
-        if (durationSeconds >= this.WARNING_THRESHOLD_MS / 1000) return 10;
-        return 5;
+    _getPenalty(violationNumber) {
+        // Match server-side Violation.CalculatePenalty (doubled values)
+        switch (violationNumber) {
+            case 1: return 0;   // Warning
+            case 2: return 10;  // 2nd = -10 pkt
+            case 3: return 20;  // 3rd = -20 pkt
+            default: return 30; // 4th+ = -30 pkt
+        }
     }
 
     // === BLAZOR COMMUNICATION ===
