@@ -85,7 +85,7 @@ else if (_room != null)
                         <div class="text-right">
                             <p class="text-2xl font-black text-white">@_leader.TotalScore</p>
                             <p class="text-sm font-bold text-green-400">+@_leader.RoundScore pkt</p>
-                            @{ var leaderPenalty = GetTotalPenalty(_leader); }
+                            @{ var leaderPenalty = GetRoundPenalty(_leader); }
                             @if (leaderPenalty > 0)
                             {
                                 <p class="text-xs font-bold text-red-400">-@leaderPenalty kara</p>
@@ -122,7 +122,7 @@ else if (_room != null)
                         </div>
                         <div class="text-right flex flex-col items-end gap-1">
                             <span class="inline-block rounded-full bg-primary/10 px-2 py-1 text-xs font-bold text-primary">+@player.RoundScore</span>
-                            @{ var playerPenalty = GetTotalPenalty(player); }
+                            @{ var playerPenalty = GetRoundPenalty(player); }
                             @if (playerPenalty > 0)
                             {
                                 <span class="inline-block rounded-full bg-red-500/10 px-2 py-1 text-xs font-bold text-red-400">-@playerPenalty</span>
@@ -311,13 +311,14 @@ else if (_room != null)
 
     private void ShowFinalResults()
     {
-        // Final results - just go home for now
-        GoHome();
+        Navigation.NavigateTo($"/finalresults/{RoomCode}?nick={Uri.EscapeDataString(_nickname)}");
     }
 
-    private int GetTotalPenalty(Player player)
+    private int GetRoundPenalty(Player player)
     {
-        return player.Violations.Sum(v => v.Penalty);
+        return player.Violations
+            .Where(v => v.RoundNumber == _currentRound)
+            .Sum(v => v.Penalty);
     }
 
     private void GoHome()

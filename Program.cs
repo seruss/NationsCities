@@ -4,28 +4,19 @@ using System.Globalization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Polska kultura
 var polishCulture = new CultureInfo("pl-PL");
 CultureInfo.DefaultThreadCurrentCulture = polishCulture;
 CultureInfo.DefaultThreadCurrentUICulture = polishCulture;
 
-// Add services to the container.
-builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
-
-// SignalR
+builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddSignalR();
 
-// Game Services (Singleton dla współdzielonego stanu)
 builder.Services.AddSingleton<NationsCities.Services.RoomService>();
 builder.Services.AddSingleton<NationsCities.Services.GameService>();
-
-// Background Services
 builder.Services.AddHostedService<NationsCities.Services.RoomCleanupService>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
@@ -34,10 +25,8 @@ if (!app.Environment.IsDevelopment())
 app.UseStaticFiles();
 app.UseAntiforgery();
 
-// SignalR Hub
 app.MapHub<GameHub>("/gamehub");
 
-app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 
 app.Run();
