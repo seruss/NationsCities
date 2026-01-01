@@ -212,6 +212,9 @@ else if (_room != null && _game != null)
     
     // Anti-cheat tracking flag
     private bool _antiCheatStarted = false;
+    
+    // Flag to track if first render has completed (needed for JS interop safety)
+    private bool _hasRendered = false;
 
     
     // Anti-cheat
@@ -289,9 +292,15 @@ else if (_room != null && _game != null)
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        // Mark that we've rendered (JS interop is now safe)
+        if (firstRender)
+        {
+            _hasRendered = true;
+        }
+        
         // Start anti-cheat after loading is complete
         // Using flag-based approach instead of firstRender to handle async loading
-        if (!_antiCheatStarted && !_isLoading && !_isDisposed && _game != null && _hubConnection != null)
+        if (!_antiCheatStarted && !_isLoading && !_isDisposed && _game != null && _hubConnection != null && _hasRendered)
         {
             _antiCheatStarted = true;
             await StartAntiCheatTracking();
@@ -494,6 +503,13 @@ else if (_room != null && _game != null)
     
     private async Task PauseAntiCheatTracking()
     {
+        // Safety check: don't call JS during prerendering or if never started
+        if (!_hasRendered || !_antiCheatStarted)
+        {
+            Console.WriteLine("[AntiCheat] Skipping pause - not yet rendered or not started");
+            return;
+        }
+        
         try
         {
             // Just pause - stop detecting but keep handler for pending reports
