@@ -20,6 +20,9 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<NationsCities.Services.RoomService>();
 builder.Services.AddSingleton<NationsCities.Services.GameService>();
 
+// Background Services
+builder.Services.AddHostedService<NationsCities.Services.RoomCleanupService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

@@ -39,4 +39,9 @@ public class Room
     /// Data utworzenia pokoju.
     /// </summary>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Data ostatniej aktywności w pokoju (używane do czyszczenia).
+    /// </summary>
+    public DateTime LastActivityAt { get; set; } = DateTime.UtcNow;
 }

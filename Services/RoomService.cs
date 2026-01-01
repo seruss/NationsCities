@@ -275,4 +275,71 @@ public class RoomService
 
         return code;
     }
+
+    /// <summary>
+    /// Aktualizuje czas ostatniej aktywności pokoju.
+    /// </summary>
+    public void UpdateRoomActivity(string roomCode)
+    {
+        if (_rooms.TryGetValue(roomCode.ToUpperInvariant(), out var room))
+        {
+            room.LastActivityAt = DateTime.UtcNow;
+        }
+    }
+
+    /// <summary>
+    /// Pobiera listę nieaktywnych pokoi do usunięcia.
+    /// </summary>
+    public List<(string Code, int PlayerCount, TimeSpan InactiveTime)> GetInactiveRooms(TimeSpan inactiveThreshold)
+    {
+        var now = DateTime.UtcNow;
+        return _rooms.Values
+            .Where(r => now - r.LastActivityAt > inactiveThreshold)
+            .Select(r => (r.Code, r.Players.Count, now - r.LastActivityAt))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Usuwa nieaktywne pokoje (puste lub bez aktywności przez dłuższy czas).
+    /// </summary>
+    public int CleanupInactiveRooms(TimeSpan emptyRoomThreshold, TimeSpan staleRoomThreshold)
+    {
+        var now = DateTime.UtcNow;
+        var removedCount = 0;
+
+        foreach (var room in _rooms.Values.ToList())
+        {
+            var inactiveTime = now - room.LastActivityAt;
+            
+            // Usuń puste pokoje (brak graczy) po krótszym czasie
+            if (room.Players.Count == 0 && inactiveTime > emptyRoomThreshold)
+            {
+                if (_rooms.TryRemove(room.Code, out _))
+                {
+                    removedCount++;
+                }
+            }
+            // Usuń pokoje z graczami po dłuższym czasie nieaktywności
+            else if (inactiveTime > staleRoomThreshold)
+            {
+                // Wyczyść mapowania graczy
+                foreach (var player in room.Players)
+                {
+                    _playerRooms.TryRemove(player.ConnectionId, out _);
+                }
+                
+                if (_rooms.TryRemove(room.Code, out _))
+                {
+                    removedCount++;
+                }
+            }
+        }
+
+        return removedCount;
+    }
+
+    /// <summary>
+    /// Pobiera całkowitą liczbę aktywnych pokoi.
+    /// </summary>
+    public int GetRoomCount() => _rooms.Count;
 }
