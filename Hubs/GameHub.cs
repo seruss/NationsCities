@@ -157,6 +157,12 @@ public class GameHub : Hub
             var oldConnectionId = player.ConnectionId;
             player.ConnectionId = Context.ConnectionId;
             
+            // If this player is the host, update room's HostConnectionId too
+            if (player.IsHost)
+            {
+                room.HostConnectionId = Context.ConnectionId;
+            }
+            
             // Add to SignalR group
             await Groups.AddToGroupAsync(Context.ConnectionId, roomCode);
             return true;

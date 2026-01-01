@@ -362,7 +362,9 @@ else if (_room != null)
     private record CategoryWithColor(Category Category, string BgClass, string TextClass);
     private List<CategoryWithColor> _categoriesWithColors = new();
 
-    private bool IsHost => _room?.HostConnectionId == _myConnectionId;
+    // Check IsHost using both HostConnectionId and player.IsHost flag (for reconnects)
+    private bool IsHost => _room?.HostConnectionId == _myConnectionId || 
+                           (_room?.Players.FirstOrDefault(p => p.ConnectionId == _myConnectionId)?.IsHost ?? false);
     private bool AmIReady => _room?.Players.FirstOrDefault(p => p.ConnectionId == _myConnectionId)?.IsReady ?? false;
     private int ReadyCount => _room?.Players.Count(p => p.IsReady) ?? 0;
     private bool AllReady => _room?.Players.All(p => p.IsReady) ?? false;
