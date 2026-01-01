@@ -574,8 +574,16 @@ else if (_room != null)
 
     private void AddSystemMessage(string text)
     {
-        // Add to Room's persisted chat
-        _room?.ChatMessages.Add(new ChatMessage
+        if (_room == null) return;
+        
+        // Prevent duplicate consecutive system messages
+        var lastMsg = _room.ChatMessages.LastOrDefault();
+        if (lastMsg != null && lastMsg.IsSystem && lastMsg.Text == text)
+        {
+            return; // Don't add duplicate
+        }
+        
+        _room.ChatMessages.Add(new ChatMessage
         {
             Nickname = "System",
             Text = text,

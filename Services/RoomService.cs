@@ -233,6 +233,18 @@ public class RoomService
     }
 
     /// <summary>
+    /// Aktualizuje ConnectionId gracza po ponownym połączeniu (rejoin).
+    /// </summary>
+    public void UpdatePlayerConnection(string roomCode, string oldConnectionId, string newConnectionId)
+    {
+        // Remove old mapping
+        _playerRooms.TryRemove(oldConnectionId, out _);
+        
+        // Add new mapping
+        _playerRooms[newConnectionId] = roomCode;
+    }
+
+    /// <summary>
     /// Sprawdza czy wszyscy gracze są gotowi.
     /// </summary>
     public bool AllPlayersReady(string roomCode)
