@@ -206,6 +206,9 @@ public class GameService
 
             foreach (var (playerId, playerAnswers) in game.RoundAnswers)
             {
+                // Safety check for null playerAnswers
+                if (playerAnswers?.Answers == null) continue;
+                
                 if (!playerAnswers.Answers.TryGetValue(category.Name, out var answer)) continue;
                 if (string.IsNullOrWhiteSpace(answer)) continue;
 
