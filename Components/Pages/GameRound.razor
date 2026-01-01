@@ -476,7 +476,7 @@ else if (_room != null && _game != null)
             // For round 1, start fresh tracking
             if (_currentRound > 1)
             {
-                await JSRuntime.InvokeVoidAsync("antiCheatTracker.resumeTracking");
+                await JSRuntime.InvokeVoidAsync("antiCheatTracker.resumeTracking", RoomCode);
                 Console.WriteLine($"[AntiCheat] Resumed tracking for round {_currentRound}");
             }
             else
@@ -589,8 +589,8 @@ else if (_room != null && _game != null)
         _blockTimer?.Stop();
         _blockTimer?.Dispose();
         
-        // Stop anti-cheat tracking before disposing
-        await StopAntiCheatTracking();
+        // Pause anti-cheat (don't clear session - needed for next round)
+        await PauseAntiCheatTracking();
         
         // Dispose .NET reference
         _antiCheatRef?.Dispose();

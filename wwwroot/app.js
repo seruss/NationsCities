@@ -79,7 +79,7 @@ window.AntiCheatTracker = class {
     }
 
     // Resume tracking after pause (for round 2+)
-    resumeTracking() {
+    resumeTracking(roomCode) {
         const session = this._getSession();
         if (session) {
             session.isActive = true;
@@ -87,8 +87,12 @@ window.AntiCheatTracker = class {
             this._saveSession(session);
             this._startHeartbeat();
             console.log(`[AntiCheat] Tracking resumed, violations: ${session.violationCount}`);
+        } else if (roomCode) {
+            // No session to resume - start fresh (fallback)
+            console.log('[AntiCheat] No session to resume, starting fresh');
+            this.startTracking(roomCode);
         } else {
-            console.log('[AntiCheat] No session to resume');
+            console.log('[AntiCheat] No session to resume and no roomCode provided');
         }
     }
 
