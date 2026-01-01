@@ -262,11 +262,16 @@ window.AntiCheatTracker = class {
         const isWarning = violationNumber === 1;
         const penalty = this._getPenalty(violationNumber);
 
-        // Create overlay if doesn't exist
-        if (!this._blockOverlay) {
+        // Create overlay if doesn't exist or was removed from DOM
+        if (!this._blockOverlay || !document.body.contains(this._blockOverlay)) {
+            // Remove old reference if exists
+            if (this._blockOverlay) {
+                this._blockOverlay.remove();
+            }
             this._blockOverlay = document.createElement('div');
             this._blockOverlay.id = 'anticheat-block-overlay';
             document.body.appendChild(this._blockOverlay);
+            console.log('[AntiCheat] Block overlay created');
         }
 
         const bgClass = isWarning ? 'bg-warning' : 'bg-block';
