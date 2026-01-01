@@ -115,6 +115,14 @@ window.AntiCheatTracker = class {
         console.log('[AntiCheat] Tracking paused (answers submitted)');
     }
 
+    // Clear session completely - call when returning to lobby between games
+    clearSession() {
+        this._stopHeartbeat();
+        this._clearSession();
+        this._hideBlockOverlay();
+        console.log('[AntiCheat] Session cleared (new game will start fresh)');
+    }
+
     isTracking() {
         const session = this._getSession();
         return session?.isActive === true;

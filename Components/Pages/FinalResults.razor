@@ -4,6 +4,7 @@
 @using NationsCities.Models
 @inject NavigationManager Navigation
 @inject NationsCities.Services.RoomService RoomService
+@inject IJSRuntime JSRuntime
 @implements IAsyncDisposable
 
 <PageTitle>Podsumowanie Gry - Państwa, Miasta</PageTitle>
@@ -287,8 +288,15 @@ else if (_room != null && _winner != null)
         // TODO: Implement share functionality
     }
 
-    private void ReturnToLobby()
+    private async Task ReturnToLobby()
     {
+        // Clear anti-cheat session so next game starts fresh
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("antiCheatTracker.clearSession");
+        }
+        catch { /* Ignore if not available */ }
+        
         // Just navigate this player to lobby - no broadcast needed
         // Each player clicks independently when ready to return
         Navigation.NavigateTo($"/lobby?code={RoomCode}&nick={Uri.EscapeDataString(_nickname)}&rejoin=true");
