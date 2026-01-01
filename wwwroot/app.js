@@ -82,6 +82,18 @@ window.AntiCheatTracker = class {
         console.log('[AntiCheat] Tracking stopped');
     }
 
+    // Pause tracking - stops detecting new violations but keeps handler for reporting
+    pauseTracking() {
+        this._stopHeartbeat();
+        const session = this._getSession();
+        if (session) {
+            session.isActive = false;
+            this._saveSession(session);
+        }
+        this._hideBlockOverlay();
+        console.log('[AntiCheat] Tracking paused (answers submitted)');
+    }
+
     isTracking() {
         const session = this._getSession();
         return session?.isActive === true;

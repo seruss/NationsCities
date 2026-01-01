@@ -419,8 +419,8 @@ else if (_room != null && _game != null)
             _isBlocked = false;
             _blockTimer?.Stop();
             
-            // Stop anti-cheat tracking immediately when submitting
-            await StopAntiCheatTracking();
+            // Pause anti-cheat (stop new detections but keep handler for any pending reports)
+            await PauseAntiCheatTracking();
             
             await _hubConnection.InvokeAsync("TriggerStop", RoomCode, _answers);
             await InvokeAsync(StateHasChanged);
@@ -443,8 +443,8 @@ else if (_room != null && _game != null)
         _isBlocked = false;
         _blockTimer?.Stop();
         
-        // Stop anti-cheat tracking immediately when submitting
-        await StopAntiCheatTracking();
+        // Pause anti-cheat (stop new detections but keep handler for any pending reports)
+        await PauseAntiCheatTracking();
         
         if (_hubConnection != null)
         {
@@ -478,6 +478,19 @@ else if (_room != null && _game != null)
         catch (Exception ex)
         {
             Console.WriteLine($"[AntiCheat] Start failed: {ex.Message}");
+        }
+    }
+    
+    private async Task PauseAntiCheatTracking()
+    {
+        try
+        {
+            // Just pause - stop detecting but keep handler for pending reports
+            await JSRuntime.InvokeVoidAsync("antiCheatTracker.pauseTracking");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[AntiCheat] Pause failed: {ex.Message}");
         }
     }
     
