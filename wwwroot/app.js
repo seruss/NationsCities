@@ -255,6 +255,8 @@ window.AntiCheatTracker = class {
     // === BLOCK OVERLAY (shown directly in JS) ===
 
     _showBlockOverlay(violationNumber, durationSeconds) {
+        console.log(`[AntiCheat] _showBlockOverlay called: violation=${violationNumber}, duration=${durationSeconds}s`);
+
         // Calculate block duration based on violation number
         const blockSeconds = this._getBlockDuration(violationNumber);
         const isWarning = violationNumber === 1;

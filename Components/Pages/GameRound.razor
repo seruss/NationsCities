@@ -344,8 +344,8 @@ else if (_room != null && _game != null)
             _blockTimer?.Stop();
             _isBlocked = false;
             
-            // Stop anti-cheat tracking before navigation
-            await StopAntiCheatTracking();
+            // Pause anti-cheat (don't clear session - needed for next round)
+            await PauseAntiCheatTracking();
             
             Navigation.NavigateTo($"/validation/{RoomCode}?nick={Uri.EscapeDataString(_nickname)}");
         });
