@@ -533,6 +533,16 @@ public class GameHub : Hub
     {
         _gameService.FinalizeVotingAndCalculateScores(roomCode);
         
+        // Check if this was the last round - reset ready states for new game
+        var room = _roomService.GetRoom(roomCode);
+        if (room?.CurrentGame != null && room.CurrentGame.CurrentRound >= room.CurrentGame.TotalRounds)
+        {
+            foreach (var player in room.Players)
+            {
+                player.IsReady = player.IsHost; // Only host stays ready
+            }
+        }
+        
         // Notify all players to go to scoreboard
         await Clients.Group(roomCode).SendAsync("OnVotingEnded");
     }
@@ -592,7 +602,40 @@ public class GameHub : Hub
             message = message[..200];
         }
 
+        // Persist message in room
+        var room = _roomService.GetRoom(roomCode);
+        var player = room?.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+        if (room != null && player != null)
+        {
+            room.ChatMessages.Add(new ChatMessage
+            {
+                Nickname = player.Nickname,
+                Text = message,
+                IsSystem = false
+            });
+            
+            // Keep only last 50 messages
+            if (room.ChatMessages.Count > 50)
+            {
+                room.ChatMessages.RemoveAt(0);
+            }
+        }
+
         await Clients.Group(roomCode).SendAsync("OnChatMessage", Context.ConnectionId, message);
+    }
+
+    /// <summary>
+    /// Dodaje system message do czatu (używane przez serwer).
+    /// </summary>
+    public void AddSystemMessage(string roomCode, string text)
+    {
+        var room = _roomService.GetRoom(roomCode);
+        room?.ChatMessages.Add(new ChatMessage
+        {
+            Nickname = "System",
+            Text = text,
+            IsSystem = true
+        });
     }
 
     #endregion

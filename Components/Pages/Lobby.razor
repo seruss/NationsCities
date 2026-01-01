@@ -170,7 +170,7 @@ else if (_room != null)
             <!-- Chat (simplified) -->
             <div class="flex-1 min-h-[120px] bg-surface-dark rounded-2xl p-3 shadow-inner border border-slate-800 flex flex-col justify-end">
                 <div class="flex-1 overflow-y-auto space-y-2 mb-2 pr-1 no-scrollbar">
-                    @foreach (var msg in _chatMessages.TakeLast(10))
+                    @foreach (var msg in (_room?.ChatMessages ?? []).TakeLast(10))
                     {
                         <div class="flex gap-2 items-start">
                             <span class="text-xs font-bold @(msg.IsSystem ? "text-primary" : "text-white") shrink-0">@(msg.IsSystem ? "System:" : $"{msg.Nickname}:")</span>
@@ -350,7 +350,6 @@ else if (_room != null)
     private string? _error;
     private bool _isLoading = true;
     private string _chatInput = "";
-    private List<ChatMessage> _chatMessages = new();
     
     // Modal state
     private bool _showCategoryModal = false;
@@ -501,8 +500,7 @@ else if (_room != null)
 
         _hubConnection.On<string, string>("OnChatMessage", (senderId, message) =>
         {
-            var sender = _room?.Players.FirstOrDefault(p => p.ConnectionId == senderId);
-            _chatMessages.Add(new ChatMessage(sender?.Nickname ?? "?", message, false));
+            // Message is persisted by hub - just refresh UI
             InvokeAsync(StateHasChanged);
         });
 
@@ -576,7 +574,13 @@ else if (_room != null)
 
     private void AddSystemMessage(string text)
     {
-        _chatMessages.Add(new ChatMessage("System", text, true));
+        // Add to Room's persisted chat
+        _room?.ChatMessages.Add(new ChatMessage
+        {
+            Nickname = "System",
+            Text = text,
+            IsSystem = true
+        });
     }
 
     private async Task ToggleReady()
@@ -776,5 +780,4 @@ else if (_room != null)
         }
     }
 
-    private record ChatMessage(string Nickname, string Text, bool IsSystem);
 }

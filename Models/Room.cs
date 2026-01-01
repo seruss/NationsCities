@@ -44,4 +44,20 @@ public class Room
     /// Data ostatniej aktywności w pokoju (używane do czyszczenia).
     /// </summary>
     public DateTime LastActivityAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Historia wiadomości czatu pokoju.
+    /// </summary>
+    public List<ChatMessage> ChatMessages { get; set; } = [];
+}
+
+/// <summary>
+/// Wiadomość na czacie pokoju.
+/// </summary>
+public class ChatMessage
+{
+    public string Nickname { get; set; } = "";
+    public string Text { get; set; } = "";
+    public bool IsSystem { get; set; }
+    public DateTime SentAt { get; set; } = DateTime.UtcNow;
 }
