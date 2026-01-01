@@ -351,12 +351,13 @@ window.AntiCheatTracker = class {
     }
 
     _getBlockDuration(violationNumber) {
+        // Match GameRound.razor StartBlockPenalty values
         switch (violationNumber) {
             case 1: return 2;
             case 2: return 3;
-            case 3: return 6;
-            case 4: return 12;
-            default: return 20;
+            case 3: return 5;
+            case 4: return 8;
+            default: return 13;
         }
     }
 
