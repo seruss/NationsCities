@@ -170,8 +170,7 @@ window.AntiCheatTracker = class {
 
             // Only process violations on game round page
             if (!this._isOnGameRoundPage(session.roomCode)) {
-                console.log('[AntiCheat] Not on game round page, clearing session');
-                this._clearSession();
+                console.log('[AntiCheat] Not on game round page, skipping');
                 return;
             }
 
