@@ -375,6 +375,7 @@ else if (_room != null)
         var isCreate = query["create"] == "true";
         var roomCode = query["code"];
         var nickname = query["nick"];
+        var isRejoin = query["rejoin"] == "true";
 
         if (string.IsNullOrEmpty(nickname))
         {
@@ -418,7 +419,23 @@ else if (_room != null)
             }
             else if (!string.IsNullOrEmpty(roomCode))
             {
-                await _hubConnection.InvokeAsync("JoinRoom", roomCode, nickname);
+                if (isRejoin)
+                {
+                    // Rejoining after game - player already exists in room
+                    var joined = await _hubConnection.InvokeAsync<bool>("JoinGame", roomCode, nickname);
+                    if (joined)
+                    {
+                        _room = RoomService.GetRoom(roomCode);
+                    }
+                    else
+                    {
+                        _error = "Nie udało się powrócić do lobby.";
+                    }
+                }
+                else
+                {
+                    await _hubConnection.InvokeAsync("JoinRoom", roomCode, nickname);
+                }
             }
             else
             {

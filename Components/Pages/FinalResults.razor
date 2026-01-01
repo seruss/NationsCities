@@ -287,12 +287,11 @@ else if (_room != null && _winner != null)
         // TODO: Implement share functionality
     }
 
-    private async Task ReturnToLobby()
+    private void ReturnToLobby()
     {
-        if (_hubConnection != null)
-        {
-            await _hubConnection.InvokeAsync("ReturnToLobby", RoomCode);
-        }
+        // Just navigate this player to lobby - no broadcast needed
+        // Each player clicks independently when ready to return
+        Navigation.NavigateTo($"/lobby?code={RoomCode}&nick={Uri.EscapeDataString(_nickname)}&rejoin=true");
     }
 
     private int GetTotalPenalty(Player player)
