@@ -163,8 +163,11 @@ public class GameHub : Hub
                 room.HostConnectionId = Context.ConnectionId;
             }
             
-            // Update the _playerRooms mapping for this connection
-            _roomService.UpdatePlayerConnection(roomCode, oldConnectionId, Context.ConnectionId);
+            // Update the _playerRooms mapping only if connectionId actually changed
+            if (oldConnectionId != Context.ConnectionId)
+            {
+                _roomService.UpdatePlayerConnection(roomCode, oldConnectionId, Context.ConnectionId);
+            }
             
             // Add to SignalR group
             await Groups.AddToGroupAsync(Context.ConnectionId, roomCode);
