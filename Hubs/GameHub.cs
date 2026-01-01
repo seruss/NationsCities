@@ -310,6 +310,28 @@ public class GameHub : Hub
                 }
             }
         }
+        else
+        {
+            // TriggerStop failed (another player already triggered) - but still submit this player's answers
+            // This prevents deadlock when both players click STOP simultaneously
+            if (_gameService.SubmitAnswers(roomCode, Context.ConnectionId, answers))
+            {
+                await Clients.Caller.SendAsync("OnAnswersSubmitted");
+                await Clients.Group(roomCode).SendAsync("OnPlayerSubmitted", Context.ConnectionId);
+                
+                // Check if all players submitted
+                if (room?.CurrentGame != null)
+                {
+                    var allSubmitted = room.Players.All(p => 
+                        room.CurrentGame.RoundAnswers.ContainsKey(p.ConnectionId));
+                    
+                    if (allSubmitted)
+                    {
+                        await EndRound(roomCode);
+                    }
+                }
+            }
+        }
     }
 
     /// <summary>
