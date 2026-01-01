@@ -61,6 +61,27 @@ public class GameService
     }
 
     /// <summary>
+    /// Resetuje grę i przygotowuje pokój do nowej rozgrywki.
+    /// </summary>
+    public void ResetGameForLobby(string roomCode)
+    {
+        var room = _roomService.GetRoom(roomCode);
+        if (room == null) return;
+
+        // Reset game state
+        room.CurrentGame = null;
+
+        // Reset all player scores and violations
+        foreach (var player in room.Players)
+        {
+            player.TotalScore = 0;
+            player.RoundScore = 0;
+            player.Violations.Clear();
+            player.IsReady = player.IsHost; // Host stays ready
+        }
+    }
+
+    /// <summary>
     /// Rozpoczyna nową rundę.
     /// </summary>
     public (bool Success, char Letter, string? Error) StartRound(string roomCode)

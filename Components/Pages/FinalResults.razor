@@ -215,6 +215,11 @@ else if (_room != null && _winner != null)
                 Navigation.NavigateTo("/");
             });
 
+            _hubConnection.On<string>("OnReturnToLobby", (roomCode) =>
+            {
+                Navigation.NavigateTo($"/lobby/{roomCode}?nick={Uri.EscapeDataString(_nickname)}");
+            });
+
             await _hubConnection.StartAsync();
 
             if (!string.IsNullOrEmpty(_nickname))
@@ -279,9 +284,8 @@ else if (_room != null && _winner != null)
     {
         if (_hubConnection != null)
         {
-            await _hubConnection.InvokeAsync("EndGame", RoomCode);
+            await _hubConnection.InvokeAsync("ReturnToLobby", RoomCode);
         }
-        Navigation.NavigateTo("/");
     }
 
     private void GoHome()

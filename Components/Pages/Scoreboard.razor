@@ -170,11 +170,13 @@ else if (_room != null)
             }
             else
             {
-                <button @onclick="ShowFinalResults"
-                        class="flex w-full items-center justify-center gap-2 rounded-xl bg-green-600 px-6 py-4 text-base font-bold text-white shadow-lg transition-transform btn-press hover:bg-green-700">
-                    <span class="material-symbols-outlined">emoji_events</span>
-                    <span>Koniec gry!</span>
-                </button>
+                <!-- Auto-redirect to final results (controlled via OnInitialized) -->
+                <div class="text-center py-4">
+                    <p class="text-lg font-bold text-green-400 flex items-center justify-center gap-2">
+                        <span class="material-symbols-outlined">emoji_events</span>
+                        Gra zakończona!
+                    </p>
+                </div>
             }
             @if (_isHost)
             {
@@ -267,6 +269,12 @@ else if (_room != null)
             _otherPlayers = sortedPlayers.Skip(1).ToList();
 
             _isLoading = false;
+
+            // Auto-redirect to final results if it's the last round
+            if (!_hasNextRound)
+            {
+                Navigation.NavigateTo($"/finalresults/{RoomCode}?nick={Uri.EscapeDataString(_nickname)}");
+            }
         }
         catch (Exception ex)
         {
@@ -287,6 +295,11 @@ else if (_room != null)
         _hubConnection.On("OnGameEnded", () =>
         {
             Navigation.NavigateTo("/");
+        });
+
+        _hubConnection.On<string>("OnReturnToLobby", (roomCode) =>
+        {
+            Navigation.NavigateTo($"/lobby/{roomCode}?nick={Uri.EscapeDataString(_nickname)}");
         });
     }
 

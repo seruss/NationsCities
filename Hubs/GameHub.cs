@@ -550,6 +550,21 @@ public class GameHub : Hub
         _roomService.DeleteRoom(roomCode);
     }
 
+    /// <summary>
+    /// Resetuje grę i wraca do lobby (zachowuje pokój i graczy).
+    /// </summary>
+    public async Task ReturnToLobby(string roomCode)
+    {
+        var room = _roomService.GetRoom(roomCode);
+        if (room == null) return;
+
+        // Reset the game
+        _gameService.ResetGameForLobby(roomCode);
+
+        // Notify all players to return to lobby
+        await Clients.Group(roomCode).SendAsync("OnReturnToLobby", roomCode);
+    }
+
     #endregion
 
     #region Chat
