@@ -299,7 +299,7 @@ else if (_room != null)
 
         _hubConnection.On<string>("OnReturnToLobby", (roomCode) =>
         {
-            Navigation.NavigateTo($"/lobby/{roomCode}?nick={Uri.EscapeDataString(_nickname)}");
+            Navigation.NavigateTo($"/lobby?code={roomCode}&nick={Uri.EscapeDataString(_nickname)}");
         });
     }
 

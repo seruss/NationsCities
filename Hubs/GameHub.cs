@@ -251,6 +251,12 @@ public class GameHub : Hub
     /// </summary>
     public async Task StartGame(string roomCode)
     {
+        var room = _roomService.GetRoom(roomCode);
+        if (room == null) return;
+
+        // Reset scores and violations when starting a new game
+        _gameService.ResetGameForLobby(roomCode);
+
         var result = _gameService.StartGame(Context.ConnectionId);
         
         if (!result.Success)
@@ -259,7 +265,8 @@ public class GameHub : Hub
             return;
         }
 
-        var room = _roomService.GetRoom(roomCode);
+        // Refresh room reference after StartGame may have modified it
+        room = _roomService.GetRoom(roomCode);
         if (room?.CurrentGame != null)
         {
             // Start first round
@@ -551,17 +558,14 @@ public class GameHub : Hub
     }
 
     /// <summary>
-    /// Resetuje grę i wraca do lobby (zachowuje pokój i graczy).
+    /// Wraca do lobby (zachowuje pokój, graczy i wyniki - reset przy następnej grze).
     /// </summary>
     public async Task ReturnToLobby(string roomCode)
     {
         var room = _roomService.GetRoom(roomCode);
         if (room == null) return;
 
-        // Reset the game
-        _gameService.ResetGameForLobby(roomCode);
-
-        // Notify all players to return to lobby
+        // Just notify all players to return to lobby (reset happens on next StartGame)
         await Clients.Group(roomCode).SendAsync("OnReturnToLobby", roomCode);
     }
 

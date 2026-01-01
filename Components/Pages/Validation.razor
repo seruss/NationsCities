@@ -173,6 +173,7 @@ else if (_answersForVoting != null)
     private int _totalPlayers = 0;
     
     private int _roundNumber = 1;
+    private int _totalRounds = 1;
     private char _letter = 'A';
     
     // Track player's own votes separately (answerId -> isValid)
@@ -230,6 +231,7 @@ else if (_answersForVoting != null)
 
             var game = _room.CurrentGame;
             _roundNumber = game.CurrentRound;
+            _totalRounds = game.TotalRounds;
             _letter = game.CurrentLetter;
             _categories = game.Categories;
             _answersForVoting = game.AnswersForVoting;
@@ -285,7 +287,15 @@ else if (_answersForVoting != null)
 
         _hubConnection.On("OnVotingEnded", () =>
         {
-            Navigation.NavigateTo($"/scoreboard/{RoomCode}?nick={Uri.EscapeDataString(_nickname)}");
+            // On last round, go directly to final results
+            if (_roundNumber >= _totalRounds)
+            {
+                Navigation.NavigateTo($"/finalresults/{RoomCode}?nick={Uri.EscapeDataString(_nickname)}");
+            }
+            else
+            {
+                Navigation.NavigateTo($"/scoreboard/{RoomCode}?nick={Uri.EscapeDataString(_nickname)}");
+            }
         });
     }
 

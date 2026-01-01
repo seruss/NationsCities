@@ -67,47 +67,54 @@ else if (_room != null && _winner != null)
                 <!-- Winner name and score -->
                 <div class="flex flex-col items-center justify-center">
                     <p class="text-white text-[24px] font-bold leading-tight tracking-[-0.015em] text-center">@_winner.Nickname</p>
-                    <div class="mt-2 px-4 py-1 bg-primary/20 rounded-full border border-primary/20">
-                        <p class="text-primary text-sm font-bold leading-normal text-center tracking-wide">@_winner.TotalScore PKT</p>
+                    <div class="mt-2 flex items-center gap-2">
+                        <div class="px-4 py-1 bg-primary/20 rounded-full border border-primary/20">
+                            <p class="text-primary text-sm font-bold leading-normal text-center tracking-wide">@_winner.TotalScore PKT</p>
+                        </div>
+                        @{ var winnerPenalty = GetTotalPenalty(_winner); }
+                        @if (winnerPenalty > 0)
+                        {
+                            <div class="px-3 py-1 bg-red-500/20 rounded-full border border-red-500/20">
+                                <p class="text-red-400 text-sm font-bold leading-normal text-center">-@winnerPenalty</p>
+                            </div>
+                        }
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Final Ranking -->
+        <!-- Final Ranking (starting from #2) -->
         <section class="px-4 mt-4">
             <h3 class="text-slate-400 text-sm font-bold uppercase tracking-wider mb-4 px-2">Ranking Końcowy</h3>
             <div class="flex flex-col gap-3">
-                @foreach (var (player, index) in _sortedPlayers.Select((p, i) => (p, i + 1)))
+                @foreach (var (player, index) in _sortedPlayers.Skip(1).Select((p, i) => (p, i + 2)))
                 {
-                    var isWinner = index == 1;
-                    var hasPenalty = player.Violations.Any(v => v.Penalty > 0);
+                    var playerPenalty = GetTotalPenalty(player);
                     var progressPercent = _maxScore > 0 ? (player.TotalScore * 100 / _maxScore) : 0;
                     
-                    <div class="group relative flex items-center gap-4 bg-surface-dark p-3 pr-4 rounded-[20px] shadow-sm border border-white/5 active:scale-[0.99] transition-transform @(hasPenalty && !isWinner ? "opacity-70" : "")">
+                    <div class="group relative flex items-center gap-4 bg-surface-dark p-3 pr-4 rounded-[20px] shadow-sm border border-white/5 active:scale-[0.99] transition-transform">
                         <div class="flex items-center justify-center w-8 text-slate-500 font-bold text-lg">@index</div>
-                        <div class="h-12 w-12 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 border border-white/10 avatar-initials @(hasPenalty ? "grayscale" : "")"
+                        <div class="h-12 w-12 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 border border-white/10 avatar-initials"
                              style="background-color: @player.AvatarColor">
                             @player.GetInitials()
                         </div>
                         <div class="flex flex-col flex-1 min-w-0">
                             <p class="text-white text-base font-semibold leading-normal truncate">@player.Nickname</p>
-                            @if (hasPenalty)
-                            {
-                                <p class="text-xs text-red-500 font-medium">Nałożono karę</p>
-                            }
-                            else
-                            {
-                                <div class="flex items-center gap-2">
-                                    <div class="h-1.5 w-full max-w-[80px] bg-white/10 rounded-full overflow-hidden">
-                                        <div class="h-full bg-slate-400" style="width: @(progressPercent)%"></div>
-                                    </div>
+                            <div class="flex items-center gap-2">
+                                <div class="h-1.5 w-full max-w-[80px] bg-white/10 rounded-full overflow-hidden">
+                                    <div class="h-full bg-slate-400" style="width: @(progressPercent)%"></div>
                                 </div>
-                            }
+                            </div>
                         </div>
-                        <div class="flex flex-col items-end">
-                            <p class="text-white text-lg font-bold leading-normal">@player.TotalScore</p>
-                            <p class="text-xs text-slate-500">pkt</p>
+                        <div class="flex items-center gap-2">
+                            @if (playerPenalty > 0)
+                            {
+                                <span class="px-2 py-1 bg-red-500/20 rounded-full text-xs font-bold text-red-400">-@playerPenalty</span>
+                            }
+                            <div class="flex flex-col items-end">
+                                <p class="text-white text-lg font-bold leading-normal">@player.TotalScore</p>
+                                <p class="text-xs text-slate-500">pkt</p>
+                            </div>
                         </div>
                     </div>
                 }
@@ -217,7 +224,7 @@ else if (_room != null && _winner != null)
 
             _hubConnection.On<string>("OnReturnToLobby", (roomCode) =>
             {
-                Navigation.NavigateTo($"/lobby/{roomCode}?nick={Uri.EscapeDataString(_nickname)}");
+                Navigation.NavigateTo($"/lobby?code={roomCode}&nick={Uri.EscapeDataString(_nickname)}");
             });
 
             await _hubConnection.StartAsync();
@@ -286,6 +293,11 @@ else if (_room != null && _winner != null)
         {
             await _hubConnection.InvokeAsync("ReturnToLobby", RoomCode);
         }
+    }
+
+    private int GetTotalPenalty(Player player)
+    {
+        return player.Violations.Sum(v => v.Penalty);
     }
 
     private void GoHome()
