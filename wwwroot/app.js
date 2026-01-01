@@ -58,21 +58,38 @@ window.AntiCheatTracker = class {
     startTracking(roomCode) {
         const existing = this._getSession();
 
-        // Always reset for a fresh game session (even if same room)
-        // Clear old session to reset violation count
+        // If same room and we have an existing session, preserve violation count (for multi-round games)
+        const preserveViolations = existing?.roomCode === roomCode;
+        const existingViolationCount = preserveViolations ? (existing.violationCount || 0) : 0;
+
+        // Clear old session
         this._clearSession();
 
-        // Create new session with fresh violation count
+        // Create new session - preserve violation count if same room
         this._saveSession({
             roomCode: roomCode,
             isActive: true,
             startedAt: Date.now(),
             lastActiveAt: Date.now(),
-            violationCount: 0
+            violationCount: existingViolationCount
         });
 
         this._startHeartbeat();
-        console.log(`[AntiCheat] Tracking started for room ${roomCode}, violation count reset to 0`);
+        console.log(`[AntiCheat] Tracking started for room ${roomCode}, violation count: ${existingViolationCount}`);
+    }
+
+    // Resume tracking after pause (for round 2+)
+    resumeTracking() {
+        const session = this._getSession();
+        if (session) {
+            session.isActive = true;
+            session.lastActiveAt = Date.now();
+            this._saveSession(session);
+            this._startHeartbeat();
+            console.log(`[AntiCheat] Tracking resumed, violations: ${session.violationCount}`);
+        } else {
+            console.log('[AntiCheat] No session to resume');
+        }
     }
 
     stopTracking() {

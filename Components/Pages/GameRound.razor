@@ -471,13 +471,26 @@ else if (_room != null && _game != null)
         try
         {
             _antiCheatRef = DotNetObjectReference.Create(this);
-            await JSRuntime.InvokeVoidAsync("antiCheatTracker.startTracking", RoomCode);
+            
+            // For round 2+, try to resume existing session (preserves violation count)
+            // For round 1, start fresh tracking
+            if (_currentRound > 1)
+            {
+                await JSRuntime.InvokeVoidAsync("antiCheatTracker.resumeTracking");
+                Console.WriteLine($"[AntiCheat] Resumed tracking for round {_currentRound}");
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("antiCheatTracker.startTracking", RoomCode);
+                Console.WriteLine($"[AntiCheat] Started fresh tracking for room {RoomCode}");
+            }
+            
+            // Always register handler (may have been unregistered)
             await JSRuntime.InvokeVoidAsync("registerAntiCheatHandler", _antiCheatRef);
-            Console.WriteLine($"[AntiCheat] Tracking started for room {RoomCode}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[AntiCheat] Start failed: {ex.Message}");
+            Console.WriteLine($"[AntiCheat] Start/Resume failed: {ex.Message}");
         }
     }
     

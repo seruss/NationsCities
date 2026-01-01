@@ -41,13 +41,13 @@ public class Violation
         // Count ALL previous violations (not just those with penalty > 0)
         var previousCount = previousViolations.Count;
 
-        // Progresywna kara: 1st=0 (warning), 2nd=-5, 3rd=-10, 4th+=-15
+        // Progresywna kara (doubled): 1st=0 (warning), 2nd=-10, 3rd=-20, 4th+=-30
         return previousCount switch
         {
-            0 => 0,  // Pierwsze = ostrzeżenie
-            1 => 5,
-            2 => 10,
-            _ => 15
+            0 => 0,   // Pierwsze = ostrzeżenie
+            1 => 10,  // Drugie = -10 pkt
+            2 => 20,  // Trzecie = -20 pkt
+            _ => 30   // Każde kolejne = -30 pkt
         };
     }
 }
