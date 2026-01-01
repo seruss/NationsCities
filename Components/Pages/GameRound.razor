@@ -413,7 +413,8 @@ else if (_room != null && _game != null)
         if (_hubConnection != null && !_hasSubmitted)
         {
             _hasSubmitted = true;
-            _stopTriggeredByMe = true;
+            // Don't set _stopTriggeredByMe here - let OnStopTriggered callback set it
+            // based on server's authoritative response (fixes race condition)
             
             _isBlocked = false;
             _blockTimer?.Stop();

@@ -1,4 +1,5 @@
 using NationsCities.Models;
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
 
@@ -10,6 +11,9 @@ namespace NationsCities.Services;
 public class GameService
 {
     private readonly RoomService _roomService;
+    
+    // Per-room locks to prevent race conditions in TriggerStop
+    private readonly ConcurrentDictionary<string, object> _roomLocks = new();
     
     // Litery bez trudnych polskich znaków diakrytycznych (Ć, Ł, Ń, Ó, Ś, Ź, Ż) oraz Q, V, X, Y
     private static readonly char[] PolishLetters = 
@@ -97,29 +101,35 @@ public class GameService
     /// </summary>
     public (bool Success, DateTime EndTime, string? Error) TriggerStop(string roomCode, string connectionId, int countdownSeconds)
     {
-        var room = _roomService.GetRoom(roomCode);
-        if (room?.CurrentGame == null)
+        // Get or create a lock object for this room
+        var roomLock = _roomLocks.GetOrAdd(roomCode, _ => new object());
+        
+        lock (roomLock)
         {
-            return (false, default, "Gra nie jest aktywna.");
+            var room = _roomService.GetRoom(roomCode);
+            if (room?.CurrentGame == null)
+            {
+                return (false, default, "Gra nie jest aktywna.");
+            }
+
+            var game = room.CurrentGame;
+
+            if (game.Phase != RoundPhase.Answering)
+            {
+                return (false, default, "Nie można teraz zatrzymać.");
+            }
+
+            if (game.StopTriggeredBy != null)
+            {
+                return (false, default, "STOP już wciśnięty.");
+            }
+
+            game.StopTriggeredBy = connectionId;
+            game.Phase = RoundPhase.Countdown;
+            game.CountdownEndTime = DateTime.UtcNow.AddSeconds(countdownSeconds);
+
+            return (true, game.CountdownEndTime.Value, null);
         }
-
-        var game = room.CurrentGame;
-
-        if (game.Phase != RoundPhase.Answering)
-        {
-            return (false, default, "Nie można teraz zatrzymać.");
-        }
-
-        if (game.StopTriggeredBy != null)
-        {
-            return (false, default, "STOP już wciśnięty.");
-        }
-
-        game.StopTriggeredBy = connectionId;
-        game.Phase = RoundPhase.Countdown;
-        game.CountdownEndTime = DateTime.UtcNow.AddSeconds(countdownSeconds);
-
-        return (true, game.CountdownEndTime.Value, null);
     }
 
     /// <summary>
