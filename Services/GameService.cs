@@ -71,13 +71,13 @@ public class GameService
         // Reset game state
         room.CurrentGame = null;
 
-        // Reset all player scores and violations
+        // Reset all player scores and violations (but NOT ready state)
         foreach (var player in room.Players)
         {
             player.TotalScore = 0;
             player.RoundScore = 0;
             player.Violations.Clear();
-            player.IsReady = player.IsHost; // Host stays ready
+            // NOTE: Don't reset IsReady - players who returned to lobby want to play again
         }
     }
 
