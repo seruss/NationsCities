@@ -116,6 +116,34 @@
 </head>
 
 <body class="bg-bg-light dark:bg-bg-dark font-sans text-slate-900 dark:text-white antialiased min-h-screen touch-manipulation">
+    <!-- Fixed Theme Toggle Button - Pure HTML, outside Blazor -->
+    <button id="theme-toggle-btn" 
+            type="button"
+            class="fixed top-4 right-4 z-[9999] flex w-12 h-12 items-center justify-center rounded-full bg-surface-light dark:bg-surface-dark text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 shadow-lg border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer">
+        <span id="theme-toggle-icon" class="material-symbols-outlined text-2xl">light_mode</span>
+    </button>
+    <script>
+        (function() {
+            // Set correct initial icon
+            var icon = document.getElementById('theme-toggle-icon');
+            if (icon) {
+                icon.textContent = document.documentElement.classList.contains('dark') ? 'light_mode' : 'dark_mode';
+            }
+            // Add click handler
+            var btn = document.getElementById('theme-toggle-btn');
+            if (btn) {
+                btn.onclick = function(e) {
+                    e.preventDefault();
+                    var newTheme = window.themeManager.toggle();
+                    var icon = document.getElementById('theme-toggle-icon');
+                    if (icon) {
+                        icon.textContent = newTheme === 'dark' ? 'light_mode' : 'dark_mode';
+                    }
+                };
+            }
+        })();
+    </script>
+    
     <Routes />
     
     <!-- Custom Blazor Reconnect Modal -->

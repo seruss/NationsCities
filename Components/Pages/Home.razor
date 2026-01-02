@@ -8,13 +8,10 @@
 <PageTitle>Państwa, Miasta</PageTitle>
 
 <div class="flex flex-col min-h-screen bg-bg-light dark:bg-bg-dark">
-    <!-- Top Navigation -->
+    <!-- Top Navigation (theme toggle moved to App.razor fixed button) -->
     <header class="flex items-center justify-between p-4 pb-2">
         <div class="w-12"></div>
-        <button data-theme-toggle
-                class="flex w-12 h-12 items-center justify-center rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50 transition-colors cursor-pointer">
-            <span class="material-symbols-outlined text-2xl">@(_isDarkMode ? "light_mode" : "dark_mode")</span>
-        </button>
+        <div class="w-12"></div>
     </header>
 
     <!-- Hero Section -->
