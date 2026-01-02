@@ -373,22 +373,23 @@ else if (_room != null && _game != null)
     [JSInvokable]
     public async Task ReportViolationFromJS(string violationType, double durationSeconds, int roundNumber)
     {
-        // Safety guard: don't report if we're disposed or hub is gone
-        if (_isDisposed || _hubConnection == null || string.IsNullOrEmpty(RoomCode)) 
+        // IMPORTANT: Throw exception instead of returning silently!
+        // This tells JS to keep the violation in the pending queue for retry.
+        if (_isDisposed)
         {
-            Console.WriteLine("[AntiCheat] Ignoring report - component disposed or no connection");
-            return;
+            Console.WriteLine("[AntiCheat] Component disposed - throwing to keep in queue");
+            throw new InvalidOperationException("Component disposed");
         }
         
-        try  
+        if (_hubConnection == null || string.IsNullOrEmpty(RoomCode)) 
         {
-            // Pass round number captured at detection time!
-            await _hubConnection.InvokeAsync("ReportViolation", RoomCode, violationType, durationSeconds, roundNumber);
+            Console.WriteLine("[AntiCheat] No hub connection - throwing to keep in queue");
+            throw new InvalidOperationException("No hub connection");
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[AntiCheat] Failed to report: {ex.Message}");
-        }
+        
+        // Pass round number captured at detection time!
+        await _hubConnection.InvokeAsync("ReportViolation", RoomCode, violationType, durationSeconds, roundNumber);
+        Console.WriteLine($"[AntiCheat] Violation reported successfully: round={roundNumber}, type={violationType}");
     }
     
 
