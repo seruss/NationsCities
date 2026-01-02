@@ -3,6 +3,7 @@
 @using Microsoft.AspNetCore.SignalR.Client
 @using NationsCities.Models
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <PageTitle>Państwa, Miasta</PageTitle>
 
@@ -10,15 +11,9 @@
     <!-- Top Navigation -->
     <header class="flex items-center justify-between p-4 pb-2">
         <div class="w-12"></div>
-        <button @onclick="ToggleTheme" class="flex w-12 h-12 items-center justify-center rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50 transition-colors">
-            @if (_isDarkMode)
-            {
-                <span class="material-symbols-outlined text-2xl">light_mode</span>
-            }
-            else
-            {
-                <span class="material-symbols-outlined text-2xl">dark_mode</span>
-            }
+        <button onclick="window.themeManager.toggle(); this.querySelector('span').textContent = document.documentElement.classList.contains('dark') ? 'light_mode' : 'dark_mode';" 
+                class="flex w-12 h-12 items-center justify-center rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50 transition-colors cursor-pointer">
+            <span class="material-symbols-outlined text-2xl">@(_isDarkMode ? "light_mode" : "dark_mode")</span>
         </button>
     </header>
 
@@ -160,8 +155,6 @@
     private List<PublicRoomInfo> _publicRooms = new();
     private bool _isDarkMode = true;
 
-    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
-
     private bool CanSubmit => !string.IsNullOrWhiteSpace(_nickname) && 
                               (_isCreating || _roomCode.Length == 4);
 
@@ -170,35 +163,12 @@
         if (firstRender)
         {
             // Sync state with actual DOM theme on first render only
-            // No StateHasChanged needed - this just syncs the icon display
             try
             {
-                var theme = await JSRuntime.InvokeAsync<string>("themeManager.get");
-                var wasDark = _isDarkMode;
+                var theme = await JS.InvokeAsync<string>("themeManager.get");
                 _isDarkMode = theme == "dark";
-                if (wasDark != _isDarkMode)
-                {
-                    StateHasChanged();
-                }
             }
             catch { /* Ignore if JS not ready */ }
-        }
-    }
-
-    private async Task ToggleTheme()
-    {
-        // Toggle immediately in UI for responsiveness
-        _isDarkMode = !_isDarkMode;
-        
-        try
-        {
-            // Then sync with JS
-            await JSRuntime.InvokeVoidAsync("themeManager.toggle");
-        }
-        catch 
-        { 
-            // Revert on error
-            _isDarkMode = !_isDarkMode;
         }
     }
 
