@@ -30,6 +30,10 @@
                 var next = current === 'dark' ? 'light' : 'dark';
                 this._apply(next);
                 localStorage.setItem(this._storageKey, next);
+                // Update all toggle button icons
+                document.querySelectorAll('[data-theme-toggle] span').forEach(function(span) {
+                    span.textContent = next === 'dark' ? 'light_mode' : 'dark_mode';
+                });
                 return next;
             }
 
@@ -55,6 +59,16 @@
             }
         };
         window.themeManager = new window.ThemeManager();
+        
+        // Event delegation for theme toggle buttons - works even after Blazor re-renders
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('[data-theme-toggle]');
+            if (btn) {
+                e.preventDefault();
+                e.stopPropagation();
+                window.themeManager.toggle();
+            }
+        }, true); // Use capture phase to handle before Blazor
     </script>
     
     <!-- Google Fonts -->
@@ -114,7 +128,7 @@
         </div>
     </div>
     
-    <script src="app.js?v=19"></script>
+    <script src="app.js?v=20"></script>
     <script src="_framework/blazor.web.js"></script>
 </body>
 
