@@ -156,6 +156,49 @@ window.AntiCheatTracker = class {
         console.log('[AntiCheat] Session cleared (new game will start fresh)');
     }
 
+    // Flush all pending violations NOW before navigating away
+    // This ensures violations are reported before showing scoreboard
+    async flushPendingViolations(dotNetRef) {
+        const queue = this._getPendingQueue();
+        if (queue.length === 0) {
+            console.log('[AntiCheat] No pending violations to flush');
+            return;
+        }
+
+        console.log(`[AntiCheat] Flushing ${queue.length} pending violation(s) before navigation`);
+
+        const session = this._getSession();
+        const currentRoom = session?.roomCode;
+
+        for (const violation of [...queue]) {  // Copy array to avoid mutation issues
+            // Skip violations from different rooms
+            if (currentRoom && violation.roomCode !== currentRoom) {
+                this._removeFromPendingQueue(violation);
+                continue;
+            }
+
+            // Skip very old violations (> 5 minutes)
+            if (Date.now() - violation.timestamp > 5 * 60 * 1000) {
+                this._removeFromPendingQueue(violation);
+                continue;
+            }
+
+            try {
+                await dotNetRef.invokeMethodAsync('ReportViolationFromJS',
+                    violation.violationType,
+                    violation.durationSeconds,
+                    violation.roundNumber || 1);
+                console.log(`[AntiCheat] Flushed violation (round ${violation.roundNumber}) successfully`);
+                this._removeFromPendingQueue(violation);
+            } catch (err) {
+                console.warn(`[AntiCheat] Failed to flush violation: ${err.message}`);
+                // Keep in queue for next attempt
+            }
+        }
+
+        console.log('[AntiCheat] Flush complete');
+    }
+
     isTracking() {
         const session = this._getSession();
         return session?.isActive === true;

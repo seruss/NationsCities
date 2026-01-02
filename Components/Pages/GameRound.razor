@@ -351,6 +351,10 @@ else if (_room != null && _game != null)
             _blockTimer?.Stop();
             _isBlocked = false;
             
+            // IMPORTANT: Flush pending violations BEFORE navigating!
+            // This ensures violations are reported and visible in the scoreboard.
+            await FlushPendingViolationsBeforeNavigation();
+            
             // Pause anti-cheat (don't clear session - needed for next round)
             await PauseAntiCheatTracking();
             
@@ -523,6 +527,28 @@ else if (_room != null && _game != null)
         catch (Exception ex)
         {
             Console.WriteLine($"[AntiCheat] Pause failed: {ex.Message}");
+        }
+    }
+    
+    private async Task FlushPendingViolationsBeforeNavigation()
+    {
+        // Safety check
+        if (!_hasRendered || _antiCheatRef == null)
+        {
+            Console.WriteLine("[AntiCheat] Skipping flush - not rendered or no ref");
+            return;
+        }
+        
+        try
+        {
+            // Flush any pending violations BEFORE navigating away
+            // This ensures they appear in the scoreboard for the current round
+            await JSRuntime.InvokeVoidAsync("antiCheatTracker.flushPendingViolations", _antiCheatRef);
+            Console.WriteLine("[AntiCheat] Pending violations flushed before navigation");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[AntiCheat] Flush failed: {ex.Message}");
         }
     }
     
