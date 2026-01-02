@@ -11,16 +11,16 @@
 
 @if (_isLoading)
 {
-    <div class="flex items-center justify-center min-h-screen">
+    <div class="flex items-center justify-center min-h-screen bg-bg-light dark:bg-bg-dark">
         <div class="flex flex-col items-center gap-4">
             <span class="material-symbols-outlined text-4xl text-primary animate-spin">progress_activity</span>
-            <p class="text-slate-400">Łączenie...</p>
+            <p class="text-slate-500 dark:text-slate-400">Łączenie...</p>
         </div>
     </div>
 }
 else if (_error != null)
 {
-    <div class="flex items-center justify-center min-h-screen p-4">
+    <div class="flex items-center justify-center min-h-screen p-4 bg-bg-light dark:bg-bg-dark">
         <div class="flex flex-col items-center gap-4 text-center">
             <span class="material-symbols-outlined text-4xl text-red-400">error</span>
             <p class="text-red-400">@_error</p>
@@ -30,21 +30,21 @@ else if (_error != null)
 }
 else if (_room != null)
 {
-    <div class="flex flex-col min-h-screen">
+    <div class="flex flex-col min-h-screen bg-bg-light dark:bg-bg-dark">
         <!-- Header -->
-        <header class="flex items-center justify-between p-4 bg-surface-dark shadow-sm z-20">
-            <button @onclick="LeaveRoom" class="flex items-center justify-center w-10 h-10 rounded-full hover:bg-white/10 transition-colors">
-                <span class="material-symbols-outlined text-white text-2xl">arrow_back</span>
+        <header class="flex items-center justify-between p-4 bg-surface-light dark:bg-surface-dark shadow-sm z-20 border-b border-slate-200 dark:border-transparent">
+            <button @onclick="LeaveRoom" class="flex items-center justify-center w-10 h-10 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 transition-colors">
+                <span class="material-symbols-outlined text-slate-700 dark:text-white text-2xl">arrow_back</span>
             </button>
             <div class="flex flex-col items-center">
-                <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Kod pokoju</span>
+                <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Kod pokoju</span>
                 <div class="flex items-center gap-2 cursor-pointer group" @onclick="CopyRoomCode">
                     <h1 class="text-2xl font-bold text-primary">@_room.Code</h1>
                     <span class="material-symbols-outlined text-base text-slate-400 group-hover:text-primary">content_copy</span>
                 </div>
             </div>
-            <button class="flex items-center justify-center w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 transition-colors">
-                <span class="material-symbols-outlined text-white">settings</span>
+            <button class="flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors">
+                <span class="material-symbols-outlined text-slate-700 dark:text-white">settings</span>
             </button>
         </header>
 
@@ -54,27 +54,27 @@ else if (_room != null)
             <!-- Game Config (Host only) -->
             @if (IsHost)
             {
-                <section class="bg-surface-dark rounded-2xl p-4 shadow-sm border border-slate-800">
+                <section class="bg-surface-light dark:bg-surface-dark rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-800">
                     <div class="flex items-center justify-between mb-3">
-                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">Ustawienia gry</h2>
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Ustawienia gry</h2>
                         <span class="px-2 py-0.5 rounded text-xs font-bold bg-primary/10 text-primary uppercase border border-primary/20">Host</span>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
-                        <button @onclick="OpenCategoryModal" class="flex flex-col items-start gap-1 p-3 rounded-xl bg-surface-darker hover:bg-slate-800 border border-slate-700 transition-all text-left group">
+                        <button @onclick="OpenCategoryModal" class="flex flex-col items-start gap-1 p-3 rounded-xl bg-slate-100 dark:bg-surface-darker hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-all text-left group">
                             <div class="flex items-center justify-between w-full">
-                                <span class="material-symbols-outlined text-purple-400">category</span>
+                                <span class="material-symbols-outlined text-purple-500 dark:text-purple-400">category</span>
                                 <span class="material-symbols-outlined text-base text-slate-400 group-hover:text-purple-400">edit</span>
                             </div>
-                            <span class="text-xs text-slate-400 font-medium mt-1">Kategorie</span>
-                            <span class="text-sm font-bold text-white">@_room.Settings.SelectedCategories.Count wybrane</span>
+                            <span class="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">Kategorie</span>
+                            <span class="text-sm font-bold text-slate-900 dark:text-white">@_room.Settings.SelectedCategories.Count wybrane</span>
                         </button>
-                        <button @onclick="OpenRoundCountModal" class="flex flex-col items-start gap-1 p-3 rounded-xl bg-surface-darker hover:bg-slate-800 border border-slate-700 transition-all text-left group">
+                        <button @onclick="OpenRoundCountModal" class="flex flex-col items-start gap-1 p-3 rounded-xl bg-slate-100 dark:bg-surface-darker hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-all text-left group">
                             <div class="flex items-center justify-between w-full">
-                                <span class="material-symbols-outlined text-cyan-400">repeat</span>
+                                <span class="material-symbols-outlined text-cyan-500 dark:text-cyan-400">repeat</span>
                                 <span class="material-symbols-outlined text-base text-slate-400 group-hover:text-cyan-400">edit</span>
                             </div>
-                            <span class="text-xs text-slate-400 font-medium mt-1">Liczba rund</span>
-                            <span class="text-sm font-bold text-white">@_room.Settings.RoundCount rund</span>
+                            <span class="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">Liczba rund</span>
+                            <span class="text-sm font-bold text-slate-900 dark:text-white">@_room.Settings.RoundCount rund</span>
                         </button>
                     </div>
                     <!-- Public/Private Toggle -->
@@ -95,19 +95,19 @@ else if (_room != null)
 
             <!-- Players List -->
             <div class="flex items-center justify-between px-1">
-                <h3 class="text-lg font-bold text-white">
-                    Gracze <span class="text-slate-400 text-base font-medium ml-1">(@_room.Players.Count/@_room.Settings.MaxPlayers)</span>
+                <h3 class="text-lg font-bold text-slate-900 dark:text-white">
+                    Gracze <span class="text-slate-500 dark:text-slate-400 text-base font-medium ml-1">(@_room.Players.Count/@_room.Settings.MaxPlayers)</span>
                 </h3>
                 <div class="flex items-center gap-1 bg-green-500/10 px-2 py-0.5 rounded-full border border-green-500/20">
                     <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                    <span class="text-xs text-green-400 font-bold uppercase">Online</span>
+                    <span class="text-xs text-green-500 dark:text-green-400 font-bold uppercase">Online</span>
                 </div>
             </div>
 
             <div class="flex flex-col gap-3">
                 @foreach (var player in _room.Players)
                 {
-                    <div class="flex items-center gap-3 p-2 pr-4 bg-surface-dark rounded-full shadow-sm border @(player.IsHost ? "border-primary/20" : "border-slate-800") relative overflow-hidden">
+                    <div class="flex items-center gap-3 p-2 pr-4 bg-surface-light dark:bg-surface-dark rounded-full shadow-sm border @(player.IsHost ? "border-primary/20" : "border-slate-200 dark:border-slate-800") relative overflow-hidden">
                         @if (player.IsHost)
                         {
                             <div class="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent pointer-events-none"></div>
@@ -120,7 +120,7 @@ else if (_room != null)
                             </div>
                             @if (player.IsHost)
                             {
-                                <div class="absolute -bottom-0.5 -right-0.5 bg-yellow-400 text-black p-0.5 rounded-full border border-surface-dark flex items-center justify-center">
+                                <div class="absolute -bottom-0.5 -right-0.5 bg-yellow-400 text-black p-0.5 rounded-full border border-surface-light dark:border-surface-dark flex items-center justify-center">
                                     <span class="material-symbols-outlined text-xs">crown</span>
                                 </div>
                             }
@@ -128,10 +128,10 @@ else if (_room != null)
                         <!-- Info -->
                         <div class="flex-1 flex flex-col z-10">
                             <div class="flex items-center gap-2">
-                                <span class="text-sm font-bold text-white">@player.Nickname</span>
+                                <span class="text-sm font-bold text-slate-900 dark:text-white">@player.Nickname</span>
                                 @if (player.ConnectionId == _myConnectionId)
                                 {
-                                    <span class="text-xs text-slate-400">(Ty)</span>
+                                    <span class="text-xs text-slate-500 dark:text-slate-400">(Ty)</span>
                                 }
                                 @if (player.IsHost)
                                 {
@@ -158,31 +158,31 @@ else if (_room != null)
                 <!-- Empty Slot -->
                 @for (var i = _room.Players.Count; i < _room.Settings.MaxPlayers && i < _room.Players.Count + 2; i++)
                 {
-                    <div class="flex items-center gap-3 p-2 pr-4 border border-dashed border-slate-700 rounded-full">
-                        <div class="h-10 w-10 rounded-full bg-slate-800 flex items-center justify-center">
-                            <span class="material-symbols-outlined text-slate-600 text-xl">add</span>
+                    <div class="flex items-center gap-3 p-2 pr-4 border border-dashed border-slate-300 dark:border-slate-700 rounded-full">
+                        <div class="h-10 w-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-slate-400 dark:text-slate-600 text-xl">add</span>
                         </div>
-                        <span class="text-sm font-medium text-slate-500">Oczekiwanie na gracza...</span>
+                        <span class="text-sm font-medium text-slate-400 dark:text-slate-500">Oczekiwanie na gracza...</span>
                     </div>
                 }
             </div>
 
             <!-- Chat (simplified) -->
-            <div class="flex-1 min-h-[120px] bg-surface-dark rounded-2xl p-3 shadow-inner border border-slate-800 flex flex-col justify-end">
+            <div class="flex-1 min-h-[120px] bg-surface-light dark:bg-surface-dark rounded-2xl p-3 shadow-inner border border-slate-200 dark:border-slate-800 flex flex-col justify-end">
                 <div class="flex-1 overflow-y-auto space-y-2 mb-2 pr-1 no-scrollbar">
                     @foreach (var msg in (_room?.ChatMessages ?? []).TakeLast(10))
                     {
                         <div class="flex gap-2 items-start">
-                            <span class="text-xs font-bold @(msg.IsSystem ? "text-primary" : "text-white") shrink-0">@(msg.IsSystem ? "System:" : $"{msg.Nickname}:")</span>
-                            <span class="text-xs text-slate-300">@msg.Text</span>
+                            <span class="text-xs font-bold @(msg.IsSystem ? "text-primary" : "text-slate-900 dark:text-white") shrink-0">@(msg.IsSystem ? "System:" : $"{msg.Nickname}:")</span>
+                            <span class="text-xs text-slate-600 dark:text-slate-300">@msg.Text</span>
                         </div>
                     }
                 </div>
-                <div class="flex gap-2 items-center bg-surface-darker rounded-full px-4 py-2 border border-slate-700 focus-within:border-primary transition-all">
+                <div class="flex gap-2 items-center bg-slate-100 dark:bg-surface-darker rounded-full px-4 py-2 border border-slate-200 dark:border-slate-700 focus-within:border-primary transition-all">
                     <input @bind="_chatInput" 
                            @onkeypress="HandleChatKeyPress"
                            placeholder="Napisz wiadomość..."
-                           class="flex-1 bg-transparent text-sm text-white placeholder-slate-400 border-none p-0 focus:ring-0 focus:outline-none" />
+                           class="flex-1 bg-transparent text-sm text-slate-900 dark:text-white placeholder-slate-400 border-none p-0 focus:ring-0 focus:outline-none" />
                     <button @onclick="SendChat" class="text-slate-400 hover:text-primary transition-colors">
                         <span class="material-symbols-outlined text-xl">send</span>
                     </button>
@@ -191,9 +191,9 @@ else if (_room != null)
         </main>
 
         <!-- Footer Actions -->
-        <footer class="p-4 bg-surface-dark border-t border-slate-800 z-20 w-full max-w-md mx-auto safe-area-bottom">
+        <footer class="p-4 bg-surface-light dark:bg-surface-dark border-t border-slate-200 dark:border-slate-800 z-20 w-full max-w-md mx-auto safe-area-bottom">
             <div class="flex justify-between items-center mb-3 text-xs px-1">
-                <span class="text-slate-400">Gotowość: <span class="font-bold text-white">@ReadyCount/@_room.Players.Count</span></span>
+                <span class="text-slate-500 dark:text-slate-400">Gotowość: <span class="font-bold text-slate-900 dark:text-white">@ReadyCount/@_room.Players.Count</span></span>
                 @if (!AllReady)
                 {
                     <span class="text-orange-400 font-medium flex items-center gap-1">
@@ -203,7 +203,7 @@ else if (_room != null)
                 }
             </div>
             <div class="flex gap-3">
-                <button @onclick="LeaveRoom" class="w-12 h-12 flex items-center justify-center rounded-xl bg-slate-800 text-slate-400 hover:text-red-400 hover:bg-red-900/20 transition-colors">
+                <button @onclick="LeaveRoom" class="w-12 h-12 flex items-center justify-center rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors">
                     <span class="material-symbols-outlined">logout</span>
                 </button>
                 @if (IsHost)

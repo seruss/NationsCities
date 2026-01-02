@@ -11,16 +11,16 @@
 
 @if (_isLoading)
 {
-    <div class="flex items-center justify-center min-h-screen">
+    <div class="flex items-center justify-center min-h-screen bg-bg-light dark:bg-bg-dark">
         <div class="flex flex-col items-center gap-4">
             <span class="material-symbols-outlined text-4xl text-primary animate-spin">progress_activity</span>
-            <p class="text-slate-400">Ładowanie wyników...</p>
+            <p class="text-slate-500 dark:text-slate-400">Ładowanie wyników...</p>
         </div>
     </div>
 }
 else if (_error != null)
 {
-    <div class="flex items-center justify-center min-h-screen p-4">
+    <div class="flex items-center justify-center min-h-screen p-4 bg-bg-light dark:bg-bg-dark">
         <div class="flex flex-col items-center gap-4 text-center">
             <span class="material-symbols-outlined text-4xl text-red-400">error</span>
             <p class="text-red-400">@_error</p>
@@ -30,30 +30,30 @@ else if (_error != null)
 }
 else if (_room != null)
 {
-    <div class="flex flex-col min-h-screen pb-24">
+    <div class="flex flex-col min-h-screen pb-24 bg-bg-light dark:bg-bg-dark">
         <!-- Header -->
-        <header class="flex items-center justify-between px-4 py-4 sticky top-0 z-10 bg-bg-dark/95 backdrop-blur-sm border-b border-slate-800">
+        <header class="flex items-center justify-between px-4 py-4 sticky top-0 z-10 bg-bg-light/95 dark:bg-bg-dark/95 backdrop-blur-sm border-b border-slate-200 dark:border-slate-800">
             <div class="w-8"></div>
-            <h1 class="text-xl font-bold">Wyniki rundy @_currentRound</h1>
+            <h1 class="text-xl font-bold text-slate-900 dark:text-white">Wyniki rundy @_currentRound</h1>
             <div class="w-8"></div>
         </header>
 
         <!-- Game Stats -->
         <section class="px-4 py-4">
             <div class="flex gap-3">
-                <div class="flex flex-1 flex-col items-center justify-center gap-1 rounded-xl bg-surface-dark p-4 shadow-sm border border-slate-800">
+                <div class="flex flex-1 flex-col items-center justify-center gap-1 rounded-xl bg-surface-light dark:bg-surface-dark p-4 shadow-sm border border-slate-200 dark:border-slate-800">
                     <div class="flex items-center gap-2 text-primary">
                         <span class="material-symbols-outlined text-lg">flag</span>
                         <span class="text-sm font-medium uppercase tracking-wide opacity-80">Runda</span>
                     </div>
-                    <p class="text-3xl font-black">@_currentRound/@_totalRounds</p>
+                    <p class="text-3xl font-black text-slate-900 dark:text-white">@_currentRound/@_totalRounds</p>
                 </div>
-                <div class="flex flex-1 flex-col items-center justify-center gap-1 rounded-xl bg-surface-dark p-4 shadow-sm border border-slate-800">
+                <div class="flex flex-1 flex-col items-center justify-center gap-1 rounded-xl bg-surface-light dark:bg-surface-dark p-4 shadow-sm border border-slate-200 dark:border-slate-800">
                     <div class="flex items-center gap-2 text-primary">
                         <span class="material-symbols-outlined text-lg">sort_by_alpha</span>
                         <span class="text-sm font-medium uppercase tracking-wide opacity-80">Litera</span>
                     </div>
-                    <p class="text-3xl font-black">@_letter</p>
+                    <p class="text-3xl font-black text-slate-900 dark:text-white">@_letter</p>
                 </div>
             </div>
         </section>
@@ -63,10 +63,10 @@ else if (_room != null)
         {
             <section class="px-4 mb-2">
                 <div class="flex items-center justify-between mb-2 px-1">
-                    <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400">Lider</h2>
+                    <h2 class="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Lider</h2>
                     <span class="material-symbols-outlined text-yellow-500">emoji_events</span>
                 </div>
-                <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-surface-dark to-bg-dark border border-yellow-500/30 p-5 shadow-lg">
+                <div class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-surface-light to-bg-light dark:from-surface-dark dark:to-bg-dark border border-yellow-500/30 p-5 shadow-lg">
                     <div class="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-yellow-500/10 blur-3xl"></div>
                     <div class="relative z-10 flex items-center gap-4">
                         <div class="relative">
@@ -98,11 +98,11 @@ else if (_room != null)
 
         <!-- Other Players -->
         <section class="flex flex-col px-4 pt-2">
-            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400 mb-3 px-1">Pozostali gracze</h2>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 px-1">Pozostali gracze</h2>
             <div class="flex flex-col gap-3">
                 @foreach (var (player, index) in _otherPlayers.Select((p, i) => (p, i + 2)))
                 {
-                    <div class="flex items-center justify-between rounded-xl bg-surface-dark p-3 pr-4 border border-slate-800 shadow-sm">
+                    <div class="flex items-center justify-between rounded-xl bg-surface-light dark:bg-surface-dark p-3 pr-4 border border-slate-200 dark:border-slate-800 shadow-sm">
                         <div class="flex items-center gap-3">
                             <div class="flex h-6 w-6 items-center justify-center rounded-full bg-slate-700 text-xs font-bold text-slate-400">@index</div>
                             <div class="h-12 w-12 rounded-full flex items-center justify-center text-sm font-bold text-white avatar-initials"
@@ -137,7 +137,7 @@ else if (_room != null)
     </div>
 
     <!-- Footer Actions -->
-    <div class="fixed bottom-0 left-0 w-full bg-surface-dark/90 backdrop-blur-md border-t border-slate-800 px-4 py-4 pb-8 z-50 safe-area-bottom">
+    <div class="fixed bottom-0 left-0 w-full bg-surface-light/90 dark:bg-surface-dark/90 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 px-4 py-4 pb-8 z-50 safe-area-bottom">
         <div class="flex flex-col gap-3 max-w-md mx-auto">
             @if (_hasNextRound)
             {

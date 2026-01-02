@@ -12,16 +12,16 @@
 
 @if (_isLoading)
 {
-    <div class="flex items-center justify-center min-h-screen">
+    <div class="flex items-center justify-center min-h-screen bg-bg-light dark:bg-bg-dark">
         <div class="flex flex-col items-center gap-4">
             <span class="material-symbols-outlined text-4xl text-primary animate-spin">progress_activity</span>
-            <p class="text-slate-400">Łączenie z grą...</p>
+            <p class="text-slate-500 dark:text-slate-400">Łączenie z grą...</p>
         </div>
     </div>
 }
 else if (_error != null)
 {
-    <div class="flex items-center justify-center min-h-screen p-4">
+    <div class="flex items-center justify-center min-h-screen p-4 bg-bg-light dark:bg-bg-dark">
         <div class="flex flex-col items-center gap-4 text-center">
             <span class="material-symbols-outlined text-4xl text-red-400">error</span>
             <p class="text-red-400">@_error</p>
@@ -31,20 +31,20 @@ else if (_error != null)
 }
 else if (_room != null && _game != null)
 {
-    <div class="flex flex-col min-h-screen">
+    <div class="flex flex-col min-h-screen bg-bg-light dark:bg-bg-dark">
         <!-- Header -->
-        <header class="flex items-center justify-between px-4 py-3 bg-bg-dark shrink-0 z-20">
+        <header class="flex items-center justify-between px-4 py-3 bg-bg-light dark:bg-bg-dark shrink-0 z-20">
             <div class="w-10"></div>
-            <h2 class="text-base font-bold tracking-tight uppercase text-slate-400">Runda @_currentRound z @_game.TotalRounds</h2>
+            <h2 class="text-base font-bold tracking-tight uppercase text-slate-500 dark:text-slate-400">Runda @_currentRound z @_game.TotalRounds</h2>
             <div class="w-10"></div>
         </header>
 
         <!-- Letter & Timer Section -->
-        <div class="px-5 pb-6 pt-2 bg-bg-dark shrink-0 z-10 border-b border-slate-800 shadow-sm">
+        <div class="px-5 pb-6 pt-2 bg-bg-light dark:bg-bg-dark shrink-0 z-10 border-b border-slate-200 dark:border-slate-800 shadow-sm">
             <div class="flex items-end justify-between gap-6">
                 <!-- Current Letter -->
                 <div class="flex flex-col">
-                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Litera</span>
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Litera</span>
                     <h1 class="text-6xl font-black text-primary leading-none tracking-tighter drop-shadow-lg">@_game.CurrentLetter</h1>
                 </div>
                 
@@ -78,11 +78,11 @@ else if (_room != null && _game != null)
                         else
                         {
                             <!-- No timer - waiting for STOP -->
-                            <div class="flex items-center gap-2 mb-2 bg-slate-800 border-slate-700 px-3 py-1 rounded-lg border">
+                            <div class="flex items-center gap-2 mb-2 bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-700 px-3 py-1 rounded-lg border">
                                 <span class="material-symbols-outlined text-primary text-2xl">all_inclusive</span>
                                 <span class="text-2xl font-black text-primary leading-none tracking-tight">Bez limitu</span>
                             </div>
-                            <p class="text-xs text-slate-400 text-right">Wciśnij STOP gdy skończysz</p>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 text-right">Wciśnij STOP gdy skończysz</p>
                         }
                     </div>
                 </div>
@@ -97,8 +97,8 @@ else if (_room != null && _game != null)
                     var inputId = $"answer-{category.Name.Replace(" ", "-").ToLowerInvariant()}";
                     <div class="group">
                         <div class="flex justify-between items-center mb-2">
-                            <label class="text-sm font-semibold text-slate-300 flex items-center gap-2">
-                                <span class="material-symbols-outlined text-base text-slate-400">@category.Icon</span>
+                            <label class="text-sm font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                                <span class="material-symbols-outlined text-base text-slate-500 dark:text-slate-400">@category.Icon</span>
                                 @category.Name
                             </label>
                             @if (!string.IsNullOrEmpty(GetAnswer(category.Name)))
@@ -134,15 +134,15 @@ else if (_room != null && _game != null)
         </main>
 
         <!-- Footer: STOP Button -->
-        <footer class="shrink-0 px-5 py-4 bg-bg-dark border-t border-slate-800 fixed bottom-0 w-full z-30 backdrop-blur-md bg-opacity-95 safe-area-bottom">
+        <footer class="shrink-0 px-5 py-4 bg-bg-light dark:bg-bg-dark border-t border-slate-200 dark:border-slate-800 fixed bottom-0 w-full z-30 backdrop-blur-md bg-opacity-95 safe-area-bottom">
             @if (_hasSubmitted)
             {
                 <div class="text-center py-2">
-                    <p class="text-lg font-bold text-green-400 flex items-center justify-center gap-2">
+                    <p class="text-lg font-bold text-green-500 dark:text-green-400 flex items-center justify-center gap-2">
                         <span class="material-symbols-outlined">check_circle</span>
                         Odpowiedzi wysłane!
                     </p>
-                    <p class="text-sm text-slate-400 mt-1">Czekam na innych graczy...</p>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Czekam na innych graczy...</p>
                 </div>
             }
             else if (_isCountdownActive)

@@ -6,12 +6,19 @@
 
 <PageTitle>Państwa, Miasta</PageTitle>
 
-<div class="flex flex-col min-h-screen">
+<div class="flex flex-col min-h-screen bg-bg-light dark:bg-bg-dark">
     <!-- Top Navigation -->
     <header class="flex items-center justify-between p-4 pb-2">
         <div class="w-12"></div>
-        <button class="flex w-12 h-12 items-center justify-center rounded-full text-slate-400 hover:bg-slate-700/50 transition-colors">
-            <span class="material-symbols-outlined text-2xl">settings</span>
+        <button @onclick="ToggleTheme" class="flex w-12 h-12 items-center justify-center rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50 transition-colors">
+            @if (_isDarkMode)
+            {
+                <span class="material-symbols-outlined text-2xl">light_mode</span>
+            }
+            else
+            {
+                <span class="material-symbols-outlined text-2xl">dark_mode</span>
+            }
         </button>
     </header>
 
@@ -22,10 +29,10 @@
             <!-- Background Glow -->
             <div class="absolute inset-0 bg-primary/30 blur-[60px] rounded-full scale-150"></div>
             <!-- Main Icon -->
-            <div class="relative flex h-32 w-32 items-center justify-center rounded-[2.5rem] bg-gradient-to-br from-surface-dark to-bg-dark shadow-lg border border-slate-800">
+            <div class="relative flex h-32 w-32 items-center justify-center rounded-[2.5rem] bg-gradient-to-br from-surface-light to-bg-light dark:from-surface-dark dark:to-bg-dark shadow-lg border border-slate-200 dark:border-slate-800">
                 <span class="material-symbols-outlined text-primary text-7xl">public</span>
                 <!-- Anti-cheat Badge -->
-                <div class="absolute -bottom-3 -right-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-bg-dark border-4 border-bg-dark shadow-sm">
+                <div class="absolute -bottom-3 -right-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-bg-light dark:bg-bg-dark border-4 border-bg-light dark:border-bg-dark shadow-sm">
                     <div class="flex h-full w-full items-center justify-center rounded-xl bg-green-500/20">
                         <span class="material-symbols-outlined text-green-400 text-2xl">shield_lock</span>
                     </div>
@@ -35,8 +42,8 @@
 
         <!-- Title -->
         <div class="flex flex-col gap-2 text-center max-w-md mx-auto">
-            <h1 class="text-white tracking-tight text-4xl font-bold leading-tight">Państwa, Miasta</h1>
-            <p class="text-slate-400 text-base leading-relaxed px-4">
+            <h1 class="text-slate-900 dark:text-white tracking-tight text-4xl font-bold leading-tight">Państwa, Miasta</h1>
+            <p class="text-slate-500 dark:text-slate-400 text-base leading-relaxed px-4">
                 Klasyczna gra towarzyska z systemem anty-cheat. Graj fair. Graj razem.
             </p>
         </div>
@@ -57,7 +64,7 @@
 
                 <!-- Join Room Button -->
                 <button @onclick="ShowJoinInput"
-                        class="flex w-full items-center justify-center rounded-full h-14 px-5 bg-surface-dark border border-slate-700 hover:bg-slate-800 active:scale-[0.98] transition-all text-white btn-press">
+                        class="flex w-full items-center justify-center rounded-full h-14 px-5 bg-surface-light dark:bg-surface-dark border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-[0.98] transition-all text-slate-900 dark:text-white btn-press">
                     <span class="material-symbols-outlined mr-2 text-2xl">login</span>
                     <span class="text-lg font-bold">Dołącz do pokoju</span>
                 </button>
@@ -68,22 +75,22 @@
                 <div class="flex flex-col gap-3 animate-in fade-in duration-200">
                     @if (_isCreating)
                     {
-                        <p class="text-center text-slate-400 text-sm">Tworzenie nowego pokoju</p>
+                        <p class="text-center text-slate-500 dark:text-slate-400 text-sm">Tworzenie nowego pokoju</p>
                     }
                     else
                     {
-                        <p class="text-center text-slate-400 text-sm">Dołącz do pokoju</p>
+                        <p class="text-center text-slate-500 dark:text-slate-400 text-sm">Dołącz do pokoju</p>
                         <input @bind="_roomCode" 
                                @bind:event="oninput"
                                placeholder="Kod pokoju (opcjonalnie)"
                                maxlength="4"
-                               class="w-full h-14 px-5 rounded-full bg-surface-dark border border-slate-700 text-white text-center text-xl font-bold uppercase tracking-widest placeholder:text-slate-500 placeholder:font-normal placeholder:text-base placeholder:tracking-normal focus:border-primary" />
+                               class="w-full h-14 px-5 rounded-full bg-surface-light dark:bg-surface-dark border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-center text-xl font-bold uppercase tracking-widest placeholder:text-slate-400 dark:placeholder:text-slate-500 placeholder:font-normal placeholder:text-base placeholder:tracking-normal focus:border-primary" />
                     }
 
                     <input @bind="_nickname" 
                            placeholder="Twój nick"
                            maxlength="20"
-                           class="w-full h-14 px-5 rounded-full bg-surface-dark border border-slate-700 text-white text-center text-lg placeholder:text-slate-500 focus:border-primary" />
+                           class="w-full h-14 px-5 rounded-full bg-surface-light dark:bg-surface-dark border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-center text-lg placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-primary" />
 
                     @if (!string.IsNullOrEmpty(_error))
                     {
@@ -110,12 +117,12 @@
                                 {
                                     <button @onclick="() => JoinPublicRoom(publicRoom.Code)"
                                             disabled="@(string.IsNullOrWhiteSpace(_nickname))"
-                                            class="flex items-center justify-between p-3 rounded-xl bg-green-900/20 border border-green-700/50 hover:bg-green-900/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                            class="flex items-center justify-between p-3 rounded-xl bg-green-100 dark:bg-green-900/20 border border-green-300 dark:border-green-700/50 hover:bg-green-200 dark:hover:bg-green-900/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                                         <div class="flex items-center gap-2">
-                                            <span class="material-symbols-outlined text-green-400">meeting_room</span>
-                                            <span class="text-white font-medium">@publicRoom.HostNickname</span>
+                                            <span class="material-symbols-outlined text-green-600 dark:text-green-400">meeting_room</span>
+                                            <span class="text-slate-900 dark:text-white font-medium">@publicRoom.HostNickname</span>
                                         </div>
-                                        <span class="text-slate-400 text-sm">@publicRoom.PlayerCount/@publicRoom.MaxPlayers graczy</span>
+                                        <span class="text-slate-500 dark:text-slate-400 text-sm">@publicRoom.PlayerCount/@publicRoom.MaxPlayers graczy</span>
                                     </button>
                                 }
                             </div>
@@ -123,7 +130,7 @@
                     }
 
                     <button @onclick="CancelForm"
-                            class="w-full py-2 text-slate-400 hover:text-white text-sm font-medium transition-colors">
+                            class="w-full py-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-sm font-medium transition-colors">
                         Anuluj
                     </button>
                 </div>
@@ -133,7 +140,7 @@
             @if (!_showJoinInput)
             {
                 <div class="mt-4 flex justify-center">
-                    <button class="flex items-center gap-1.5 text-sm font-medium text-slate-400 hover:text-primary transition-colors py-2 px-4 rounded-full hover:bg-slate-800/50">
+                    <button class="flex items-center gap-1.5 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-primary transition-colors py-2 px-4 rounded-full hover:bg-slate-200/50 dark:hover:bg-slate-800/50">
                         <span class="material-symbols-outlined text-lg">info</span>
                         <span>Jak grać?</span>
                     </button>
@@ -151,9 +158,37 @@
     private string _nickname = "";
     private string? _error;
     private List<PublicRoomInfo> _publicRooms = new();
+    private bool _isDarkMode = true;
+
+    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
 
     private bool CanSubmit => !string.IsNullOrWhiteSpace(_nickname) && 
                               (_isCreating || _roomCode.Length == 4);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var theme = await JSRuntime.InvokeAsync<string>("themeManager.get");
+                _isDarkMode = theme == "dark";
+                StateHasChanged();
+            }
+            catch { /* Ignore if JS not ready */ }
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        try
+        {
+            var newTheme = await JSRuntime.InvokeAsync<string>("themeManager.toggle");
+            _isDarkMode = newTheme == "dark";
+        }
+        catch { /* Ignore */ }
+    }
+
 
     private void ShowNicknameForCreate()
     {

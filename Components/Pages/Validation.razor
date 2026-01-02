@@ -11,16 +11,16 @@
 
 @if (_isLoading)
 {
-    <div class="flex items-center justify-center min-h-screen">
+    <div class="flex items-center justify-center min-h-screen bg-bg-light dark:bg-bg-dark">
         <div class="flex flex-col items-center gap-4">
             <span class="material-symbols-outlined text-4xl text-primary animate-spin">progress_activity</span>
-            <p class="text-slate-400">Ładowanie odpowiedzi...</p>
+            <p class="text-slate-500 dark:text-slate-400">Ładowanie odpowiedzi...</p>
         </div>
     </div>
 }
 else if (_error != null)
 {
-    <div class="flex items-center justify-center min-h-screen p-4">
+    <div class="flex items-center justify-center min-h-screen p-4 bg-bg-light dark:bg-bg-dark">
         <div class="flex flex-col items-center gap-4 text-center">
             <span class="material-symbols-outlined text-4xl text-red-400">error</span>
             <p class="text-red-400">@_error</p>
@@ -30,20 +30,20 @@ else if (_error != null)
 }
 else if (_answersForVoting != null)
 {
-    <div class="flex flex-col min-h-screen pb-28">
+    <div class="flex flex-col min-h-screen pb-28 bg-bg-light dark:bg-bg-dark">
         <!-- Header -->
-        <div class="sticky top-0 z-50 bg-bg-dark/95 backdrop-blur-md border-b border-slate-800 transition-colors">
+        <div class="sticky top-0 z-50 bg-bg-light/95 dark:bg-bg-dark/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
             <div class="flex items-center px-4 h-16 justify-between max-w-lg mx-auto w-full">
                 <div class="w-10"></div>
-                <h1 class="text-lg font-bold">Runda @_roundNumber: Litera '@_letter'</h1>
+                <h1 class="text-lg font-bold text-slate-900 dark:text-white">Runda @_roundNumber: Litera '@_letter'</h1>
                 <div class="w-10"></div>
             </div>
             
             <!-- Info Strip -->
-            <div class="w-full bg-surface-dark border-b border-slate-800">
+            <div class="w-full bg-surface-light dark:bg-surface-dark border-b border-slate-200 dark:border-slate-800">
                 <div class="max-w-lg mx-auto px-4 py-2 flex items-center justify-center gap-2">
                     <span class="material-symbols-outlined text-primary text-xl">how_to_vote</span>
-                    <span class="text-sm font-medium text-slate-400">
+                    <span class="text-sm font-medium text-slate-500 dark:text-slate-400">
                         @if (_hasSubmittedVotes)
                         {
                             <span>Czekam na innych graczy... (@_votesSubmittedCount/@_totalPlayers)</span>
@@ -76,13 +76,13 @@ else if (_answersForVoting != null)
                     <div class="flex flex-col gap-4">
                         @foreach (var answer in categoryGroup)
                         {
-                            <article class="bg-surface-dark p-4 rounded-xl shadow-sm border border-slate-800 relative overflow-hidden">
+                            <article class="bg-surface-light dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 relative overflow-hidden">
                                 <!-- Status Indicator -->
                                 <div class="absolute left-0 top-0 bottom-0 w-1 @GetStatusColor(answer)"></div>
                                 
                                 <div class="flex justify-between items-start mb-3 pl-2">
                                     <div>
-                                        <h3 class="text-lg font-bold">@answer.Answer</h3>
+                                        <h3 class="text-lg font-bold text-slate-900 dark:text-white">@answer.Answer</h3>
                                         @if (answer.IsDuplicate)
                                         {
                                             <span class="text-xs text-yellow-500">Duplikat</span>
@@ -121,7 +121,7 @@ else if (_answersForVoting != null)
         </main>
 
         <!-- Footer -->
-        <div class="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-bg-dark via-bg-dark to-transparent z-40 safe-area-bottom">
+        <div class="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-bg-light dark:from-bg-dark via-bg-light dark:via-bg-dark to-transparent z-40 safe-area-bottom">
             <div class="max-w-lg mx-auto w-full flex flex-col gap-2">
                 @if (_hasSubmittedVotes)
                 {

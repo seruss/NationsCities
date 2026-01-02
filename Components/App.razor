@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pl" class="dark">
+<html lang="pl">
 
 <head>
     <meta charset="utf-8" />
@@ -9,6 +9,18 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Państwa, Miasta</title>
     <base href="/" />
+    
+    <!-- Theme initialization (must run before page renders to prevent flash) -->
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme_preference') || 'dark';
+            if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+            }
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', theme === 'dark' ? '#101922' : '#f5f7f8');
+        })();
+    </script>
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
