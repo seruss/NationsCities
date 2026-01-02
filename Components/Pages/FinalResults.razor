@@ -102,7 +102,7 @@ else if (_room != null && _winner != null)
                         <div class="flex flex-col flex-1 min-w-0">
                             <p class="text-slate-900 dark:text-white text-base font-semibold leading-normal truncate">@player.Nickname</p>
                             <div class="flex items-center gap-2">
-                                <div class="h-1.5 w-full max-w-[80px] bg-white/10 rounded-full overflow-hidden">
+                                <div class="h-1.5 w-full max-w-[80px] bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden">
                                     <div class="h-full bg-slate-400" style="width: @(progressPercent)%"></div>
                                 </div>
                             </div>
@@ -113,7 +113,7 @@ else if (_room != null && _winner != null)
                                 <span class="px-2 py-1 bg-red-500/20 rounded-full text-xs font-bold text-red-400">-@playerPenalty</span>
                             }
                             <div class="flex flex-col items-end">
-                                <p class="text-white text-lg font-bold leading-normal">@player.TotalScore</p>
+                                <p class="text-slate-900 dark:text-white text-lg font-bold leading-normal">@player.TotalScore</p>
                                 <p class="text-xs text-slate-500">pkt</p>
                             </div>
                         </div>
@@ -127,7 +127,7 @@ else if (_room != null && _winner != null)
         {
             <section class="px-4 mt-8">
                 <div class="flex items-center justify-between mb-4 px-2">
-                    <h3 class="text-slate-400 text-sm font-bold uppercase tracking-wider">Kontrola Fair Play</h3>
+                    <h3 class="text-slate-500 dark:text-slate-400 text-sm font-bold uppercase tracking-wider">Kontrola Fair Play</h3>
                     <span class="flex items-center gap-1 text-[10px] font-bold bg-green-500/20 text-green-500 px-2 py-0.5 rounded-full uppercase tracking-wide">
                         System Aktywny
                     </span>

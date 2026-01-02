@@ -469,12 +469,18 @@ textarea:focus {
     width: 100%;
     background: transparent !important;
     color: transparent !important;
-    caret-color: white;
+    caret-color: #1e293b;
+    /* Light mode: dark caret */
     position: relative;
     z-index: 2;
     font-family: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
     font-size: 1.125rem;
     letter-spacing: 0.02em;
+}
+
+html.dark .password-visible-input {
+    caret-color: white;
+    /* Dark mode: white caret */
 }
 
 .password-visible-input::selection {
@@ -507,23 +513,41 @@ textarea:focus {
     font-family: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
     font-size: 1.125rem;
     letter-spacing: 0.02em;
-    color: white;
+    color: #1e293b;
+    /* Light mode: dark text */
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
     border-radius: 0.75rem;
+    background: #ffffff;
+    /* Light mode: white background */
+    border: 1px solid #e2e8f0;
+}
+
+html.dark .password-visible-overlay {
+    color: white;
+    /* Dark mode: white text */
     background: #1A2633;
+    /* Dark mode: dark background */
+    border-color: transparent;
 }
 
 .password-visible-overlay.placeholder {
-    color: #475569;
+    color: #94a3b8;
+    /* Light mode: slate-400 */
     font-family: 'Inter', sans-serif;
     letter-spacing: normal;
 }
 
+html.dark .password-visible-overlay.placeholder {
+    color: #475569;
+    /* Dark mode: slate-600 */
+}
+
 /* Focus state styling */
 .password-visible-wrapper:focus-within .password-visible-overlay {
-    background: rgba(10, 132, 255, 0.05);
+    background: rgba(37, 140, 244, 0.05);
+    border-color: #258cf4;
 }
 
 /* ===========================================
