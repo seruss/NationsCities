@@ -9,30 +9,14 @@
 
 <div class="flex flex-col min-h-screen bg-bg-light dark:bg-bg-dark">
     <!-- Top Navigation -->
-    <header class="flex items-center justify-between p-4 pb-2">
+    <header class="relative z-10 flex items-center justify-between p-4 pb-2">
         <div class="w-12"></div>
         <button id="home-theme-toggle" 
                 type="button"
                 class="flex w-12 h-12 items-center justify-center rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50 transition-colors cursor-pointer">
-            <span id="home-theme-icon" class="material-symbols-outlined text-2xl">light_mode</span>
+            <span id="home-theme-icon" class="material-symbols-outlined text-2xl pointer-events-none">light_mode</span>
         </button>
     </header>
-    <script>
-        (function() {
-            var icon = document.getElementById('home-theme-icon');
-            if (icon) {
-                icon.textContent = document.documentElement.classList.contains('dark') ? 'light_mode' : 'dark_mode';
-            }
-            var btn = document.getElementById('home-theme-toggle');
-            if (btn) {
-                btn.onclick = function(e) {
-                    e.preventDefault();
-                    var newTheme = window.themeManager.toggle();
-                    document.getElementById('home-theme-icon').textContent = newTheme === 'dark' ? 'light_mode' : 'dark_mode';
-                };
-            }
-        })();
-    </script>
 
     <!-- Hero Section -->
     <main class="flex-1 flex flex-col items-center justify-center px-4 -mt-10">
@@ -177,16 +161,18 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        // Setup theme toggle button click handler after every render
+        try
         {
-            // Sync state with actual DOM theme on first render only
-            try
+            await JS.InvokeVoidAsync("setupThemeToggle", "home-theme-toggle", "home-theme-icon");
+            
+            if (firstRender)
             {
                 var theme = await JS.InvokeAsync<string>("themeManager.get");
                 _isDarkMode = theme == "dark";
             }
-            catch { /* Ignore if JS not ready */ }
         }
+        catch { /* Ignore if JS not ready */ }
     }
 
 
@@ -262,7 +248,7 @@
         
         if (!CanSubmit)
         {
-            return $"{baseClass} bg-slate-700 text-slate-400 cursor-not-allowed";
+            return $"{baseClass} bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-400 cursor-not-allowed";
         }
         
         return $"{baseClass} bg-primary hover:bg-primary-dark active:scale-[0.98] text-white shadow-lg shadow-primary/25";

@@ -31,6 +31,30 @@ window.copyToClipboard = async function (text) {
     }
 };
 
+/**
+ * Sets up the theme toggle button click handler and initial icon state.
+ * Called from Blazor's OnAfterRenderAsync to ensure handler is attached after render.
+ */
+window.setupThemeToggle = function (buttonId, iconId) {
+    var icon = document.getElementById(iconId);
+    if (icon) {
+        icon.textContent = document.documentElement.classList.contains('dark') ? 'light_mode' : 'dark_mode';
+    }
+
+    var btn = document.getElementById(buttonId);
+    if (btn) {
+        btn.onclick = function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var newTheme = window.themeManager.toggle();
+            var iconEl = document.getElementById(iconId);
+            if (iconEl) {
+                iconEl.textContent = newTheme === 'dark' ? 'light_mode' : 'dark_mode';
+            }
+        };
+    }
+};
+
 // ======================================
 // Anti-Cheat System (Heartbeat-based)
 // ======================================
@@ -289,7 +313,7 @@ window.AntiCheatTracker = class {
         const textColor = isWarning ? '#78350f' : 'white';
         const title = isWarning ? 'Ostrzeżenie' : 'Kara czasowa';
         const message = isWarning
-            ? 'Pozostań w grze! Kolejne naruszenia spowodują kary czasowe.'
+            ? 'Pozostań w grze! Kolejne naruszenia spowodują kary punktowe.'
             : `Opuściłeś grę podczas rundy. Kara: ${penalty} pkt i blokada na ${blockSeconds}s.`;
         const icon = isWarning ? 'warning' : 'block';
         const circleColor = isWarning ? '#eab308' : 'url(#blockGradient)';

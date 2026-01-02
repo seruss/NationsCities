@@ -33,7 +33,7 @@ else if (_room != null && _game != null)
 {
     <div class="flex flex-col min-h-screen bg-bg-light dark:bg-bg-dark">
         <!-- Header -->
-        <header class="flex items-center justify-between px-4 py-3 bg-bg-light dark:bg-bg-dark shrink-0 z-20">
+        <header class="sticky top-0 flex items-center justify-between px-4 py-3 bg-bg-light dark:bg-bg-dark shrink-0 z-20">
             <div class="w-10"></div>
             <h2 class="text-base font-bold tracking-tight uppercase text-slate-500 dark:text-slate-400">Runda @_currentRound z @_game.TotalRounds</h2>
             <div class="w-10"></div>
@@ -54,13 +54,13 @@ else if (_room != null && _game != null)
                         @if (_isCountdownActive)
                         {
                             <!-- Countdown active -->
-                            <div class="flex items-center gap-2 mb-2 @(_secondsRemaining <= 5 ? "bg-red-900/20 border-red-900/30" : "bg-yellow-900/20 border-yellow-900/30") px-3 py-1 rounded-lg border animate-pulse">
+                            <div class="flex items-center gap-2 mb-2 @(_secondsRemaining <= 5 ? "bg-red-100 dark:bg-red-900/20 border-red-200 dark:border-red-900/30" : "bg-yellow-100 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-900/30") px-3 py-1 rounded-lg border animate-pulse">
                                 <span class="material-symbols-outlined @(_secondsRemaining <= 5 ? "text-red-500" : "text-yellow-500") text-2xl">hourglass_top</span>
                                 <span class="text-4xl font-black font-mono tabular-nums leading-none @(_secondsRemaining <= 5 ? "text-red-500" : "text-yellow-500") tracking-tight">@_secondsRemaining</span>
                             </div>
                             
                             <!-- Progress Bar -->
-                            <div class="w-full h-3 bg-surface-dark rounded-full overflow-hidden mb-2">
+                            <div class="w-full h-3 bg-slate-200 dark:bg-surface-dark rounded-full overflow-hidden mb-2">
                                 <div class="h-full @(_secondsRemaining <= 5 ? "bg-red-500" : "bg-yellow-500") rounded-full transition-all duration-1000" 
                                      style="width: @(Math.Min(100, (_secondsRemaining / 10.0) * 100))%"></div>
                             </div>
@@ -160,7 +160,7 @@ else if (_room != null && _game != null)
             {
                 <button @onclick="TriggerStop" 
                         disabled="@(!CanStop)"
-                        class="w-full flex items-center justify-center gap-2 @(CanStop ? "bg-red-500 hover:bg-red-600 shadow-red-500/30" : "bg-slate-700 cursor-not-allowed") text-white font-bold text-lg py-4 rounded-xl shadow-lg transition-all btn-press">
+                        class="w-full flex items-center justify-center gap-2 @(CanStop ? "bg-red-500 hover:bg-red-600 shadow-red-500/30" : "bg-slate-200 dark:bg-slate-700 cursor-not-allowed") text-white font-bold text-lg py-4 rounded-xl shadow-lg transition-all btn-press">
                     <span class="material-symbols-outlined">stop_circle</span>
                     <span>STOP!</span>
                 </button>
@@ -567,11 +567,7 @@ else if (_room != null && _game != null)
         var dashLength = progress * circumference;
         return $"{dashLength:F0} {circumference:F0}";
     }
-    
-    private string GetBlockMessage() => _isWarningOnly 
-        ? "Pozostań w grze! Kolejne naruszenia spowodują kary czasowe."
-        : $"Opuściłeś grę podczas rundy. Kara: {_currentPenalty} pkt i blokada na {_blockTotalSeconds}s.";
-    
+
     private string GetBlockTitle() => _isWarningOnly ? "Ostrzeżenie" : "Kara czasowa";
     
     private string GetBlockOverlayClass() => _isWarningOnly 
