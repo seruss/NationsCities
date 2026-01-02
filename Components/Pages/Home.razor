@@ -8,11 +8,31 @@
 <PageTitle>Państwa, Miasta</PageTitle>
 
 <div class="flex flex-col min-h-screen bg-bg-light dark:bg-bg-dark">
-    <!-- Top Navigation (theme toggle moved to App.razor fixed button) -->
+    <!-- Top Navigation -->
     <header class="flex items-center justify-between p-4 pb-2">
         <div class="w-12"></div>
-        <div class="w-12"></div>
+        <button id="home-theme-toggle" 
+                type="button"
+                class="flex w-12 h-12 items-center justify-center rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50 transition-colors cursor-pointer">
+            <span id="home-theme-icon" class="material-symbols-outlined text-2xl">light_mode</span>
+        </button>
     </header>
+    <script>
+        (function() {
+            var icon = document.getElementById('home-theme-icon');
+            if (icon) {
+                icon.textContent = document.documentElement.classList.contains('dark') ? 'light_mode' : 'dark_mode';
+            }
+            var btn = document.getElementById('home-theme-toggle');
+            if (btn) {
+                btn.onclick = function(e) {
+                    e.preventDefault();
+                    var newTheme = window.themeManager.toggle();
+                    document.getElementById('home-theme-icon').textContent = newTheme === 'dark' ? 'light_mode' : 'dark_mode';
+                };
+            }
+        })();
+    </script>
 
     <!-- Hero Section -->
     <main class="flex-1 flex flex-col items-center justify-center px-4 -mt-10">
