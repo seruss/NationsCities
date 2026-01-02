@@ -12,14 +12,49 @@
     
     <!-- Theme initialization (must run before page renders to prevent flash) -->
     <script>
-        (function() {
-            var theme = localStorage.getItem('theme_preference') || 'dark';
-            if (theme === 'dark') {
-                document.documentElement.classList.add('dark');
+        // Theme Manager - defined in head so it's available immediately for onclick handlers
+        window.ThemeManager = class {
+            constructor() {
+                this._storageKey = 'theme_preference';
+                this._init();
             }
-            var meta = document.querySelector('meta[name="theme-color"]');
-            if (meta) meta.setAttribute('content', theme === 'dark' ? '#101922' : '#f5f7f8');
-        })();
+
+            _init() {
+                var stored = localStorage.getItem(this._storageKey);
+                var theme = stored || 'dark';
+                this._apply(theme);
+            }
+
+            toggle() {
+                var current = this.get();
+                var next = current === 'dark' ? 'light' : 'dark';
+                this._apply(next);
+                localStorage.setItem(this._storageKey, next);
+                return next;
+            }
+
+            get() {
+                return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+            }
+
+            set(theme) {
+                this._apply(theme);
+                localStorage.setItem(this._storageKey, theme);
+            }
+
+            _apply(theme) {
+                if (theme === 'dark') {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+                var metaTheme = document.querySelector('meta[name="theme-color"]');
+                if (metaTheme) {
+                    metaTheme.setAttribute('content', theme === 'dark' ? '#101922' : '#f5f7f8');
+                }
+            }
+        };
+        window.themeManager = new window.ThemeManager();
     </script>
     
     <!-- Google Fonts -->

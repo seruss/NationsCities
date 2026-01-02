@@ -1,56 +1,8 @@
 // Państwa, Miasta - JavaScript Interop
 // ======================================
 
-// ======================================
-// Theme Manager (Dark/Light Mode)
-// ======================================
-
-window.ThemeManager = class {
-    constructor() {
-        this._storageKey = 'theme_preference';
-        this._init();
-    }
-
-    _init() {
-        // Get stored preference or default to 'dark'
-        const stored = localStorage.getItem(this._storageKey);
-        const theme = stored || 'dark';
-        this._apply(theme);
-    }
-
-    toggle() {
-        const current = this.get();
-        const next = current === 'dark' ? 'light' : 'dark';
-        this._apply(next);
-        localStorage.setItem(this._storageKey, next);
-        return next;
-    }
-
-    get() {
-        return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-    }
-
-    set(theme) {
-        this._apply(theme);
-        localStorage.setItem(this._storageKey, theme);
-    }
-
-    _apply(theme) {
-        if (theme === 'dark') {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
-        // Update meta theme-color for mobile browsers
-        const metaTheme = document.querySelector('meta[name="theme-color"]');
-        if (metaTheme) {
-            metaTheme.setAttribute('content', theme === 'dark' ? '#101922' : '#f5f7f8');
-        }
-    }
-};
-
-// Create global instance
-window.themeManager = new window.ThemeManager();
+// NOTE: ThemeManager is now defined inline in App.razor <head> 
+// so it's available immediately for onclick handlers.
 
 /**
  * Copies text to clipboard using modern Clipboard API with fallback
