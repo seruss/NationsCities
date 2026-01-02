@@ -479,6 +479,11 @@ else if (_room != null && _game != null)
         {
             _antiCheatRef = DotNetObjectReference.Create(this);
             
+            // IMPORTANT: Register handler FIRST, before resuming/starting tracking!
+            // This prevents race condition where violations detected during resume
+            // are lost because the handler isn't registered yet.
+            await JSRuntime.InvokeVoidAsync("registerAntiCheatHandler", _antiCheatRef);
+            
             // For round 2+, try to resume existing session (preserves violation count)
             // For round 1, start fresh tracking
             if (_currentRound > 1)
@@ -491,9 +496,6 @@ else if (_room != null && _game != null)
                 await JSRuntime.InvokeVoidAsync("antiCheatTracker.startTracking", RoomCode);
                 Console.WriteLine($"[AntiCheat] Started fresh tracking for room {RoomCode}");
             }
-            
-            // Always register handler (may have been unregistered)
-            await JSRuntime.InvokeVoidAsync("registerAntiCheatHandler", _antiCheatRef);
         }
         catch (Exception ex)
         {
