@@ -371,7 +371,7 @@ else if (_room != null && _game != null)
     }
 
     [JSInvokable]
-    public async Task ReportViolationFromJS(string violationType, double durationSeconds)
+    public async Task ReportViolationFromJS(string violationType, double durationSeconds, int roundNumber)
     {
         // Safety guard: don't report if we're disposed or hub is gone
         if (_isDisposed || _hubConnection == null || string.IsNullOrEmpty(RoomCode)) 
@@ -382,7 +382,8 @@ else if (_room != null && _game != null)
         
         try  
         {
-            await _hubConnection.InvokeAsync("ReportViolation", RoomCode, violationType, durationSeconds);
+            // Pass round number captured at detection time!
+            await _hubConnection.InvokeAsync("ReportViolation", RoomCode, violationType, durationSeconds, roundNumber);
         }
         catch (Exception ex)
         {
@@ -486,15 +487,16 @@ else if (_room != null && _game != null)
             
             // For round 2+, try to resume existing session (preserves violation count)
             // For round 1, start fresh tracking
+            // Pass round number so violations are assigned to the correct round!
             if (_currentRound > 1)
             {
-                await JSRuntime.InvokeVoidAsync("antiCheatTracker.resumeTracking", RoomCode);
+                await JSRuntime.InvokeVoidAsync("antiCheatTracker.resumeTracking", RoomCode, _currentRound);
                 Console.WriteLine($"[AntiCheat] Resumed tracking for round {_currentRound}");
             }
             else
             {
-                await JSRuntime.InvokeVoidAsync("antiCheatTracker.startTracking", RoomCode);
-                Console.WriteLine($"[AntiCheat] Started fresh tracking for room {RoomCode}");
+                await JSRuntime.InvokeVoidAsync("antiCheatTracker.startTracking", RoomCode, _currentRound);
+                Console.WriteLine($"[AntiCheat] Started fresh tracking for room {RoomCode}, round {_currentRound}");
             }
         }
         catch (Exception ex)

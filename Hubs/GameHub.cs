@@ -676,9 +676,9 @@ public class GameHub : Hub
     /// <summary>
     /// Raportuje naruszenie.
     /// </summary>
-    public async Task ReportViolation(string roomCode, string violationType, double durationSeconds)
+    public async Task ReportViolation(string roomCode, string violationType, double durationSeconds, int roundNumber)
     {
-        Console.WriteLine($"[AntiCheat] ReportViolation called: room={roomCode}, type={violationType}, duration={durationSeconds}s, connectionId={Context.ConnectionId}");
+        Console.WriteLine($"[AntiCheat] ReportViolation called: room={roomCode}, type={violationType}, duration={durationSeconds}s, round={roundNumber}, connectionId={Context.ConnectionId}");
         
         var room = _roomService.GetRoom(roomCode);
         var player = room?.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
@@ -696,13 +696,13 @@ public class GameHub : Hub
                 Type = type,
                 DurationSeconds = durationSeconds,
                 Penalty = penalty,
-                RoundNumber = room?.CurrentGame?.CurrentRound ?? 0
+                RoundNumber = roundNumber  // Use round number from client (captured at detection time!)
             };
             
             player.Violations.Add(violation);
             player.TotalScore -= penalty;
             
-            Console.WriteLine($"[AntiCheat] Violation added. Player {player.Nickname} now has TotalScore={player.TotalScore}, Violations={player.Violations.Count}");
+            Console.WriteLine($"[AntiCheat] Violation added. Player {player.Nickname} now has TotalScore={player.TotalScore}, Violations={player.Violations.Count}, Round={roundNumber}");
 
             await Clients.Group(roomCode).SendAsync("OnAntiCheatViolation", 
                 Context.ConnectionId, 

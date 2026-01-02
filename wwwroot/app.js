@@ -82,7 +82,7 @@ window.AntiCheatTracker = class {
 
     // === PUBLIC API ===
 
-    startTracking(roomCode) {
+    startTracking(roomCode, roundNumber = 1) {
         const existing = this._getSession();
 
         // If same room and we have an existing session, preserve violation count (for multi-round games)
@@ -95,6 +95,7 @@ window.AntiCheatTracker = class {
         // Create new session - preserve violation count if same room
         this._saveSession({
             roomCode: roomCode,
+            roundNumber: roundNumber,
             isActive: true,
             startedAt: Date.now(),
             lastActiveAt: Date.now(),
@@ -102,22 +103,26 @@ window.AntiCheatTracker = class {
         });
 
         this._startHeartbeat();
-        console.log(`[AntiCheat] Tracking started for room ${roomCode}, violation count: ${existingViolationCount}`);
+        console.log(`[AntiCheat] Tracking started for room ${roomCode}, round ${roundNumber}, violations: ${existingViolationCount}`);
     }
 
     // Resume tracking after pause (for round 2+)
-    resumeTracking(roomCode) {
+    resumeTracking(roomCode, roundNumber) {
         const session = this._getSession();
         if (session) {
             session.isActive = true;
             session.lastActiveAt = Date.now();
+            // Update round number for new round
+            if (roundNumber) {
+                session.roundNumber = roundNumber;
+            }
             this._saveSession(session);
             this._startHeartbeat();
-            console.log(`[AntiCheat] Tracking resumed, violations: ${session.violationCount}`);
+            console.log(`[AntiCheat] Tracking resumed, round ${session.roundNumber}, violations: ${session.violationCount}`);
         } else if (roomCode) {
             // No session to resume - start fresh (fallback)
             console.log('[AntiCheat] No session to resume, starting fresh');
-            this.startTracking(roomCode);
+            this.startTracking(roomCode, roundNumber || 1);
         } else {
             console.log('[AntiCheat] No session to resume and no roomCode provided');
         }
@@ -276,13 +281,17 @@ window.AntiCheatTracker = class {
         session.lastActiveAt = Date.now();
         this._saveSession(session);
 
-        console.log(`[AntiCheat] Violation #${session.violationCount} detected: ${durationSeconds.toFixed(2)}s`);
+        // Capture round number at the time of violation!
+        const roundNumber = session.roundNumber || 1;
+
+        console.log(`[AntiCheat] Violation #${session.violationCount} detected in round ${roundNumber}: ${durationSeconds.toFixed(2)}s`);
 
         // Show block overlay IMMEDIATELY (don't wait for Blazor)
         this._showBlockOverlay(session.violationCount, durationSeconds);
 
         // Try to report to Blazor (may fail if circuit not ready)
-        this._tryReportToBlazor(session.roomCode, 'FocusLost', durationSeconds);
+        // Pass round number captured at detection time!
+        this._tryReportToBlazor(session.roomCode, 'FocusLost', durationSeconds, roundNumber);
 
         // Resume heartbeat
         this._startHeartbeat();
@@ -409,16 +418,16 @@ window.AntiCheatTracker = class {
 
     // === BLAZOR COMMUNICATION ===
 
-    _tryReportToBlazor(roomCode, violationType, durationSeconds) {
+    _tryReportToBlazor(roomCode, violationType, durationSeconds, roundNumber) {
         // Add to pending queue first (will be processed by handler)
-        this._addToPendingQueue({ roomCode, violationType, durationSeconds, timestamp: Date.now() });
+        this._addToPendingQueue({ roomCode, violationType, durationSeconds, roundNumber, timestamp: Date.now() });
 
         // Dispatch event for Blazor handler (if connected)
         const event = new CustomEvent('anticheat-report', {
-            detail: { roomCode, violationType, durationSeconds }
+            detail: { roomCode, violationType, durationSeconds, roundNumber }
         });
         window.dispatchEvent(event);
-        console.log(`[AntiCheat] Report event dispatched: ${violationType}, ${durationSeconds.toFixed(2)}s`);
+        console.log(`[AntiCheat] Report event dispatched: ${violationType}, round ${roundNumber}, ${durationSeconds.toFixed(2)}s`);
     }
 
     // === PENDING QUEUE (for circuit reconnection scenarios) ===
@@ -536,8 +545,9 @@ window.registerAntiCheatHandler = function (dotNetHelper) {
             try {
                 await window._antiCheatDotNetRef.invokeMethodAsync('ReportViolationFromJS',
                     violation.violationType,
-                    violation.durationSeconds);
-                console.log(`[AntiCheat] Pending violation reported to Blazor successfully`);
+                    violation.durationSeconds,
+                    violation.roundNumber || 1);  // Pass round number!
+                console.log(`[AntiCheat] Pending violation (round ${violation.roundNumber}) reported to Blazor successfully`);
                 window.antiCheatTracker._removeFromPendingQueue(violation);
             } catch (err) {
                 console.warn(`[AntiCheat] Failed to report pending violation: ${err.message}`);
@@ -559,12 +569,14 @@ window.registerAntiCheatHandler = function (dotNetHelper) {
         try {
             await window._antiCheatDotNetRef.invokeMethodAsync('ReportViolationFromJS',
                 report.violationType,
-                report.durationSeconds);
-            console.log('[AntiCheat] Reported to Blazor successfully');
-            // Remove from pending queue (find by matching violationType and close timestamp)
+                report.durationSeconds,
+                report.roundNumber || 1);  // Pass round number!
+            console.log(`[AntiCheat] Reported to Blazor successfully (round ${report.roundNumber})`);
+            // Remove from pending queue (find by matching violationType and roundNumber)
             const queue = window.antiCheatTracker._getPendingQueue();
             const matchIdx = queue.findIndex(v =>
                 v.violationType === report.violationType &&
+                v.roundNumber === report.roundNumber &&
                 Math.abs(v.durationSeconds - report.durationSeconds) < 0.1);
             if (matchIdx >= 0) {
                 queue.splice(matchIdx, 1);
