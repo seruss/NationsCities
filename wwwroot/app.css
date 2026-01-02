@@ -153,7 +153,7 @@ textarea:focus {
 .modal-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.75);
+    background: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(4px);
     z-index: 50;
     display: flex;
@@ -163,25 +163,39 @@ textarea:focus {
     animation: fadeIn 0.2s ease-out;
 }
 
+html.dark .modal-backdrop {
+    background: rgba(0, 0, 0, 0.75);
+}
+
 .modal-content {
-    background: #1e293b;
+    background: #ffffff;
     border-radius: 1rem;
     max-width: 500px;
     width: 100%;
     max-height: 80vh;
     display: flex;
     flex-direction: column;
-    border: 1px solid #334155;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
     animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html.dark .modal-content {
+    background: #1e293b;
+    border-color: #334155;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
 }
 
 .modal-header {
     padding: 1.5rem;
-    border-bottom: 1px solid #334155;
+    border-bottom: 1px solid #e2e8f0;
     display: flex;
     align-items: center;
     justify-content: space-between;
+}
+
+html.dark .modal-header {
+    border-bottom-color: #334155;
 }
 
 .modal-body {
@@ -192,9 +206,13 @@ textarea:focus {
 
 .modal-footer {
     padding: 1rem 1.5rem;
-    border-top: 1px solid #334155;
+    border-top: 1px solid #e2e8f0;
     display: flex;
     gap: 0.75rem;
+}
+
+html.dark .modal-footer {
+    border-top-color: #334155;
 }
 
 @keyframes fadeIn {

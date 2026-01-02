@@ -140,7 +140,7 @@ else if (_room != null)
                             </div>
                         </div>
                         <!-- Ready Status -->
-                        <div class="z-10 px-3 py-1 @(player.IsReady ? "bg-green-500/20 dark:bg-green-900/30 text-green-700 dark:text-green-400" : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300") rounded-full text-xs font-bold flex items-center gap-1">
+                        <div class="z-10 px-3 py-1 @(player.IsReady ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300") rounded-full text-xs font-bold flex items-center gap-1">
                             <span class="material-symbols-outlined text-sm">@(player.IsReady ? "check" : "hourglass_empty")</span>
                             @(player.IsReady ? "Gotowy" : "Czeka")
                         </div>
@@ -233,7 +233,7 @@ else if (_room != null)
             <div class="modal-content category-list-modal" @onclick:stopPropagation="true">
                 <!-- Modal Header -->
                 <div class="modal-header">
-                    <button @onclick="CloseCategoryModal" class="text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors">
+                    <button @onclick="CloseCategoryModal" class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
                         <span class="material-symbols-outlined text-2xl">arrow_back</span>
                     </button>
                     <h2 class="text-lg font-bold text-slate-900 dark:text-white flex-1 text-center">Wybierz Kategorie</h2>
@@ -255,8 +255,8 @@ else if (_room != null)
                     <!-- Custom Category Input -->
                     <div class="py-3">
                         <div class="flex items-center gap-3 bg-surface-light dark:bg-surface-dark rounded-xl p-2 pl-4 shadow-sm border border-slate-200 dark:border-slate-700">
-                            <span class="material-symbols-outlined text-slate-400">edit</span>
-                            <input @bind="_customCategoryInput" class="bg-transparent border-none text-base text-slate-900 dark:text-white placeholder-slate-400 flex-1 focus:ring-0 p-0" placeholder="Dodaj własną kategorię..." type="text" />
+                            <span class="material-symbols-outlined text-slate-500 dark:text-slate-400">edit</span>
+                            <input @bind="_customCategoryInput" class="bg-transparent border-none text-base text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400 flex-1 focus:ring-0 p-0" placeholder="Dodaj własną kategorię..." type="text" />
                             <button @onclick="AddCustomCategory" class="bg-primary/20 hover:bg-primary/30 text-primary rounded-lg w-10 h-10 flex items-center justify-center transition-colors">
                                 <span class="material-symbols-outlined">add</span>
                             </button>
@@ -309,13 +309,13 @@ else if (_room != null)
         <div class="modal-backdrop" @onclick="CloseRoundCountModal">
             <div class="modal-content" @onclick:stopPropagation="true">
                 <div class="modal-header">
-                    <h2 class="text-xl font-bold text-white">Liczba rund</h2>
-                    <button @onclick="CloseRoundCountModal" class="text-slate-400 hover:text-white transition-colors">
+                    <h2 class="text-xl font-bold text-slate-900 dark:text-white">Liczba rund</h2>
+                    <button @onclick="CloseRoundCountModal" class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
                         <span class="material-symbols-outlined">close</span>
                     </button>
                 </div>
                 <div class="modal-body">
-                    <p class="text-sm text-slate-400 mb-4">Wybierz liczbę rund w grze (od 1 do 20)</p>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Wybierz liczbę rund w grze (od 1 do 20)</p>
                     <div class="number-input-wrapper">
                         <button @onclick="DecrementRounds" disabled="@(_tempRoundCount <= 1)" class="number-input-button">
                             <span class="material-symbols-outlined">remove</span>
@@ -331,7 +331,7 @@ else if (_room != null)
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button @onclick="CloseRoundCountModal" class="flex-1 h-12 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-bold transition-colors">
+                    <button @onclick="CloseRoundCountModal" class="flex-1 h-12 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-white rounded-xl font-bold transition-colors">
                         Anuluj
                     </button>
                     <button @onclick="SaveRoundCountSettings" class="flex-1 h-12 bg-primary hover:bg-primary-dark text-white rounded-xl font-bold transition-colors">
