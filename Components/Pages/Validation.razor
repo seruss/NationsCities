@@ -30,7 +30,18 @@ else if (_error != null)
 }
 else if (_answersForVoting != null)
 {
-    var currentCategory = _categories.ElementAtOrDefault(_currentCategoryIndex);
+    // Handle case where there are no categories with answers to vote
+    if (!_categoriesWithAnswers.Any())
+    {
+        <div class="flex flex-col min-h-screen bg-bg-light dark:bg-bg-dark items-center justify-center">
+            <span class="material-symbols-outlined text-6xl text-green-500 mb-4">check_circle</span>
+            <h1 class="text-xl font-bold text-slate-900 dark:text-white mb-2">Brak odpowiedzi do głosowania</h1>
+            <p class="text-slate-500 dark:text-slate-400">Wszystkie odpowiedzi zostały automatycznie zatwierdzone.</p>
+        </div>
+    }
+    else
+    {
+    var currentCategory = _categoriesWithAnswers.ElementAtOrDefault(_currentCategoryIndex);
     var categoryName = currentCategory?.Name ?? "";
     var answersForCurrentCategory = _filteredAnswers.Where(a => a.Category == categoryName).ToList();
     var myAnswer = GetMyAnswerForCategory(categoryName);
@@ -41,13 +52,13 @@ else if (_answersForVoting != null)
             <div class="flex items-center px-4 h-16 justify-center max-w-lg mx-auto w-full">
                 <div class="text-center">
                     <h1 class="text-lg font-bold text-slate-900 dark:text-white">@categoryName</h1>
-                    <span class="text-xs text-primary font-semibold">@(_currentCategoryIndex + 1) / @_categories.Count</span>
+                    <span class="text-xs text-primary font-semibold">@(_currentCategoryIndex + 1) / @_categoriesWithAnswers.Count</span>
                 </div>
             </div>
             
             <!-- Progress bar -->
             <div class="h-1 w-full bg-slate-200 dark:bg-slate-700">
-                <div class="h-full bg-primary transition-all duration-300" style="width: @((_currentCategoryIndex + 1) * 100 / _categories.Count)%"></div>
+                <div class="h-full bg-primary transition-all duration-300" style="width: @((_currentCategoryIndex + 1) * 100 / _categoriesWithAnswers.Count)%"></div>
             </div>
         </div>
 
@@ -158,6 +169,7 @@ else if (_answersForVoting != null)
             </div>
         </div>
     </div>
+    }
 }
 
 @code {
@@ -167,7 +179,8 @@ else if (_answersForVoting != null)
     private Room? _room;
     private List<AnswerForVoting>? _answersForVoting;
     private List<AnswerForVoting> _filteredAnswers = [];
-    private List<Category> _categories = [];
+    private List<Category> _categories = [];  // All categories
+    private List<Category> _categoriesWithAnswers = [];  // Only categories with answers to vote
     private string? _myConnectionId;
     private string? _myPlayerId;
     private string _nickname = "";
@@ -246,16 +259,31 @@ else if (_answersForVoting != null)
             _answersForVoting = game.AnswersForVoting;
             
             // Filter out empty answers and own answers (by nickname)
+            // Auto-detected duplicates (where all players have same answer) are hidden and auto-treated as correct
             _filteredAnswers = _answersForVoting
                 .Where(a => !string.IsNullOrWhiteSpace(a.Answer)) // No empty answers
                 .Where(a => !a.SubmitterNicknames.Any(n => n.Equals(_nickname, StringComparison.OrdinalIgnoreCase))) // Hide own answers
                 .ToList();
+            
+            // Filter categories to only those with answers to vote
+            var categoriesWithAnswersNames = _filteredAnswers.Select(a => a.Category).Distinct().ToHashSet();
+            _categoriesWithAnswers = _categories.Where(c => categoriesWithAnswersNames.Contains(c.Name)).ToList();
+            
             _isLoading = false;
         }
         catch (Exception ex)
         {
             _error = $"Błąd: {ex.Message}";
             _isLoading = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_isLoading && !_hasSubmittedVotes && _categoriesWithAnswers.Any())
+        {
+            // Check and auto-advance for initial empty categories
+            await CheckAndAutoAdvance();
         }
     }
 
@@ -345,23 +373,31 @@ else if (_answersForVoting != null)
     
     private async Task CheckAndAutoAdvance()
     {
-        var currentCategory = _categories.ElementAtOrDefault(_currentCategoryIndex);
+        var currentCategory = _categoriesWithAnswers.ElementAtOrDefault(_currentCategoryIndex);
         var categoryName = currentCategory?.Name ?? "";
         var answersForCurrentCategory = _filteredAnswers.Where(a => a.Category == categoryName).ToList();
         
         // Check if all answers in this category have been voted on
-        var allVoted = answersForCurrentCategory.All(a => _myVotes.ContainsKey(a.Id));
+        // Empty list = nothing to vote, counts as "all voted"
+        var allVoted = !answersForCurrentCategory.Any() || 
+                       answersForCurrentCategory.All(a => _myVotes.ContainsKey(a.Id));
         
-        if (allVoted && answersForCurrentCategory.Any())
+        if (allVoted)
         {
-            // Small delay for visual feedback
-            await Task.Delay(300);
+            // Small delay for visual feedback (unless empty)
+            if (answersForCurrentCategory.Any())
+            {
+                await Task.Delay(300);
+            }
             
-            if (_currentCategoryIndex < _categories.Count - 1)
+            if (_currentCategoryIndex < _categoriesWithAnswers.Count - 1)
             {
                 // Go to next category
                 _currentCategoryIndex++;
                 StateHasChanged();
+                
+                // Check again immediately in case next category is also empty
+                await CheckAndAutoAdvance();
             }
             else
             {
