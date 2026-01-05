@@ -67,6 +67,11 @@ public class AnswerForVoting
     public List<string> VotesInvalid { get; set; } = [];
 
     /// <summary>
+    /// Głosy za duplikatem.
+    /// </summary>
+    public List<string> VotesDuplicate { get; set; } = [];
+
+    /// <summary>
     /// Status walidacji.
     /// </summary>
     public AnswerStatus Status { get; set; } = AnswerStatus.Pending;

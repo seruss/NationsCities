@@ -503,29 +503,34 @@ public class GameHub : Hub
     /// <summary>
     /// Głosuje na odpowiedź.
     /// </summary>
-    public async Task VoteAnswer(string roomCode, string answerId, bool isValid)
+    public async Task VoteAnswer(string roomCode, string answerId, string voteType)
     {
         var room = _roomService.GetRoom(roomCode);
         var answer = room?.CurrentGame?.AnswersForVoting.FirstOrDefault(a => a.Id == answerId);
         
         if (answer != null)
         {
-            // Usuń poprzedni głos
+            // Usuń poprzedni głos ze wszystkich list
             answer.VotesValid.Remove(Context.ConnectionId);
             answer.VotesInvalid.Remove(Context.ConnectionId);
+            answer.VotesDuplicate.Remove(Context.ConnectionId);
             
-            // Dodaj nowy
-            if (isValid)
+            // Dodaj nowy głos
+            switch (voteType.ToLowerInvariant())
             {
-                answer.VotesValid.Add(Context.ConnectionId);
-            }
-            else
-            {
-                answer.VotesInvalid.Add(Context.ConnectionId);
+                case "valid":
+                    answer.VotesValid.Add(Context.ConnectionId);
+                    break;
+                case "invalid":
+                    answer.VotesInvalid.Add(Context.ConnectionId);
+                    break;
+                case "duplicate":
+                    answer.VotesDuplicate.Add(Context.ConnectionId);
+                    break;
             }
 
             await Clients.Group(roomCode).SendAsync("OnVoteCast", answerId, 
-                answer.VotesValid.Count, answer.VotesInvalid.Count);
+                answer.VotesValid.Count, answer.VotesInvalid.Count, answer.VotesDuplicate.Count);
         }
     }
 

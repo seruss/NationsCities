@@ -268,6 +268,12 @@ public class GameService
 
     /// <summary>
     /// Kończy głosowanie i oblicza punkty.
+    /// Algorytm konsensusu: większość głosów decyduje o statusie odpowiedzi.
+    /// Punktacja:
+    /// - 15 pkt: unikalna poprawna odpowiedź (nikt inny nie dał poprawnej w kategorii)
+    /// - 10 pkt: poprawna odpowiedź, ale inni też dali poprawne (różne odpowiedzi)
+    /// - 5 pkt: poprawna odpowiedź, ale duplikat (ta sama odpowiedź od wielu graczy)
+    /// - 0 pkt: niepoprawna lub brak odpowiedzi
     /// </summary>
     public void FinalizeVotingAndCalculateScores(string roomCode)
     {
@@ -276,31 +282,86 @@ public class GameService
 
         var game = room.CurrentGame;
 
+        // Krok 1: Ustal status każdej odpowiedzi na podstawie głosów (konsensus)
         foreach (var answer in game.AnswersForVoting)
         {
-            // Ustal status odpowiedzi
             var validVotes = answer.VotesValid.Count;
             var invalidVotes = answer.VotesInvalid.Count;
+            var duplicateVotes = answer.VotesDuplicate.Count;
             
-            answer.Status = validVotes > invalidVotes 
-                ? AnswerStatus.Valid 
-                : invalidVotes > validVotes 
-                    ? AnswerStatus.Invalid 
-                    : AnswerStatus.Contested;
-
-            // Przydziel punkty (use nicknames for reliable matching)
-            if (answer.Status == AnswerStatus.Valid)
+            // Znajdź maksymalną liczbę głosów
+            var maxVotes = Math.Max(validVotes, Math.Max(invalidVotes, duplicateVotes));
+            
+            if (maxVotes == 0)
             {
-                var points = answer.IsDuplicate ? 5 : 10;
-                foreach (var nickname in answer.SubmitterNicknames)
+                // Brak głosów - domyślnie poprawna
+                answer.Status = AnswerStatus.Valid;
+            }
+            else if (duplicateVotes == maxVotes)
+            {
+                // Duplikat wygrywa (lub remis z duplikatem) - oznacz jako duplikat
+                answer.Status = AnswerStatus.Valid; // Duplikat też jest "poprawny", ale z mniejszą liczbą punktów
+            }
+            else if (validVotes > invalidVotes)
+            {
+                answer.Status = AnswerStatus.Valid;
+            }
+            else if (invalidVotes > validVotes)
+            {
+                answer.Status = AnswerStatus.Invalid;
+            }
+            else
+            {
+                // Remis valid/invalid - contested (0 punktów)
+                answer.Status = AnswerStatus.Contested;
+            }
+        }
+
+        // Krok 2: Policz ile poprawnych odpowiedzi jest w każdej kategorii
+        var correctAnswersPerCategory = game.AnswersForVoting
+            .Where(a => a.Status == AnswerStatus.Valid)
+            .GroupBy(a => a.Category)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        // Krok 3: Przydziel punkty
+        foreach (var answer in game.AnswersForVoting)
+        {
+            if (answer.Status != AnswerStatus.Valid) continue;
+
+            var validVotes = answer.VotesValid.Count;
+            var duplicateVotes = answer.VotesDuplicate.Count;
+            
+            // Sprawdź czy odpowiedź została oznaczona jako duplikat przez głosowanie
+            var isVotedDuplicate = duplicateVotes >= validVotes && duplicateVotes > 0;
+            
+            // Sprawdź ile poprawnych odpowiedzi jest w tej kategorii
+            var correctInCategory = correctAnswersPerCategory.GetValueOrDefault(answer.Category, 1);
+            
+            int points;
+            if (answer.IsDuplicate || isVotedDuplicate)
+            {
+                // Duplikat (ta sama odpowiedź od wielu graczy lub zagłosowano jako duplikat)
+                points = 5;
+            }
+            else if (correctInCategory == 1)
+            {
+                // Unikalna poprawna odpowiedź - nikt inny nie dał poprawnej w kategorii
+                points = 15;
+            }
+            else
+            {
+                // Poprawna, ale nie unikalna (inne poprawne odpowiedzi w kategorii)
+                points = 10;
+            }
+
+            foreach (var nickname in answer.SubmitterNicknames)
+            {
+                var player = room.Players.FirstOrDefault(p => 
+                    p.Nickname.Equals(nickname, StringComparison.OrdinalIgnoreCase));
+                if (player != null)
                 {
-                    var player = room.Players.FirstOrDefault(p => 
-                        p.Nickname.Equals(nickname, StringComparison.OrdinalIgnoreCase));
-                    if (player != null)
-                    {
-                        player.RoundScore += points;
-                        player.TotalScore += points;
-                    }
+                    player.RoundScore += points;
+                    player.TotalScore += points;
                 }
             }
         }

@@ -30,99 +30,84 @@ else if (_error != null)
 }
 else if (_answersForVoting != null)
 {
-    <div class="flex flex-col min-h-screen pb-28 bg-bg-light dark:bg-bg-dark">
-        <!-- Header -->
+    var currentCategory = _categories.ElementAtOrDefault(_currentCategoryIndex);
+    var categoryName = currentCategory?.Name ?? "";
+    var answersForCurrentCategory = _filteredAnswers.Where(a => a.Category == categoryName).ToList();
+    var myAnswer = GetMyAnswerForCategory(categoryName);
+    
+    <div class="flex flex-col min-h-screen bg-bg-light dark:bg-bg-dark">
+        <!-- Header with category name and progress -->
         <div class="sticky top-0 z-50 bg-bg-light/95 dark:bg-bg-dark/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
-            <div class="flex items-center px-4 h-16 justify-between max-w-lg mx-auto w-full">
-                <div class="w-10"></div>
-                <h1 class="text-lg font-bold text-slate-900 dark:text-white">Runda @_roundNumber: Litera '@_letter'</h1>
-                <div class="w-10"></div>
+            <div class="flex items-center px-4 h-16 justify-center max-w-lg mx-auto w-full">
+                <div class="text-center">
+                    <h1 class="text-lg font-bold text-slate-900 dark:text-white">@categoryName</h1>
+                    <span class="text-xs text-primary font-semibold">@(_currentCategoryIndex + 1) / @_categories.Count</span>
+                </div>
             </div>
             
-            <!-- Info Strip -->
-            <div class="w-full bg-surface-light dark:bg-surface-dark border-b border-slate-200 dark:border-slate-800">
-                <div class="max-w-lg mx-auto px-4 py-2 flex items-center justify-center gap-2">
-                    <span class="material-symbols-outlined text-primary text-xl">how_to_vote</span>
-                    <span class="text-sm font-medium text-slate-500 dark:text-slate-400">
-                        @if (_hasSubmittedVotes)
-                        {
-                            <span>Czekam na innych graczy... (@_votesSubmittedCount/@_totalPlayers)</span>
-                        }
-                        else
-                        {
-                            <span>Głosuj na odpowiedzi innych graczy</span>
-                        }
-                    </span>
-                </div>
+            <!-- Progress bar -->
+            <div class="h-1 w-full bg-slate-200 dark:bg-slate-700">
+                <div class="h-full bg-primary transition-all duration-300" style="width: @((_currentCategoryIndex + 1) * 100 / _categories.Count)%"></div>
             </div>
         </div>
 
-        <!-- Answers by Category (excluding own answers, hiding player names) -->
-        <main class="flex-1 w-full max-w-lg mx-auto px-4 py-6 flex flex-col gap-8">
-            @foreach (var categoryGroup in _filteredAnswers.GroupBy(a => a.Category))
+        <!-- Main content -->
+        <main class="flex-1 w-full max-w-lg mx-auto px-4 py-4 pb-28">
+            <!-- "Twoja odpowiedź" header -->
+            @if (!string.IsNullOrWhiteSpace(myAnswer))
             {
-                var category = _categories.FirstOrDefault(c => c.Name == categoryGroup.Key);
-                <section>
-                    <header class="flex items-center gap-3 mb-4">
-                        <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary">
-                            <span class="material-symbols-outlined text-lg">@(category?.Icon ?? "category")</span>
-                        </div>
-                        <h2 class="text-xl font-bold text-slate-900 dark:text-white">@categoryGroup.Key</h2>
-                        <span class="ml-auto text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 bg-slate-200 dark:bg-slate-800 px-2 py-1 rounded">
-                            @categoryGroup.Count() odpowiedzi
-                        </span>
-                    </header>
-                    
-                    <div class="flex flex-col gap-4">
-                        @foreach (var answer in categoryGroup)
-                        {
-                            <article class="bg-surface-light dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 relative overflow-hidden">
-                                <!-- Status Indicator -->
-                                <div class="absolute left-0 top-0 bottom-0 w-1 @GetStatusColor(answer)"></div>
-                                
-                                <div class="flex justify-between items-start mb-3 pl-2">
-                                    <div>
-                                        <h3 class="text-lg font-bold text-slate-900 dark:text-white">@answer.Answer</h3>
-                                        @if (answer.IsDuplicate)
-                                        {
-                                            <span class="text-xs text-yellow-500">Duplikat</span>
-                                        }
-                                    </div>
-                                </div>
-
-                                <!-- Voting Buttons -->
-                                <div class="flex gap-2 pl-2">
-                                    <button @onclick="() => Vote(answer.Id, true)"
-                                            disabled="@_hasSubmittedVotes"
-                                            class="flex-1 h-10 rounded-lg @(HasVotedValid(answer) ? "bg-primary text-white" : "bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-primary hover:text-white") text-sm font-bold flex items-center justify-center gap-2 transition-all btn-press disabled:opacity-50">
-                                        <span class="material-symbols-outlined text-xl">thumb_up</span>
-                                        Poprawna
-                                    </button>
-                                    <button @onclick="() => Vote(answer.Id, false)"
-                                            disabled="@_hasSubmittedVotes"
-                                            class="flex-1 h-10 rounded-lg @(HasVotedInvalid(answer) ? "bg-red-500 text-white" : "bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-red-500 hover:text-white") text-sm font-bold flex items-center justify-center gap-2 transition-all btn-press disabled:opacity-50">
-                                        <span class="material-symbols-outlined text-xl">thumb_down</span>
-                                        Błędna
-                                    </button>
-                                </div>
-                            </article>
-                        }
-                    </div>
-                </section>
-            }
-            
-            @if (!_filteredAnswers.Any())
-            {
-                <div class="text-center py-8">
-                    <span class="material-symbols-outlined text-4xl text-slate-400 dark:text-slate-600">inbox</span>
-                    <p class="text-slate-500 dark:text-slate-400 mt-2">Brak odpowiedzi do głosowania</p>
+                <div class="w-full bg-primary/10 dark:bg-surface-dark border border-primary/20 dark:border-slate-700 rounded-xl p-4 mb-4 flex items-center justify-between">
+                    <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Twoja odpowiedź:</span>
+                    <span class="text-lg font-bold text-primary dark:text-white">@myAnswer</span>
                 </div>
             }
+            else
+            {
+                <div class="w-full bg-slate-100 dark:bg-surface-dark border border-slate-200 dark:border-slate-700 rounded-xl p-4 mb-4 flex items-center justify-between">
+                    <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Twoja odpowiedź:</span>
+                    <span class="text-lg font-medium text-slate-400 dark:text-slate-500 italic">Brak</span>
+                </div>
+            }
+            
+            <!-- Answer list with horizontal layout -->
+            <div class="flex-1 space-y-3">
+                @foreach (var answer in answersForCurrentCategory)
+                {
+                    <div class="bg-surface-light dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                        <span class="text-lg font-bold text-slate-800 dark:text-white">@answer.Answer</span>
+                        <div class="flex items-center gap-2">
+                            <button @onclick="@(() => Vote(answer.Id, "valid"))"
+                                    disabled="@_hasSubmittedVotes"
+                                    class="@($"w-10 h-10 rounded-lg flex items-center justify-center transition-all {(HasVotedValid(answer) ? "bg-green-500 text-white shadow-md" : "border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:bg-green-50 dark:hover:bg-slate-700 hover:text-green-600 dark:hover:text-green-400")} disabled:opacity-50")">
+                                <span class="material-symbols-outlined text-xl">check</span>
+                            </button>
+                            <button @onclick="@(() => Vote(answer.Id, "invalid"))"
+                                    disabled="@_hasSubmittedVotes"
+                                    class="@($"w-10 h-10 rounded-lg flex items-center justify-center transition-all {(HasVotedInvalid(answer) ? "bg-red-500 text-white shadow-md" : "border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:bg-red-50 dark:hover:bg-slate-700 hover:text-red-600 dark:hover:text-red-400")} disabled:opacity-50")">
+                                <span class="material-symbols-outlined text-xl">close</span>
+                            </button>
+                            <button @onclick="@(() => Vote(answer.Id, "duplicate"))"
+                                    disabled="@_hasSubmittedVotes"
+                                    class="@($"w-10 h-10 rounded-lg flex items-center justify-center transition-all {(HasVotedDuplicate(answer) ? "bg-amber-500 text-white shadow-md" : "border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:bg-amber-50 dark:hover:bg-slate-700 hover:text-amber-600 dark:hover:text-amber-400")} disabled:opacity-50")">
+                                <span class="material-symbols-outlined text-xl">content_copy</span>
+                            </button>
+                        </div>
+                    </div>
+                }
+                
+                @if (!answersForCurrentCategory.Any())
+                {
+                    <div class="text-center py-8">
+                        <span class="material-symbols-outlined text-4xl text-slate-400 dark:text-slate-600">inbox</span>
+                        <p class="text-slate-500 dark:text-slate-400 mt-2">Brak odpowiedzi do głosowania w tej kategorii</p>
+                    </div>
+                }
+            </div>
         </main>
 
         <!-- Footer -->
-        <div class="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-bg-light dark:from-bg-dark via-bg-light dark:via-bg-dark to-transparent z-40 safe-area-bottom">
-            <div class="max-w-lg mx-auto w-full flex flex-col gap-2">
+        <div class="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-bg-light dark:from-bg-dark via-bg-light dark:via-bg-dark to-transparent z-40 safe-area-bottom pointer-events-none">
+            <div class="max-w-lg mx-auto w-full flex flex-col gap-2 pointer-events-auto">
                 @if (_hasSubmittedVotes)
                 {
                     <div class="text-center py-4">
@@ -140,14 +125,6 @@ else if (_answersForVoting != null)
                             Wymuś zakończenie głosowania
                         </button>
                     }
-                }
-                else
-                {
-                    <button @onclick="SubmitVotes"
-                            class="w-full bg-primary hover:bg-primary-dark text-white font-bold h-14 rounded-xl shadow-lg shadow-primary/20 flex items-center justify-center gap-2 transition-all btn-press">
-                        <span>Prześlij głosy</span>
-                        <span class="material-symbols-outlined">send</span>
-                    </button>
                 }
             </div>
         </div>
@@ -176,8 +153,11 @@ else if (_answersForVoting != null)
     private int _totalRounds = 1;
     private char _letter = 'A';
     
-    // Track player's own votes separately (answerId -> isValid)
-    private Dictionary<string, bool?> _myVotes = new();
+    // Category navigation
+    private int _currentCategoryIndex = 0;
+    
+    // Track player's own votes separately (answerId -> voteType: "valid", "invalid", "duplicate")
+    private Dictionary<string, string?> _myVotes = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -241,7 +221,6 @@ else if (_answersForVoting != null)
                 .Where(a => !string.IsNullOrWhiteSpace(a.Answer)) // No empty answers
                 .Where(a => !a.SubmitterNicknames.Any(n => n.Equals(_nickname, StringComparison.OrdinalIgnoreCase))) // Hide own answers
                 .ToList();
-
             _isLoading = false;
         }
         catch (Exception ex)
@@ -255,25 +234,23 @@ else if (_answersForVoting != null)
     {
         if (_hubConnection == null) return;
 
-        _hubConnection.On<string, int, int>("OnVoteCast", (answerId, validCount, invalidCount) =>
+        _hubConnection.On<string, int, int, int>("OnVoteCast", (answerId, validCount, invalidCount, duplicateCount) =>
         {
             var answer = _answersForVoting?.FirstOrDefault(a => a.Id == answerId);
             if (answer != null)
             {
-                // Don't clear votes - server sends counts only
-                // Just update to match server counts while preserving identity
+                // Clear and rebuild vote lists from server counts
                 answer.VotesValid.Clear();
                 answer.VotesInvalid.Clear();
+                answer.VotesDuplicate.Clear();
                 
                 // Add placeholder IDs to match the counts
                 for (int i = 0; i < validCount; i++)
-                {
                     answer.VotesValid.Add($"vote_{i}");
-                }
                 for (int i = 0; i < invalidCount; i++)
-                {
                     answer.VotesInvalid.Add($"vote_{i}");
-                }
+                for (int i = 0; i < duplicateCount; i++)
+                    answer.VotesDuplicate.Add($"vote_{i}");
                 
                 InvokeAsync(StateHasChanged);
             }
@@ -299,28 +276,68 @@ else if (_answersForVoting != null)
         });
     }
 
-    private async Task Vote(string answerId, bool isValid)
+    private async Task Vote(string answerId, string voteType)
     {
         if (_hubConnection != null && !_hasSubmittedVotes)
         {
             // Track this player's vote locally
-            _myVotes[answerId] = isValid;
+            _myVotes[answerId] = voteType;
             
-            await _hubConnection.InvokeAsync("VoteAnswer", RoomCode, answerId, isValid);
+            await _hubConnection.InvokeAsync("VoteAnswer", RoomCode, answerId, voteType);
             
-            // Optimistic update - keep for server sync
+            // Optimistic update
             var answer = _answersForVoting?.FirstOrDefault(a => a.Id == answerId);
             if (answer != null && _myConnectionId != null)
             {
                 answer.VotesValid.Remove(_myConnectionId);
                 answer.VotesInvalid.Remove(_myConnectionId);
+                answer.VotesDuplicate.Remove(_myConnectionId);
                 
-                if (isValid)
-                    answer.VotesValid.Add(_myConnectionId);
-                else
-                    answer.VotesInvalid.Add(_myConnectionId);
-                
+                switch (voteType)
+                {
+                    case "valid":
+                        answer.VotesValid.Add(_myConnectionId);
+                        break;
+                    case "invalid":
+                        answer.VotesInvalid.Add(_myConnectionId);
+                        break;
+                    case "duplicate":
+                        answer.VotesDuplicate.Add(_myConnectionId);
+                        break;
+                }
+            }
+            
+            // Check if all answers in current category are voted - auto-advance
+            await CheckAndAutoAdvance();
+            
+            StateHasChanged();
+        }
+    }
+    
+    private async Task CheckAndAutoAdvance()
+    {
+        var currentCategory = _categories.ElementAtOrDefault(_currentCategoryIndex);
+        var categoryName = currentCategory?.Name ?? "";
+        var answersForCurrentCategory = _filteredAnswers.Where(a => a.Category == categoryName).ToList();
+        
+        // Check if all answers in this category have been voted on
+        var allVoted = answersForCurrentCategory.All(a => _myVotes.ContainsKey(a.Id));
+        
+        if (allVoted && answersForCurrentCategory.Any())
+        {
+            // Small delay for visual feedback
+            await Task.Delay(300);
+            
+            if (_currentCategoryIndex < _categories.Count - 1)
+            {
+                // Go to next category
+                _currentCategoryIndex++;
                 StateHasChanged();
+            }
+            else
+            {
+                // Last category - auto-submit
+                await SubmitVotes();
             }
         }
     }
@@ -345,32 +362,48 @@ else if (_answersForVoting != null)
 
     private bool HasVotedValid(AnswerForVoting answer)
     {
-        // Check local vote tracking first
         if (_myVotes.TryGetValue(answer.Id, out var vote))
-        {
-            return vote == true;
-        }
-        // Fallback to checking vote lists (for initial state)
+            return vote == "valid";
         return _myConnectionId != null && answer.VotesValid.Contains(_myConnectionId);
     }
 
     private bool HasVotedInvalid(AnswerForVoting answer)
     {
-        // Check local vote tracking first
         if (_myVotes.TryGetValue(answer.Id, out var vote))
-        {
-            return vote == false;
-        }
-        // Fallback to checking vote lists (for initial state)
+            return vote == "invalid";
         return _myConnectionId != null && answer.VotesInvalid.Contains(_myConnectionId);
     }
 
-    private string GetStatusColor(AnswerForVoting answer)
+    private bool HasVotedDuplicate(AnswerForVoting answer)
     {
-        if (answer.VotesValid.Count > answer.VotesInvalid.Count) return "bg-primary";
-        if (answer.VotesInvalid.Count > answer.VotesValid.Count) return "bg-red-500";
-        if (answer.VotesValid.Count > 0 || answer.VotesInvalid.Count > 0) return "bg-yellow-500";
-        return "bg-slate-600";
+        if (_myVotes.TryGetValue(answer.Id, out var vote))
+            return vote == "duplicate";
+        return _myConnectionId != null && answer.VotesDuplicate.Contains(_myConnectionId);
+    }
+
+    private void GoToPreviousCategory()
+    {
+        if (_currentCategoryIndex > 0)
+        {
+            _currentCategoryIndex--;
+        }
+    }
+
+    private void GoToNextCategory()
+    {
+        if (_currentCategoryIndex < _categories.Count - 1)
+        {
+            _currentCategoryIndex++;
+        }
+    }
+
+    private string GetMyAnswerForCategory(string categoryName)
+    {
+        // Look up player's answer from AnswersForVoting by nickname
+        var myAnswer = _answersForVoting?
+            .FirstOrDefault(a => a.Category == categoryName && 
+                a.SubmitterNicknames.Any(n => n.Equals(_nickname, StringComparison.OrdinalIgnoreCase)));
+        return myAnswer?.Answer ?? "";
     }
 
     private void GoHome()
