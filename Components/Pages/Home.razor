@@ -136,7 +136,7 @@
             @if (!_showJoinInput)
             {
                 <div class="mt-4 flex justify-center">
-                    <button class="flex items-center gap-1.5 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-primary transition-colors py-2 px-4 rounded-full hover:bg-slate-200/50 dark:hover:bg-slate-800/50">
+                    <button @onclick="GoToHowToPlay" class="flex items-center gap-1.5 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-primary transition-colors py-2 px-4 rounded-full hover:bg-slate-200/50 dark:hover:bg-slate-800/50">
                         <span class="material-symbols-outlined text-lg">info</span>
                         <span>Jak grać?</span>
                     </button>
@@ -252,6 +252,11 @@
         }
         
         return $"{baseClass} bg-primary hover:bg-primary-dark active:scale-[0.98] text-white shadow-lg shadow-primary/25";
+    }
+
+    private void GoToHowToPlay()
+    {
+        Navigation.NavigateTo("/how-to-play");
     }
 
     public async ValueTask DisposeAsync()

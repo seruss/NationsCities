@@ -189,7 +189,6 @@ NationsCities/
 | Round Count | 10 | 1-20 |
 | Round Time | 60s | ∞ (until STOP) |
 | Countdown (after STOP) | 10s | Fixed |
-| Voting Time | 45s | Fixed |
 | Max Players | 10 | 2-10 |
 
 ## 📄 License
