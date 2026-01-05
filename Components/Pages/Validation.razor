@@ -73,24 +73,59 @@ else if (_answersForVoting != null)
             <div class="flex-1 space-y-3">
                 @foreach (var answer in answersForCurrentCategory)
                 {
-                    <div class="bg-surface-light dark:bg-surface-dark rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                        <span class="text-lg font-bold text-slate-800 dark:text-white">@answer.Answer</span>
-                        <div class="flex items-center gap-2">
-                            <button @onclick="@(() => Vote(answer.Id, "valid"))"
-                                    disabled="@_hasSubmittedVotes"
-                                    class="@($"w-10 h-10 rounded-lg flex items-center justify-center transition-all {(HasVotedValid(answer) ? "bg-green-500 text-white shadow-md" : "border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:bg-green-50 dark:hover:bg-slate-700 hover:text-green-600 dark:hover:text-green-400")} disabled:opacity-50")">
-                                <span class="material-symbols-outlined text-xl">check</span>
-                            </button>
-                            <button @onclick="@(() => Vote(answer.Id, "invalid"))"
-                                    disabled="@_hasSubmittedVotes"
-                                    class="@($"w-10 h-10 rounded-lg flex items-center justify-center transition-all {(HasVotedInvalid(answer) ? "bg-red-500 text-white shadow-md" : "border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:bg-red-50 dark:hover:bg-slate-700 hover:text-red-600 dark:hover:text-red-400")} disabled:opacity-50")">
-                                <span class="material-symbols-outlined text-xl">close</span>
-                            </button>
-                            <button @onclick="@(() => Vote(answer.Id, "duplicate"))"
-                                    disabled="@_hasSubmittedVotes"
-                                    class="@($"w-10 h-10 rounded-lg flex items-center justify-center transition-all {(HasVotedDuplicate(answer) ? "bg-amber-500 text-white shadow-md" : "border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:bg-amber-50 dark:hover:bg-slate-700 hover:text-amber-600 dark:hover:text-amber-400")} disabled:opacity-50")">
-                                <span class="material-symbols-outlined text-xl">content_copy</span>
-                            </button>
+                    var isAutoDetected = answer.IsAutoDetectedDuplicate;
+                    
+                    <div class="@($"bg-surface-light dark:bg-surface-dark rounded-xl p-4 shadow-sm border {(isAutoDetected ? "border-amber-300 dark:border-amber-600" : "border-slate-200 dark:border-slate-700")} flex flex-col gap-2")">
+                        <!-- Answer text and variants -->
+                        <div class="flex items-center justify-between">
+                            @if (isAutoDetected && answer.DuplicateGroupAnswers.Count > 1)
+                            {
+                                <!-- Show all variants for auto-detected duplicates -->
+                                <div class="flex flex-col">
+                                    <span class="text-lg font-bold text-slate-800 dark:text-white">@string.Join(" / ", answer.DuplicateGroupAnswers.Take(3))</span>
+                                    @if (answer.DuplicateGroupAnswers.Count > 3)
+                                    {
+                                        <span class="text-xs text-slate-400">+@(answer.DuplicateGroupAnswers.Count - 3) więcej...</span>
+                                    }
+                                    <span class="text-xs text-amber-500 flex items-center gap-1 mt-1">
+                                        <span class="material-symbols-outlined text-sm">auto_awesome</span>
+                                        Automatycznie zgrupowano (@answer.SubmittedBy.Count graczy)
+                                    </span>
+                                </div>
+                            }
+                            else
+                            {
+                                <span class="text-lg font-bold text-slate-800 dark:text-white">@answer.Answer</span>
+                            }
+                            
+                            <!-- Voting buttons -->
+                            <div class="flex items-center gap-2 flex-shrink-0">
+                                <button @onclick="@(() => Vote(answer.Id, "valid"))"
+                                        disabled="@(_hasSubmittedVotes || isAutoDetected)"
+                                        class="@($"w-10 h-10 rounded-lg flex items-center justify-center transition-all {(HasVotedValid(answer) ? "bg-green-500 text-white shadow-md" : "border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:bg-green-50 dark:hover:bg-slate-700 hover:text-green-600 dark:hover:text-green-400")} disabled:opacity-50")">
+                                    <span class="material-symbols-outlined text-xl">check</span>
+                                </button>
+                                <button @onclick="@(() => Vote(answer.Id, "invalid"))"
+                                        disabled="@(_hasSubmittedVotes || isAutoDetected)"
+                                        class="@($"w-10 h-10 rounded-lg flex items-center justify-center transition-all {(HasVotedInvalid(answer) ? "bg-red-500 text-white shadow-md" : "border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:bg-red-50 dark:hover:bg-slate-700 hover:text-red-600 dark:hover:text-red-400")} disabled:opacity-50")">
+                                    <span class="material-symbols-outlined text-xl">close</span>
+                                </button>
+                                @if (isAutoDetected)
+                                {
+                                    <!-- Locked duplicate button for auto-detected -->
+                                    <div class="w-10 h-10 rounded-lg flex items-center justify-center bg-amber-500 text-white shadow-md cursor-not-allowed" title="Automatycznie wykryty duplikat">
+                                        <span class="material-symbols-outlined text-xl">content_copy</span>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <button @onclick="@(() => Vote(answer.Id, "duplicate"))"
+                                            disabled="@_hasSubmittedVotes"
+                                            class="@($"w-10 h-10 rounded-lg flex items-center justify-center transition-all {(HasVotedDuplicate(answer) ? "bg-amber-500 text-white shadow-md" : "border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:bg-amber-50 dark:hover:bg-slate-700 hover:text-amber-600 dark:hover:text-amber-400")} disabled:opacity-50")">
+                                        <span class="material-symbols-outlined text-xl">content_copy</span>
+                                    </button>
+                                }
+                            </div>
                         </div>
                     </div>
                 }
@@ -321,7 +356,9 @@ else if (_answersForVoting != null)
         var answersForCurrentCategory = _filteredAnswers.Where(a => a.Category == categoryName).ToList();
         
         // Check if all answers in this category have been voted on
-        var allVoted = answersForCurrentCategory.All(a => _myVotes.ContainsKey(a.Id));
+        // Auto-detected duplicates count as already voted (they don't require voting)
+        var allVoted = answersForCurrentCategory.All(a => 
+            a.IsAutoDetectedDuplicate || _myVotes.ContainsKey(a.Id));
         
         if (allVoted && answersForCurrentCategory.Any())
         {

@@ -77,9 +77,27 @@ public class AnswerForVoting
     public AnswerStatus Status { get; set; } = AnswerStatus.Pending;
 
     /// <summary>
-    /// Czy odpowiedź jest duplikatem (więcej niż 1 gracz).
+    /// Czy odpowiedź jest duplikatem (więcej niż 1 gracz z identyczną odpowiedzią).
     /// </summary>
     public bool IsDuplicate => SubmittedBy.Count > 1;
+
+    /// <summary>
+    /// ID odpowiedzi "głównej" jeśli ta jest automatycznie wykrytym duplikatem.
+    /// Null jeśli ta odpowiedź jest główna lub nie jest częścią grupy.
+    /// </summary>
+    public string? DuplicateOfId { get; set; }
+
+    /// <summary>
+    /// Czy ta odpowiedź została automatycznie wykryta jako duplikat (fuzzy matching).
+    /// Jeśli true, przycisk "duplikat" jest zablokowany w UI.
+    /// </summary>
+    public bool IsAutoDetectedDuplicate { get; set; }
+
+    /// <summary>
+    /// Lista wszystkich wariantów odpowiedzi w grupie (dla wyświetlania).
+    /// Np. ["żółw", "zolw", "Żółw"]
+    /// </summary>
+    public List<string> DuplicateGroupAnswers { get; set; } = [];
 }
 
 /// <summary>

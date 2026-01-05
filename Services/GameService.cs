@@ -218,46 +218,57 @@ public class GameService
         game.Phase = RoundPhase.Voting;
         game.VotesSubmittedBy.Clear(); // Reset votes submitted tracking
 
-        // Grupowanie odpowiedzi po kategorii i treści
         var answersForVoting = new List<AnswerForVoting>();
 
         foreach (var category in game.Categories)
         {
-            var categoryAnswers = new Dictionary<string, AnswerForVoting>(StringComparer.OrdinalIgnoreCase);
+            // Dictionary: normalized answer -> (primary answer, list of all original variants)
+            var categoryAnswerGroups = new Dictionary<string, (AnswerForVoting Primary, HashSet<string> Variants)>();
 
             foreach (var (playerId, playerAnswers) in game.RoundAnswers)
             {
-                // Safety check for null playerAnswers
                 if (playerAnswers?.Answers == null) continue;
-                
                 if (!playerAnswers.Answers.TryGetValue(category.Name, out var answer)) continue;
                 if (string.IsNullOrWhiteSpace(answer)) continue;
 
-                // Find player nickname
                 var player = room.Players.FirstOrDefault(p => p.ConnectionId == playerId);
                 var nickname = player?.Nickname ?? "";
-
                 var normalizedAnswer = NormalizeForDuplicateCheck(answer);
 
-                if (categoryAnswers.TryGetValue(normalizedAnswer, out var existing))
+                if (categoryAnswerGroups.TryGetValue(normalizedAnswer, out var existing))
                 {
-                    existing.SubmittedBy.Add(playerId);
+                    // Add this player to existing group
+                    existing.Primary.SubmittedBy.Add(playerId);
                     if (!string.IsNullOrEmpty(nickname))
-                    {
-                        existing.SubmitterNicknames.Add(nickname);
-                    }
+                        existing.Primary.SubmitterNicknames.Add(nickname);
+                    
+                    // Track different spelling variants
+                    existing.Variants.Add(answer.Trim());
                 }
                 else
                 {
+                    // Create new answer group
                     var answerForVoting = new AnswerForVoting
                     {
                         Category = category.Name,
-                        Answer = answer, // Oryginalna wersja
+                        Answer = answer.Trim(),
                         SubmittedBy = [playerId],
                         SubmitterNicknames = string.IsNullOrEmpty(nickname) ? [] : [nickname]
                     };
-                    categoryAnswers[normalizedAnswer] = answerForVoting;
+                    var variants = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { answer.Trim() };
+                    categoryAnswerGroups[normalizedAnswer] = (answerForVoting, variants);
                     answersForVoting.Add(answerForVoting);
+                }
+            }
+
+            // Post-process: mark auto-detected duplicates (groups with multiple different spellings)
+            foreach (var (_, (primary, variants)) in categoryAnswerGroups)
+            {
+                if (variants.Count > 1)
+                {
+                    // Multiple different spellings found - this is an auto-detected duplicate group
+                    primary.IsAutoDetectedDuplicate = true;
+                    primary.DuplicateGroupAnswers = variants.ToList();
                 }
             }
         }
@@ -416,7 +427,7 @@ public class GameService
     }
 
     /// <summary>
-    /// Normalizuje do porównania duplikatów (usuwa diakrytyki, lowercase).
+    /// Normalizuje do porównania duplikatów (usuwa polskie diakrytyki, lowercase).
     /// </summary>
     private static string NormalizeForDuplicateCheck(string answer)
     {
@@ -424,9 +435,47 @@ public class GameService
 
         var normalized = answer.Trim().ToLowerInvariant();
         
-        // Zachowaj polskie znaki przy porównaniu, ale normalizuj spacje
+        // Usuwanie polskich znaków diakrytycznych
+        normalized = RemovePolishDiacritics(normalized);
+        
+        // Normalizuj spacje
         normalized = string.Join(" ", normalized.Split(default(char[]), StringSplitOptions.RemoveEmptyEntries));
         
         return normalized;
+    }
+
+    /// <summary>
+    /// Usuwa polskie znaki diakrytyczne (ą→a, ć→c, ę→e, ł→l, ń→n, ó→o, ś→s, ź→z, ż→z).
+    /// </summary>
+    private static string RemovePolishDiacritics(string text)
+    {
+        var sb = new System.Text.StringBuilder(text.Length);
+        foreach (char c in text)
+        {
+            sb.Append(c switch
+            {
+                'ą' => 'a',
+                'ć' => 'c',
+                'ę' => 'e',
+                'ł' => 'l',
+                'ń' => 'n',
+                'ó' => 'o',
+                'ś' => 's',
+                'ź' => 'z',
+                'ż' => 'z',
+                // Already lowercase at this point, but just in case
+                'Ą' => 'a',
+                'Ć' => 'c',
+                'Ę' => 'e',
+                'Ł' => 'l',
+                'Ń' => 'n',
+                'Ó' => 'o',
+                'Ś' => 's',
+                'Ź' => 'z',
+                'Ż' => 'z',
+                _ => c
+            });
+        }
+        return sb.ToString();
     }
 }
