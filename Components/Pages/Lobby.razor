@@ -245,9 +245,9 @@ else if (_room != null)
                 <!-- Modal Body with scrollable list -->
                 <div class="modal-body category-modal-body">
                     <!-- Custom Category Input -->
-                    <div class="flex items-center gap-3 bg-surface-light dark:bg-surface-dark rounded-xl p-2 pl-4 mb-4 border border-slate-200 dark:border-slate-700">
-                        <span class="material-symbols-outlined text-slate-400">edit</span>
-                        <input @bind="_customCategoryInput" class="bg-transparent border-none text-sm text-slate-900 dark:text-white placeholder-slate-400 flex-1 focus:ring-0 p-0" placeholder="Nowa kategoria..." type="text" />
+                    <div class="flex items-center gap-2 bg-surface-light dark:bg-surface-dark rounded-xl p-2 pl-4 mb-4 border border-slate-200 dark:border-slate-700 overflow-hidden">
+                        <span class="material-symbols-outlined text-slate-400 shrink-0">edit</span>
+                        <input @bind="_customCategoryInput" class="bg-transparent border-none text-sm text-slate-900 dark:text-white placeholder-slate-400 flex-1 min-w-0 focus:ring-0 p-0" placeholder="Nowa kategoria..." type="text" />
                         <button @onclick="AddCustomCategory" class="bg-primary hover:bg-primary-dark text-white rounded-lg w-10 h-10 flex items-center justify-center transition-colors shrink-0">
                             <span class="material-symbols-outlined">add</span>
                         </button>

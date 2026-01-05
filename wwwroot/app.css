@@ -748,13 +748,17 @@ html.dark .password-visible-overlay.placeholder {
 .reconnect-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(16, 25, 34, 0.95);
+    background: rgba(245, 247, 248, 0.95);
     backdrop-filter: blur(8px);
     z-index: 9999;
     display: flex;
     align-items: center;
     justify-content: center;
     animation: reconnect-fade-in 0.3s ease-out;
+}
+
+html.dark .reconnect-overlay {
+    background: rgba(16, 25, 34, 0.95);
 }
 
 .reconnect-content {
@@ -768,17 +772,26 @@ html.dark .password-visible-overlay.placeholder {
 .reconnect-spinner {
     width: 48px;
     height: 48px;
-    border: 4px solid #334155;
+    border: 4px solid #e2e8f0;
     border-top-color: #258cf4;
     border-radius: 50%;
     animation: reconnect-spin 1s linear infinite;
 }
 
+html.dark .reconnect-spinner {
+    border-color: #334155;
+    border-top-color: #258cf4;
+}
+
 .reconnect-text {
-    color: #94a3b8;
+    color: #64748b;
     font-size: 1rem;
     font-weight: 500;
     margin: 0;
+}
+
+html.dark .reconnect-text {
+    color: #94a3b8;
 }
 
 @keyframes reconnect-fade-in {
