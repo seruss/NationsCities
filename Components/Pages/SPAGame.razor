@@ -1,15 +1,11 @@
 @page "/"
-@page "/{RoomCode}"
-@page "/play"
-@page "/play/{RoomCode}"
+@page "/room/{RoomCode}"
 @rendermode InteractiveServer
 @* 
     SPAGame.razor - SPA Entry Point
     Routes:
     - / - Main entry (HomeView)
-    - /{RoomCode} - Deep link to specific room
-    - /play - Alternate entry (backward compat)
-    - /play/{RoomCode} - Alternate deep link
+    - /room/{RoomCode} - Deep link to specific room
 *@
 
 <NationsCities.Components.Game.GameFlow RoomCodeFromUrl="@RoomCode" />

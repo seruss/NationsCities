@@ -673,13 +673,12 @@ public class ClientGameStateService : IAsyncDisposable
         var targetUrl = CurrentPhase switch
         {
             GamePhase.Home => "/",
-            _ when !string.IsNullOrEmpty(RoomCode) => $"/{RoomCode}",
+            _ when !string.IsNullOrEmpty(RoomCode) => $"/room/{RoomCode}",
             _ => "/"
         };
 
         var currentPath = new Uri(_navigation.Uri).AbsolutePath;
-        // Only sync URL if on game routes (/, /{code}, /play, /play/{code})
-        if (currentPath != targetUrl && (currentPath == "/" || currentPath.StartsWith("/play") || currentPath.Length == 5))
+        if (currentPath != targetUrl && (currentPath == "/" || currentPath.StartsWith("/room")))
         {
             _navigation.NavigateTo(targetUrl, replace: true);
         }
