@@ -1,15 +1,15 @@
-@page "/scoreboard/{RoomCode}"
-@rendermode InteractiveServer
-@using Microsoft.AspNetCore.SignalR.Client
+@* 
+    ScoreboardView.razor - SPA Scoreboard View
+    Displays round results using ClientGameStateService
+*@
 @using NationsCities.Models
-@inject NavigationManager Navigation
-@inject NationsCities.Services.RoomService RoomService
-@inject NationsCities.Services.GameService GameService
-@implements IAsyncDisposable
+@using NationsCities.Services
+@inject ClientGameStateService GameState
+@implements IDisposable
 
 <PageTitle>Wyniki - Państwa, Miasta</PageTitle>
 
-@if (_isLoading)
+@if (GameState.CurrentRoom == null || GameState.CurrentGame == null)
 {
     <div class="flex items-center justify-center min-h-screen bg-bg-light dark:bg-bg-dark">
         <div class="flex flex-col items-center gap-4">
@@ -18,23 +18,20 @@
         </div>
     </div>
 }
-else if (_error != null)
+else
 {
-    <div class="flex items-center justify-center min-h-screen p-4 bg-bg-light dark:bg-bg-dark">
-        <div class="flex flex-col items-center gap-4 text-center">
-            <span class="material-symbols-outlined text-4xl text-red-400">error</span>
-            <p class="text-red-400">@_error</p>
-            <button @onclick="GoHome" class="text-primary hover:underline">Wróć do menu</button>
-        </div>
-    </div>
-}
-else if (_room != null)
-{
+    var currentRound = GameState.CurrentGame.CurrentRound;
+    var totalRounds = GameState.CurrentGame.TotalRounds;
+    var letter = GameState.CurrentGame.CurrentLetter;
+    var sortedPlayers = GameState.CurrentRoom.Players.OrderByDescending(p => p.TotalScore).ToList();
+    var leader = sortedPlayers.FirstOrDefault();
+    var otherPlayers = sortedPlayers.Skip(1).ToList();
+
     <div class="flex flex-col min-h-screen pb-24 bg-bg-light dark:bg-bg-dark">
         <!-- Header -->
         <header class="flex items-center justify-between px-4 py-4 sticky top-0 z-10 bg-bg-light/95 dark:bg-bg-dark/95 backdrop-blur-sm border-b border-slate-200 dark:border-slate-800">
             <div class="w-8"></div>
-            <h1 class="text-xl font-bold text-slate-900 dark:text-white">Wyniki rundy @_currentRound</h1>
+            <h1 class="text-xl font-bold text-slate-900 dark:text-white">Wyniki rundy @currentRound</h1>
             <div class="w-8"></div>
         </header>
 
@@ -46,20 +43,20 @@ else if (_room != null)
                         <span class="material-symbols-outlined text-lg">flag</span>
                         <span class="text-sm font-medium uppercase tracking-wide opacity-80">Runda</span>
                     </div>
-                    <p class="text-3xl font-black text-slate-900 dark:text-white">@_currentRound/@_totalRounds</p>
+                    <p class="text-3xl font-black text-slate-900 dark:text-white">@currentRound/@totalRounds</p>
                 </div>
                 <div class="flex flex-1 flex-col items-center justify-center gap-1 rounded-xl bg-surface-light dark:bg-surface-dark p-4 shadow-sm border border-slate-200 dark:border-slate-800">
                     <div class="flex items-center gap-2 text-primary">
                         <span class="material-symbols-outlined text-lg">sort_by_alpha</span>
                         <span class="text-sm font-medium uppercase tracking-wide opacity-80">Litera</span>
                     </div>
-                    <p class="text-3xl font-black text-slate-900 dark:text-white">@_letter</p>
+                    <p class="text-3xl font-black text-slate-900 dark:text-white">@letter</p>
                 </div>
             </div>
         </section>
 
         <!-- Leader Card -->
-        @if (_leader != null)
+        @if (leader != null)
         {
             <section class="px-4 mb-2">
                 <div class="flex items-center justify-between mb-2 px-1">
@@ -71,21 +68,21 @@ else if (_room != null)
                     <div class="relative z-10 flex items-center gap-4">
                         <div class="relative">
                             <div class="h-16 w-16 rounded-full flex items-center justify-center text-xl font-bold text-white border-2 border-yellow-500 shadow-lg avatar-initials"
-                                 style="background-color: @_leader.AvatarColor">
-                                @_leader.GetInitials()
+                                 style="background-color: @leader.AvatarColor">
+                                @leader.GetInitials()
                             </div>
                             <div class="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-yellow-500 text-black shadow-sm">
                                 <span class="text-xs font-bold">1</span>
                             </div>
                         </div>
                         <div class="flex flex-1 flex-col">
-                            <h3 class="text-lg font-bold text-slate-900 dark:text-white">@_leader.Nickname</h3>
+                            <h3 class="text-lg font-bold text-slate-900 dark:text-white">@leader.Nickname</h3>
                             <p class="text-sm text-slate-500 dark:text-slate-400">Łączny wynik</p>
                         </div>
                         <div class="text-right">
-                            <p class="text-2xl font-black text-slate-900 dark:text-white">@_leader.TotalScore</p>
-                            <p class="text-sm font-bold text-green-600 dark:text-green-400">+@_leader.RoundScore pkt</p>
-                            @{ var leaderPenalty = GetRoundPenalty(_leader); }
+                            <p class="text-2xl font-black text-slate-900 dark:text-white">@leader.TotalScore</p>
+                            <p class="text-sm font-bold text-green-600 dark:text-green-400">+@leader.RoundScore pkt</p>
+                            @{ var leaderPenalty = GetRoundPenalty(leader, currentRound); }
                             @if (leaderPenalty > 0)
                             {
                                 <p class="text-xs font-bold text-red-400">-@leaderPenalty kara</p>
@@ -100,7 +97,7 @@ else if (_room != null)
         <section class="flex flex-col px-4 pt-2">
             <h2 class="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 px-1">Pozostali gracze</h2>
             <div class="flex flex-col gap-3">
-                @foreach (var (player, index) in _otherPlayers.Select((p, i) => (p, i + 2)))
+                @foreach (var (player, index) in otherPlayers.Select((p, i) => (p, i + 2)))
                 {
                     <div class="flex items-center justify-between rounded-xl bg-surface-light dark:bg-surface-dark p-3 pr-4 border border-slate-200 dark:border-slate-800 shadow-sm">
                         <div class="flex items-center gap-3">
@@ -122,7 +119,7 @@ else if (_room != null)
                         </div>
                         <div class="text-right flex flex-col items-end gap-1">
                             <span class="inline-block rounded-full bg-primary/10 px-2 py-1 text-xs font-bold text-primary">+@player.RoundScore</span>
-                            @{ var playerPenalty = GetRoundPenalty(player); }
+                            @{ var playerPenalty = GetRoundPenalty(player, currentRound); }
                             @if (playerPenalty > 0)
                             {
                                 <span class="inline-block rounded-full bg-red-500/10 px-2 py-1 text-xs font-bold text-red-400">-@playerPenalty</span>
@@ -139,9 +136,9 @@ else if (_room != null)
     <!-- Footer Actions -->
     <div class="fixed bottom-0 left-0 w-full bg-surface-light/90 dark:bg-surface-dark/90 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 px-4 py-4 pb-8 z-50 safe-area-bottom">
         <div class="flex flex-col gap-3 max-w-md mx-auto">
-            @if (_hasNextRound)
+            @if (currentRound < totalRounds)
             {
-                @if (_isHost)
+                @if (GameState.IsHost)
                 {
                     <button @onclick="NextRound"
                             disabled="@_isStartingRound"
@@ -153,7 +150,7 @@ else if (_room != null)
                         }
                         else
                         {
-                            <span>Następna runda (@(_currentRound + 1))</span>
+                            <span>Następna runda (@(currentRound + 1))</span>
                             <span class="material-symbols-outlined">arrow_forward</span>
                         }
                     </button>
@@ -170,7 +167,6 @@ else if (_room != null)
             }
             else
             {
-                <!-- Auto-redirect to final results (controlled via OnInitialized) -->
                 <div class="text-center py-4">
                     <p class="text-lg font-bold text-green-400 flex items-center justify-center gap-2">
                         <span class="material-symbols-outlined">emoji_events</span>
@@ -178,7 +174,7 @@ else if (_room != null)
                     </p>
                 </div>
             }
-            @if (_isHost)
+            @if (GameState.IsHost)
             {
                 <button @onclick="EndGame"
                         class="w-full text-center text-sm font-medium text-slate-400 hover:text-red-400 py-2 transition-colors">
@@ -190,160 +186,52 @@ else if (_room != null)
 }
 
 @code {
-    [Parameter] public string RoomCode { get; set; } = "";
-
-    private HubConnection? _hubConnection;
-    private Room? _room;
-    private Player? _leader;
-    private List<Player> _otherPlayers = [];
-    private string _nickname = "";
-    private string? _error;
-    private bool _isLoading = true;
-    private bool _isHost = false;
     private bool _isStartingRound = false;
-    
-    private int _currentRound = 1;
-    private int _totalRounds = 10;
-    private char _letter = 'A';
-    private bool _hasNextRound = true;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        // Get nickname from URL
-        var uri = new Uri(Navigation.Uri);
-        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
-        _nickname = query["nick"] ?? "";
-
-        if (string.IsNullOrEmpty(_nickname))
-        {
-            _error = "Brak nicku.";
-            _isLoading = false;
-            return;
-        }
-
-        try
-        {
-            // Setup SignalR and join game
-            _hubConnection = new HubConnectionBuilder()
-                .WithUrl(Navigation.ToAbsoluteUri("/gamehub"))
-                .Build();
-
-            SetupHubCallbacks();
-            await _hubConnection.StartAsync();
-
-            // Join the game (adds to SignalR group)
-            var joined = await _hubConnection.InvokeAsync<bool>("JoinGame", RoomCode, _nickname);
-            if (!joined)
-            {
-                _error = "Nie udało się dołączyć do gry.";
-                _isLoading = false;
-                return;
-            }
-
-            // Get room data
-            _room = RoomService.GetRoom(RoomCode);
-            
-            if (_room == null)
-            {
-                _error = "Gra nie istnieje.";
-                _isLoading = false;
-                return;
-            }
-
-            // Check if host by nickname (more reliable after reconnects)
-            var myPlayer = _room.Players.FirstOrDefault(p => p.Nickname.Equals(_nickname, StringComparison.OrdinalIgnoreCase));
-            _isHost = myPlayer?.IsHost ?? false;
-
-            var game = _room.CurrentGame;
-            if (game != null)
-            {
-                _currentRound = game.CurrentRound;
-                _totalRounds = game.TotalRounds;
-                _letter = game.CurrentLetter;
-                _hasNextRound = _currentRound < _totalRounds;
-            }
-
-            // Sort players by total score
-            var sortedPlayers = _room.Players.OrderByDescending(p => p.TotalScore).ToList();
-            _leader = sortedPlayers.FirstOrDefault();
-            _otherPlayers = sortedPlayers.Skip(1).ToList();
-
-            _isLoading = false;
-
-            // Auto-redirect to final results if it's the last round
-            if (!_hasNextRound)
-            {
-                Navigation.NavigateTo($"/finalresults/{RoomCode}?nick={Uri.EscapeDataString(_nickname)}");
-            }
-        }
-        catch (Exception ex)
-        {
-            _error = $"Błąd: {ex.Message}";
-            _isLoading = false;
-        }
+        GameState.OnStateChanged += HandleStateChanged;
+        GameState.OnNewRound += HandleNewRound;
     }
 
-    private void SetupHubCallbacks()
+    private void HandleStateChanged()
     {
-        if (_hubConnection == null) return;
+        InvokeAsync(StateHasChanged);
+    }
 
-        _hubConnection.On<char, int>("OnRoundStarted", (letter, roundNumber) =>
-        {
-            Navigation.NavigateTo($"/game/{RoomCode}?nick={Uri.EscapeDataString(_nickname)}");
-        });
-
-        _hubConnection.On("OnGameEnded", () =>
-        {
-            Navigation.NavigateTo("/");
-        });
-
-        _hubConnection.On<string>("OnReturnToLobby", (roomCode) =>
-        {
-            Navigation.NavigateTo($"/lobby?code={roomCode}&nick={Uri.EscapeDataString(_nickname)}");
-        });
+    private void HandleNewRound(char letter)
+    {
+        // Phase transition handled by GameState service
     }
 
     private async Task NextRound()
     {
-        if (_hubConnection != null && _isHost && !_isStartingRound)
+        if (GameState.IsHost && !_isStartingRound)
         {
             _isStartingRound = true;
             StateHasChanged();
-            
-            await _hubConnection.InvokeAsync("StartNextRound", RoomCode);
+            await GameState.StartNextRoundAsync();
         }
     }
 
     private async Task EndGame()
     {
-        if (_hubConnection != null && _isHost)
+        if (GameState.IsHost)
         {
-            await _hubConnection.InvokeAsync("EndGame", RoomCode);
+            await GameState.EndGameAsync();
         }
     }
 
-    private void ShowFinalResults()
-    {
-        Navigation.NavigateTo($"/finalresults/{RoomCode}?nick={Uri.EscapeDataString(_nickname)}");
-    }
-
-    private int GetRoundPenalty(Player player)
+    private int GetRoundPenalty(Player player, int roundNumber)
     {
         return player.Violations
-            .Where(v => v.RoundNumber == _currentRound)
+            .Where(v => v.RoundNumber == roundNumber)
             .Sum(v => v.Penalty);
     }
 
-    private void GoHome()
+    public void Dispose()
     {
-        Navigation.NavigateTo("/");
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_hubConnection != null)
-        {
-            await _hubConnection.DisposeAsync();
-        }
+        GameState.OnStateChanged -= HandleStateChanged;
+        GameState.OnNewRound -= HandleNewRound;
     }
 }

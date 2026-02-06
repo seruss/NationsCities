@@ -67,9 +67,9 @@ public class GameHub : Hub
     /// <summary>
     /// Tworzy nowy pokój.
     /// </summary>
-    public async Task CreateRoom(string nickname)
+    public async Task CreateRoom(string nickname, string? sessionId = null)
     {
-        var room = _roomService.CreateRoom(Context.ConnectionId, nickname);
+        var room = _roomService.CreateRoom(Context.ConnectionId, nickname, sessionId);
         await Groups.AddToGroupAsync(Context.ConnectionId, room.Code);
         await Clients.Caller.SendAsync("OnRoomCreated", room.Code);
     }
@@ -77,9 +77,9 @@ public class GameHub : Hub
     /// <summary>
     /// Dołącza do pokoju.
     /// </summary>
-    public async Task JoinRoom(string roomCode, string nickname)
+    public async Task JoinRoom(string roomCode, string nickname, string? sessionId = null)
     {
-        var result = _roomService.JoinRoom(roomCode, Context.ConnectionId, nickname);
+        var result = _roomService.JoinRoom(roomCode, Context.ConnectionId, nickname, sessionId);
         
         if (!result.Success)
         {
@@ -90,6 +90,93 @@ public class GameHub : Hub
         await Groups.AddToGroupAsync(Context.ConnectionId, roomCode.ToUpperInvariant());
         await Clients.Caller.SendAsync("OnRoomCreated", roomCode.ToUpperInvariant()); // Reuse for join
         await Clients.OthersInGroup(roomCode.ToUpperInvariant()).SendAsync("OnPlayerJoined", nickname, Context.ConnectionId);
+    }
+
+    /// <summary>
+    /// Reconnects a player using their session ID.
+    /// </summary>
+    public async Task<GameStateSnapshot?> ReconnectSession(string roomCode, string sessionId, string? nickname)
+    {
+        var room = _roomService.GetRoom(roomCode);
+        if (room == null) return null;
+
+        // Find player by session ID first
+        var player = room.Players.FirstOrDefault(p => p.SessionId == sessionId);
+        
+        // Fallback to nickname if session not found
+        if (player == null && !string.IsNullOrEmpty(nickname))
+        {
+            player = room.Players.FirstOrDefault(p => 
+                p.Nickname.Equals(nickname, StringComparison.OrdinalIgnoreCase));
+        }
+        
+        if (player == null) return null;
+
+        // Update connection ID
+        var oldConnectionId = player.ConnectionId;
+        player.ConnectionId = Context.ConnectionId;
+        
+        // Update session ID if not set
+        if (string.IsNullOrEmpty(player.SessionId))
+        {
+            player.SessionId = sessionId;
+        }
+
+        // Update host connection if this is the host
+        if (player.IsHost)
+        {
+            room.HostConnectionId = Context.ConnectionId;
+        }
+
+        // Update player-room mapping
+        if (oldConnectionId != Context.ConnectionId)
+        {
+            _roomService.UpdatePlayerConnection(roomCode, oldConnectionId, Context.ConnectionId);
+        }
+
+        // Add to SignalR group
+        await Groups.AddToGroupAsync(Context.ConnectionId, roomCode);
+
+        // Determine current phase
+        var phase = DeterminePhase(room);
+
+        return new GameStateSnapshot
+        {
+            Room = room,
+            Phase = phase,
+            SecondsRemaining = CalculateRemainingSeconds(room),
+            IsHost = player.IsHost,
+            Nickname = player.Nickname
+        };
+    }
+
+    private GamePhase DeterminePhase(Room room)
+    {
+        if (room.CurrentGame == null) return GamePhase.Lobby;
+        
+        return room.CurrentGame.Phase switch
+        {
+            RoundPhase.Waiting => GamePhase.Lobby,
+            RoundPhase.Answering => GamePhase.Playing,
+            RoundPhase.Countdown => GamePhase.Playing,
+            RoundPhase.Voting => GamePhase.Voting,
+            RoundPhase.Results => room.CurrentGame.CurrentRound >= room.CurrentGame.TotalRounds 
+                ? GamePhase.FinalResults 
+                : GamePhase.RoundResults,
+            _ => GamePhase.Lobby
+        };
+    }
+
+    private int? CalculateRemainingSeconds(Room room)
+    {
+        if (room.CurrentGame?.Phase != RoundPhase.Countdown)
+            return null;
+            
+        var endTime = room.CurrentGame.CountdownEndTime;
+        if (endTime == null) return null;
+        
+        var remaining = (endTime.Value - DateTime.UtcNow).TotalSeconds;
+        return Math.Max(0, (int)remaining);
     }
 
     /// <summary>

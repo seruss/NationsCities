@@ -1,0 +1,116 @@
+@* 
+    GameFlow.razor - Main SPA Orchestrator
+    Switches between views based on ClientGameStateService.CurrentPhase
+    Handles deep linking via RoomCodeFromUrl parameter
+*@
+@using NationsCities.Models
+@using NationsCities.Services
+@inject ClientGameStateService GameState
+@inject IJSRuntime JS
+@implements IDisposable
+
+<div class="game-flow-container min-h-screen">
+    @switch (GameState.CurrentPhase)
+    {
+        case GamePhase.Home:
+            <NationsCities.Components.Game.Views.HomeView />
+            break;
+        case GamePhase.Lobby:
+            <NationsCities.Components.Game.Views.LobbyView />
+            break;
+        case GamePhase.Playing:
+            <NationsCities.Components.Game.Views.RoundView />
+            break;
+        case GamePhase.Voting:
+            <NationsCities.Components.Game.Views.VotingView />
+            break;
+        case GamePhase.RoundResults:
+            <NationsCities.Components.Game.Views.ScoreboardView />
+            break;
+        case GamePhase.FinalResults:
+            <NationsCities.Components.Game.Views.FinalResultsView />
+            break;
+        case GamePhase.Disconnected:
+            <NationsCities.Components.Game.Views.ReconnectingView />
+            break;
+        case GamePhase.Error:
+            <NationsCities.Components.Game.Views.ErrorView Message="@GameState.LastError" />
+            break;
+    }
+</div>
+
+@* Back button confirmation modal *@
+@if (_showLeaveConfirmation)
+{
+    <NationsCities.Components.Game.Shared.ConfirmationModal 
+        Title="Opuścić grę?"
+        Message="Czy na pewno chcesz opuścić aktualną grę? Twój postęp zostanie utracony."
+        ConfirmText="Opuść"
+        CancelText="Zostań"
+        OnConfirm="ConfirmLeave"
+        OnCancel="CancelLeave" />
+}
+
+@code {
+    [Parameter]
+    public string? RoomCodeFromUrl { get; set; }
+    
+    private bool _showLeaveConfirmation = false;
+    private bool _initialized = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        GameState.OnStateChanged += HandleStateChanged;
+        GameState.OnNavigateAway += ShowLeaveConfirmation;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_initialized)
+        {
+            _initialized = true;
+            
+            if (!string.IsNullOrEmpty(RoomCodeFromUrl))
+            {
+                // Deep link - initialize with room code
+                await GameState.InitializeWithRoomCodeAsync(RoomCodeFromUrl);
+            }
+            else
+            {
+                // Normal entry - just initialize
+                await GameState.InitializeAsync();
+            }
+            
+            StateHasChanged();
+        }
+    }
+
+    private void HandleStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ShowLeaveConfirmation()
+    {
+        _showLeaveConfirmation = true;
+        StateHasChanged();
+    }
+
+    private async Task ConfirmLeave()
+    {
+        _showLeaveConfirmation = false;
+        await GameState.LeaveGameAsync();
+    }
+
+    private void CancelLeave()
+    {
+        _showLeaveConfirmation = false;
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        GameState.OnStateChanged -= HandleStateChanged;
+        GameState.OnNavigateAway -= ShowLeaveConfirmation;
+    }
+}

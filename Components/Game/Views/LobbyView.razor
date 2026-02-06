@@ -1,35 +1,29 @@
-@page "/lobby"
-@rendermode InteractiveServer
+@* 
+    LobbyView.razor - SPA Lobby View
+    Converted from Lobby.razor to work with ClientGameStateService
+*@
 @using Microsoft.AspNetCore.SignalR.Client
 @using NationsCities.Models
+@using NationsCities.Services
+@inject ClientGameStateService GameState
 @inject NavigationManager Navigation
-@inject NationsCities.Services.RoomService RoomService
 @inject IJSRuntime JSRuntime
-@implements IAsyncDisposable
+@implements IDisposable
 
 <PageTitle>Lobby - Państwa, Miasta</PageTitle>
 
-@if (_isLoading)
+@if (GameState.CurrentRoom == null)
 {
     <div class="flex items-center justify-center min-h-screen bg-bg-light dark:bg-bg-dark">
         <div class="flex flex-col items-center gap-4">
             <span class="material-symbols-outlined text-4xl text-primary animate-spin">progress_activity</span>
-            <p class="text-slate-500 dark:text-slate-400">Łączenie...</p>
+            <p class="text-slate-500 dark:text-slate-400">Ładowanie pokoju...</p>
         </div>
     </div>
 }
-else if (_error != null)
+else
 {
-    <div class="flex items-center justify-center min-h-screen p-4 bg-bg-light dark:bg-bg-dark">
-        <div class="flex flex-col items-center gap-4 text-center">
-            <span class="material-symbols-outlined text-4xl text-red-400">error</span>
-            <p class="text-red-400">@_error</p>
-            <button @onclick="GoHome" class="text-primary hover:underline">Wróć do menu</button>
-        </div>
-    </div>
-}
-else if (_room != null)
-{
+    var room = GameState.CurrentRoom;
     <div class="flex flex-col min-h-screen bg-bg-light dark:bg-bg-dark">
         <!-- Header -->
         <header class="sticky top-0 flex items-center justify-between p-4 bg-surface-light dark:bg-surface-dark shadow-sm z-20 border-b border-slate-200 dark:border-transparent">
@@ -39,11 +33,11 @@ else if (_room != null)
             <div class="flex flex-col items-center">
                 <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Kod pokoju</span>
                 <div class="flex items-center gap-2 cursor-pointer group" @onclick="CopyRoomCode">
-                    <h1 class="text-2xl font-bold text-primary">@_room.Code</h1>
+                    <h1 class="text-2xl font-bold text-primary">@room.Code</h1>
                     <span class="material-symbols-outlined text-base text-slate-400 group-hover:text-primary">content_copy</span>
                 </div>
             </div>
-            <button id="lobby-theme-toggle" data-theme-toggle type="button" class="flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors">
+            <button data-theme-toggle type="button" class="flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 transition-colors">
                 <span class="material-symbols-outlined text-slate-700 dark:text-white pointer-events-none">dark_mode</span>
             </button>
         </header>
@@ -66,7 +60,7 @@ else if (_room != null)
                                 <span class="material-symbols-outlined text-base text-slate-400 group-hover:text-purple-400">edit</span>
                             </div>
                             <span class="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">Kategorie</span>
-                            <span class="text-sm font-bold text-slate-900 dark:text-white">@_room.Settings.SelectedCategories.Count wybrane</span>
+                            <span class="text-sm font-bold text-slate-900 dark:text-white">@room.Settings.SelectedCategories.Count wybrane</span>
                         </button>
                         <button @onclick="OpenRoundCountModal" class="flex flex-col items-start gap-1 p-3 rounded-xl bg-slate-100 dark:bg-surface-darker hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-all text-left group">
                             <div class="flex items-center justify-between w-full">
@@ -74,19 +68,19 @@ else if (_room != null)
                                 <span class="material-symbols-outlined text-base text-slate-400 group-hover:text-cyan-400">edit</span>
                             </div>
                             <span class="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">Liczba rund</span>
-                            <span class="text-sm font-bold text-slate-900 dark:text-white">@_room.Settings.RoundCount rund</span>
+                            <span class="text-sm font-bold text-slate-900 dark:text-white">@room.Settings.RoundCount rund</span>
                         </button>
                     </div>
                     <!-- Public/Private Toggle -->
-                    <div class="mt-3 flex items-center justify-between p-3 rounded-xl @(_room.IsPublic ? "bg-green-500/15 border-green-500/30 dark:bg-green-900/30 dark:border-green-700/50" : "bg-slate-100 border-slate-200 dark:bg-surface-darker dark:border-slate-700") border transition-all">
+                    <div class="mt-3 flex items-center justify-between p-3 rounded-xl @(room.IsPublic ? "bg-green-500/15 border-green-500/30 dark:bg-green-900/30 dark:border-green-700/50" : "bg-slate-100 border-slate-200 dark:bg-surface-darker dark:border-slate-700") border transition-all">
                         <div class="flex items-center gap-2">
-                            <span class="material-symbols-outlined @(_room.IsPublic ? "text-green-600 dark:text-green-400" : "text-slate-500 dark:text-slate-400")">@(_room.IsPublic ? "visibility" : "visibility_off")</span>
+                            <span class="material-symbols-outlined @(room.IsPublic ? "text-green-600 dark:text-green-400" : "text-slate-500 dark:text-slate-400")">@(room.IsPublic ? "visibility" : "visibility_off")</span>
                             <div class="flex flex-col">
-                                <span class="text-sm font-bold @(_room.IsPublic ? "text-green-600 dark:text-green-400" : "text-slate-900 dark:text-white")">@(_room.IsPublic ? "Pokój publiczny" : "Pokój prywatny")</span>
-                                <span class="text-xs text-slate-500 dark:text-slate-400">@(_room.IsPublic ? "Widoczny dla wszystkich" : "Tylko z kodem")</span>
+                                <span class="text-sm font-bold @(room.IsPublic ? "text-green-600 dark:text-green-400" : "text-slate-900 dark:text-white")">@(room.IsPublic ? "Pokój publiczny" : "Pokój prywatny")</span>
+                                <span class="text-xs text-slate-500 dark:text-slate-400">@(room.IsPublic ? "Widoczny dla wszystkich" : "Tylko z kodem")</span>
                             </div>
                         </div>
-                        <label class="toggle-switch @(_room.IsPublic ? "checked" : "")" @onclick="ToggleRoomVisibility">
+                        <label class="toggle-switch @(room.IsPublic ? "checked" : "")" @onclick="ToggleRoomVisibility">
                             <div class="toggle-slider"></div>
                         </label>
                     </div>
@@ -96,7 +90,7 @@ else if (_room != null)
             <!-- Players List -->
             <div class="flex items-center justify-between px-1">
                 <h3 class="text-lg font-bold text-slate-900 dark:text-white">
-                    Gracze <span class="text-slate-500 dark:text-slate-400 text-base font-medium ml-1">(@_room.Players.Count/@_room.Settings.MaxPlayers)</span>
+                    Gracze <span class="text-slate-500 dark:text-slate-400 text-base font-medium ml-1">(@room.Players.Count/@room.Settings.MaxPlayers)</span>
                 </h3>
                 <div class="flex items-center gap-1 bg-green-500/10 px-2 py-0.5 rounded-full border border-green-500/20">
                     <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
@@ -105,8 +99,9 @@ else if (_room != null)
             </div>
 
             <div class="flex flex-col gap-3">
-                @foreach (var player in _room.Players)
+                @foreach (var player in room.Players)
                 {
+                    var isMe = player.Nickname == GameState.Nickname;
                     <div class="flex items-center gap-3 p-2 pr-4 bg-surface-light dark:bg-surface-dark rounded-full shadow-sm border @(player.IsHost ? "border-primary/20" : "border-slate-200 dark:border-slate-800") relative overflow-hidden">
                         @if (player.IsHost)
                         {
@@ -129,7 +124,7 @@ else if (_room != null)
                         <div class="flex-1 flex flex-col z-10">
                             <div class="flex items-center gap-2">
                                 <span class="text-sm font-bold text-slate-900 dark:text-white">@player.Nickname</span>
-                                @if (player.ConnectionId == _myConnectionId)
+                                @if (isMe)
                                 {
                                     <span class="text-xs text-slate-500 dark:text-slate-400">(Ty)</span>
                                 }
@@ -145,7 +140,7 @@ else if (_room != null)
                             @(player.IsReady ? "Gotowy" : "Czeka")
                         </div>
                         <!-- Kick (Host only, not self) -->
-                        @if (IsHost && player.ConnectionId != _myConnectionId)
+                        @if (IsHost && !isMe)
                         {
                             <button @onclick="() => KickPlayer(player.ConnectionId)" 
                                     class="ml-1 p-1.5 text-slate-400 hover:text-red-500 transition-colors rounded-full hover:bg-red-900/20">
@@ -155,8 +150,8 @@ else if (_room != null)
                     </div>
                 }
 
-                <!-- Empty Slot -->
-                @for (var i = _room.Players.Count; i < _room.Settings.MaxPlayers && i < _room.Players.Count + 2; i++)
+                <!-- Empty Slots -->
+                @for (var i = room.Players.Count; i < room.Settings.MaxPlayers && i < room.Players.Count + 2; i++)
                 {
                     <div class="flex items-center gap-3 p-2 pr-4 border border-dashed border-slate-300 dark:border-slate-700 rounded-full">
                         <div class="h-10 w-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
@@ -167,10 +162,10 @@ else if (_room != null)
                 }
             </div>
 
-            <!-- Chat (simplified) -->
+            <!-- Chat -->
             <div class="flex-1 min-h-[120px] bg-surface-light dark:bg-surface-dark rounded-2xl p-3 shadow-inner border border-slate-200 dark:border-slate-800 flex flex-col justify-end">
                 <div class="flex-1 overflow-y-auto space-y-2 mb-2 pr-1 no-scrollbar">
-                    @foreach (var msg in (_room?.ChatMessages ?? []).TakeLast(10))
+                    @foreach (var msg in (room.ChatMessages ?? new List<ChatMessage>()).TakeLast(10))
                     {
                         <div class="flex gap-2 items-start">
                             <span class="text-xs font-bold @(msg.IsSystem ? "text-primary" : "text-slate-900 dark:text-white") shrink-0">@(msg.IsSystem ? "System:" : $"{msg.Nickname}:")</span>
@@ -193,12 +188,12 @@ else if (_room != null)
         <!-- Footer Actions -->
         <footer class="sticky bottom-0 p-4 bg-surface-light dark:bg-surface-dark border-t border-slate-200 dark:border-slate-800 z-20 w-full max-w-md mx-auto safe-area-bottom">
             <div class="flex justify-between items-center mb-3 text-xs px-1">
-                <span class="text-slate-500 dark:text-slate-400">Gotowość: <span class="font-bold text-slate-900 dark:text-white">@ReadyCount/@_room.Players.Count</span></span>
+                <span class="text-slate-500 dark:text-slate-400">Gotowość: <span class="font-bold text-slate-900 dark:text-white">@ReadyCount/@room.Players.Count</span></span>
                 @if (!AllReady)
                 {
                     <span class="text-orange-400 font-medium flex items-center gap-1">
                         <span class="material-symbols-outlined text-sm">info</span>
-                        Czeka na @(_room.Players.Count - ReadyCount) graczy
+                        Czeka na @(room.Players.Count - ReadyCount) graczy
                     </span>
                 }
             </div>
@@ -226,12 +221,11 @@ else if (_room != null)
         </footer>
     </div>
 
-    <!-- Category Selection Modal (Blueprint Design) -->
+    <!-- Category Selection Modal -->
     @if (_showCategoryModal)
     {
         <div class="modal-backdrop" @onclick="CloseCategoryModal">
             <div class="modal-content category-list-modal" @onclick:stopPropagation="true">
-                <!-- Modal Header -->
                 <div class="modal-header">
                     <button @onclick="CloseCategoryModal" class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
                         <span class="material-symbols-outlined text-2xl">arrow_back</span>
@@ -242,9 +236,7 @@ else if (_room != null)
                     </button>
                 </div>
 
-                <!-- Modal Body with scrollable list -->
                 <div class="modal-body category-modal-body">
-                    <!-- Custom Category Input -->
                     <div class="flex items-center gap-2 bg-surface-light dark:bg-surface-dark rounded-xl p-2 pl-4 mb-4 border border-slate-200 dark:border-slate-700 overflow-hidden">
                         <span class="material-symbols-outlined text-slate-400 shrink-0">edit</span>
                         <input @bind="_customCategoryInput" class="bg-transparent border-none text-sm text-slate-900 dark:text-white placeholder-slate-400 flex-1 min-w-0 focus:ring-0 p-0" placeholder="Nowa kategoria..." type="text" />
@@ -253,7 +245,6 @@ else if (_room != null)
                         </button>
                     </div>
 
-                    <!-- Category List -->
                     <div class="flex flex-col">
                         @foreach (var item in _categoriesWithColors)
                         {
@@ -276,7 +267,6 @@ else if (_room != null)
                     </div>
                 </div>
 
-                <!-- Modal Footer -->
                 <div class="modal-footer">
                     <button @onclick="SaveCategorySettings" 
                             disabled="@(_selectedCategoryNames.Count == 0)"
@@ -326,48 +316,31 @@ else if (_room != null)
 }
 
 @code {
-    private HubConnection? _hubConnection;
-    private Room? _room;
-    private string? _myConnectionId;
-    private string? _error;
-    private bool _isLoading = true;
-    private string _chatInput = "";
-    
     // Modal state
     private bool _showCategoryModal = false;
     private bool _showRoundCountModal = false;
     private HashSet<string> _selectedCategoryNames = new();
     private int _tempRoundCount = 10;
     private string _customCategoryInput = "";
+    private string _chatInput = "";
 
     private record CategoryWithColor(Category Category, string BgClass, string TextClass);
     private List<CategoryWithColor> _categoriesWithColors = new();
 
-    // Check IsHost using both HostConnectionId and player.IsHost flag (for reconnects)
-    private bool IsHost => _room?.HostConnectionId == _myConnectionId || 
-                           (_room?.Players.FirstOrDefault(p => p.ConnectionId == _myConnectionId)?.IsHost ?? false);
-    private bool AmIReady => _room?.Players.FirstOrDefault(p => p.ConnectionId == _myConnectionId)?.IsReady ?? false;
-    private int ReadyCount => _room?.Players.Count(p => p.IsReady) ?? 0;
-    private bool AllReady => _room?.Players.All(p => p.IsReady) ?? false;
-    private bool CanStart => AllReady && (_room?.Players.Count ?? 0) >= 2;
+    private bool IsHost => GameState.CurrentRoom?.Players.FirstOrDefault(p => p.Nickname == GameState.Nickname)?.IsHost ?? false;
+    private bool AmIReady => GameState.CurrentRoom?.Players.FirstOrDefault(p => p.Nickname == GameState.Nickname)?.IsReady ?? false;
+    private int ReadyCount => GameState.CurrentRoom?.Players.Count(p => p.IsReady) ?? 0;
+    private bool AllReady => GameState.CurrentRoom?.Players.All(p => p.IsReady) ?? false;
+    private bool CanStart => AllReady && (GameState.CurrentRoom?.Players.Count ?? 0) >= 2;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        var uri = new Uri(Navigation.Uri);
-        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
-        var isCreate = query["create"] == "true";
-        var roomCode = query["code"];
-        var nickname = query["nick"];
-        var isRejoin = query["rejoin"] == "true";
+        GameState.OnStateChanged += HandleStateChanged;
+        InitializeCategoryColors();
+    }
 
-        if (string.IsNullOrEmpty(nickname))
-        {
-            _error = "Brak nicku.";
-            _isLoading = false;
-            return;
-        }
-
-        // Initialize category colors
+    private void InitializeCategoryColors()
+    {
         var colorSchemes = new[]
         {
             ("bg-blue-100 dark:bg-blue-900/30", "text-blue-600 dark:text-blue-400"),
@@ -385,215 +358,35 @@ else if (_room != null)
         _categoriesWithColors = Category.StandardCategories
             .Select((cat, index) => new CategoryWithColor(cat, colorSchemes[index % colorSchemes.Length].Item1, colorSchemes[index % colorSchemes.Length].Item2))
             .ToList();
-
-        try
-        {
-            _hubConnection = new HubConnectionBuilder()
-                .WithUrl(Navigation.ToAbsoluteUri("/gamehub"))
-                .Build();
-
-            SetupHubCallbacks();
-            await _hubConnection.StartAsync();
-            _myConnectionId = _hubConnection.ConnectionId;
-
-            if (isCreate)
-            {
-                await _hubConnection.InvokeAsync("CreateRoom", nickname);
-            }
-            else if (!string.IsNullOrEmpty(roomCode))
-            {
-                if (isRejoin)
-                {
-                    // Rejoining after game - player already exists in room
-                    var joined = await _hubConnection.InvokeAsync<bool>("JoinGame", roomCode, nickname);
-                    if (joined)
-                    {
-                        _room = RoomService.GetRoom(roomCode);
-                    }
-                    else
-                    {
-                        _error = "Nie udało się powrócić do lobby.";
-                    }
-                }
-                else
-                {
-                    await _hubConnection.InvokeAsync("JoinRoom", roomCode, nickname);
-                }
-            }
-            else
-            {
-                _error = "Brak kodu pokoju.";
-            }
-        }
-        catch (Exception ex)
-        {
-            _error = $"Błąd połączenia: {ex.Message}";
-        }
-        finally
-        {
-            _isLoading = false;
-        }
     }
 
-    private void SetupHubCallbacks()
+    private void HandleStateChanged()
     {
-        if (_hubConnection == null) return;
-
-        _hubConnection.On<string>("OnRoomCreated", roomCode =>
-        {
-            _room = RoomService.GetRoom(roomCode);
-            AddSystemMessage($"Pokój {roomCode} utworzony!");
-            InvokeAsync(StateHasChanged);
-        });
-
-        _hubConnection.On<string, string>("OnPlayerJoined", (nickname, connectionId) =>
-        {
-            if (_room != null)
-            {
-                _room = RoomService.GetRoom(_room.Code);
-                AddSystemMessage($"{nickname} dołączył/a do pokoju.");
-                InvokeAsync(StateHasChanged);
-            }
-        });
-
-        _hubConnection.On<string>("OnPlayerLeft", connectionId =>
-        {
-            if (_room != null)
-            {
-                var player = _room.Players.FirstOrDefault(p => p.ConnectionId == connectionId);
-                _room = RoomService.GetRoom(_room.Code);
-                if (player != null)
-                {
-                    AddSystemMessage($"{player.Nickname} opuścił/a pokój.");
-                }
-                InvokeAsync(StateHasChanged);
-            }
-        });
-
-        _hubConnection.On<string, bool>("OnPlayerReadyChanged", (connectionId, isReady) =>
-        {
-            var player = _room?.Players.FirstOrDefault(p => p.ConnectionId == connectionId);
-            if (player != null)
-            {
-                player.IsReady = isReady;
-                InvokeAsync(StateHasChanged);
-            }
-        });
-
-        _hubConnection.On<string, string>("OnChatMessage", (senderId, message) =>
-        {
-            // Message is persisted by hub - just refresh UI
-            InvokeAsync(StateHasChanged);
-        });
-
-        _hubConnection.On("OnKicked", () =>
-        {
-            _error = "Zostałeś/aś wyrzucony/a z pokoju.";
-            _room = null;
-            InvokeAsync(StateHasChanged);
-        });
-
-        _hubConnection.On<string>("OnPlayerKicked", connectionId =>
-        {
-            if (_room != null)
-            {
-                _room = RoomService.GetRoom(_room.Code);
-                InvokeAsync(StateHasChanged);
-            }
-        });
-
-        _hubConnection.On<List<string>, int>("OnGameStarted", (categories, totalRounds) =>
-        {
-            if (_room != null)
-            {
-                var myPlayer = _room.Players.FirstOrDefault(p => p.ConnectionId == _myConnectionId);
-                var nick = myPlayer?.Nickname ?? "";
-                Navigation.NavigateTo($"/game/{_room.Code}?nick={Uri.EscapeDataString(nick)}");
-            }
-        });
-
-        _hubConnection.On<List<string>, int>("OnSettingsUpdated", (categoryNames, roundCount) =>
-        {
-            if (_room != null)
-            {
-                // Build category list including custom categories
-                var updatedCategories = new List<Category>();
-                foreach (var name in categoryNames)
-                {
-                    var standardCat = Category.StandardCategories.FirstOrDefault(c => c.Name == name);
-                    if (standardCat != null)
-                    {
-                        updatedCategories.Add(standardCat);
-                    }
-                    else
-                    {
-                        // Custom category - add to updatedCategories
-                        var customCat = new Category { Name = name, Icon = "star", IsCustom = true };
-                        updatedCategories.Add(customCat);
-                        
-                        // Also ensure it's in _categoriesWithColors for display
-                        if (!_categoriesWithColors.Any(c => c.Category.Name == name))
-                        {
-                            _categoriesWithColors.Add(new CategoryWithColor(customCat, "bg-primary/20", "text-primary"));
-                        }
-                    }
-                }
-                _room.Settings.SelectedCategories = updatedCategories;
-                _room.Settings.RoundCount = roundCount;
-                InvokeAsync(StateHasChanged);
-            }
-        });
-
-        _hubConnection.On<bool>("OnRoomVisibilityChanged", isPublic =>
-        {
-            if (_room != null)
-            {
-                _room.IsPublic = isPublic;
-                InvokeAsync(StateHasChanged);
-            }
-        });
-    }
-
-    private void AddSystemMessage(string text)
-    {
-        if (_room == null) return;
-        
-        // Prevent duplicate system messages - check last 3 messages
-        var recentMessages = _room.ChatMessages.TakeLast(3);
-        if (recentMessages.Any(m => m.IsSystem && m.Text == text))
-        {
-            return; // Don't add duplicate
-        }
-        
-        _room.ChatMessages.Add(new ChatMessage
-        {
-            Nickname = "System",
-            Text = text,
-            IsSystem = true
-        });
+        InvokeAsync(StateHasChanged);
     }
 
     private async Task ToggleReady()
     {
-        if (_hubConnection != null && _room != null)
+        var currentPlayer = GameState.CurrentRoom?.Players.FirstOrDefault(p => p.Nickname == GameState.Nickname);
+        if (currentPlayer != null)
         {
-            await _hubConnection.InvokeAsync("SetReady", _room.Code, !AmIReady);
+            await GameState.SetReadyAsync(!currentPlayer.IsReady);
         }
     }
 
     private async Task ToggleRoomVisibility()
     {
-        if (_hubConnection != null && _room != null && IsHost)
+        if (GameState.CurrentRoom != null && IsHost)
         {
-            await _hubConnection.InvokeAsync("SetRoomPublic", _room.Code, !_room.IsPublic);
+            await GameState.SetRoomPublicAsync(!GameState.CurrentRoom.IsPublic);
         }
     }
 
     private async Task SendChat()
     {
-        if (!string.IsNullOrWhiteSpace(_chatInput) && _hubConnection != null && _room != null)
+        if (!string.IsNullOrWhiteSpace(_chatInput))
         {
-            await _hubConnection.InvokeAsync("SendChatMessage", _room.Code, _chatInput);
+            await GameState.SendChatMessageAsync(_chatInput);
             _chatInput = "";
         }
     }
@@ -608,48 +401,35 @@ else if (_room != null)
 
     private async Task LeaveRoom()
     {
-        if (_hubConnection != null && _room != null)
-        {
-            await _hubConnection.InvokeAsync("LeaveRoom", _room.Code);
-        }
-        GoHome();
+        await GameState.LeaveGameAsync();
     }
 
     private async Task KickPlayer(string connectionId)
     {
-        if (_hubConnection != null && _room != null)
-        {
-            await _hubConnection.InvokeAsync("KickPlayer", _room.Code, connectionId);
-        }
+        await GameState.KickPlayerAsync(connectionId);
     }
 
     private async Task StartGame()
     {
-        if (_hubConnection != null && _room != null)
-        {
-            await _hubConnection.InvokeAsync("StartGame", _room.Code);
-        }
+        await GameState.StartGameAsync();
     }
 
     private async Task CopyRoomCode()
     {
-        if (_room != null)
+        if (GameState.CurrentRoom != null)
         {
             try
             {
-                await JSRuntime.InvokeVoidAsync("copyToClipboard", _room.Code);
+                await JSRuntime.InvokeVoidAsync("copyToClipboard", GameState.CurrentRoom.Code);
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Failed to copy: {ex.Message}");
-            }
+            catch { }
         }
     }
 
     // Modal methods
     private void OpenCategoryModal()
     {
-        _selectedCategoryNames = _room?.Settings.SelectedCategories.Select(c => c.Name).ToHashSet() ?? new();
+        _selectedCategoryNames = GameState.CurrentRoom?.Settings.SelectedCategories.Select(c => c.Name).ToHashSet() ?? new();
         _showCategoryModal = true;
     }
 
@@ -677,34 +457,22 @@ else if (_room != null)
 
     private async Task SaveCategorySettings()
     {
-        if (_selectedCategoryNames.Count == 0 || _hubConnection == null || _room == null)
-        {
-            return;
-        }
+        if (_selectedCategoryNames.Count == 0 || GameState.CurrentRoom == null) return;
 
-        await _hubConnection.InvokeAsync("UpdateGameSettings", 
-            _room.Code, 
-            _selectedCategoryNames.ToList(), 
-            _room.Settings.RoundCount);
-        
+        await GameState.UpdateGameSettingsAsync(_selectedCategoryNames.ToList(), GameState.CurrentRoom.Settings.RoundCount);
         _showCategoryModal = false;
     }
 
     private void AddCustomCategory()
     {
-        if (string.IsNullOrWhiteSpace(_customCategoryInput))
-        {
-            return;
-        }
+        if (string.IsNullOrWhiteSpace(_customCategoryInput)) return;
 
-        // Check if category already exists
         if (_categoriesWithColors.Any(c => c.Category.Name.Equals(_customCategoryInput.Trim(), StringComparison.OrdinalIgnoreCase)))
         {
             _customCategoryInput = "";
             return;
         }
 
-        // Create custom category
         var customCategory = new Category
         {
             Name = _customCategoryInput.Trim(),
@@ -712,20 +480,14 @@ else if (_room != null)
             IsCustom = true
         };
 
-        // Add to list with primary color scheme
-        var customColorScheme = ("bg-primary/20", "text-primary");
-        _categoriesWithColors.Add(new CategoryWithColor(customCategory, customColorScheme.Item1, customColorScheme.Item2));
-
-        // Automatically select it
+        _categoriesWithColors.Add(new CategoryWithColor(customCategory, "bg-primary/20", "text-primary"));
         _selectedCategoryNames.Add(customCategory.Name);
-
-        // Clear input
         _customCategoryInput = "";
     }
 
     private void OpenRoundCountModal()
     {
-        _tempRoundCount = _room?.Settings.RoundCount ?? 10;
+        _tempRoundCount = GameState.CurrentRoom?.Settings.RoundCount ?? 10;
         _showRoundCountModal = true;
     }
 
@@ -746,28 +508,16 @@ else if (_room != null)
 
     private async Task SaveRoundCountSettings()
     {
-        if (_hubConnection != null && _room != null)
+        if (GameState.CurrentRoom != null)
         {
-            var categoryNames = _room.Settings.SelectedCategories.Select(c => c.Name).ToList();
-            await _hubConnection.InvokeAsync("UpdateGameSettings", 
-                _room.Code, 
-                categoryNames, 
-                _tempRoundCount);
+            var categoryNames = GameState.CurrentRoom.Settings.SelectedCategories.Select(c => c.Name).ToList();
+            await GameState.UpdateGameSettingsAsync(categoryNames, _tempRoundCount);
         }
         _showRoundCountModal = false;
     }
 
-    private void GoHome()
+    public void Dispose()
     {
-        Navigation.NavigateTo("/");
+        GameState.OnStateChanged -= HandleStateChanged;
     }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_hubConnection != null)
-        {
-            await _hubConnection.DisposeAsync();
-        }
-    }
-
 }

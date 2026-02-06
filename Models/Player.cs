@@ -6,6 +6,11 @@ namespace NationsCities.Models;
 public class Player
 {
     /// <summary>
+    /// Unique session ID for the player (persists across reconnections).
+    /// </summary>
+    public string SessionId { get; set; } = string.Empty;
+
+    /// <summary>
     /// SignalR ConnectionId gracza.
     /// </summary>
     public string ConnectionId { get; set; } = string.Empty;

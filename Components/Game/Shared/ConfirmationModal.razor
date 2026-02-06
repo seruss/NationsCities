@@ -1,0 +1,49 @@
+@* 
+    ConfirmationModal.razor - Shared confirmation dialog
+    Used for leave game confirmation, etc.
+*@
+
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div class="bg-surface-light dark:bg-surface-dark rounded-2xl shadow-xl max-w-sm w-full p-6 space-y-4 animate-scale-in">
+        <h3 class="text-xl font-bold text-slate-900 dark:text-white">@Title</h3>
+        <p class="text-slate-600 dark:text-slate-400">@Message</p>
+        <div class="flex gap-3 pt-2">
+            <button @onclick="OnCancel" 
+                    class="flex-1 px-4 py-3 rounded-full border border-slate-300 dark:border-slate-600 
+                           text-slate-700 dark:text-slate-300 font-semibold
+                           hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                @CancelText
+            </button>
+            <button @onclick="OnConfirm" 
+                    class="flex-1 px-4 py-3 rounded-full bg-red-500 text-white font-semibold
+                           hover:bg-red-600 transition-colors">
+                @ConfirmText
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    @@keyframes scale-in {
+        from {
+            opacity: 0;
+            transform: scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+    .animate-scale-in {
+        animation: scale-in 0.2s ease-out;
+    }
+</style>
+
+@code {
+    [Parameter] public string Title { get; set; } = "Potwierdzenie";
+    [Parameter] public string Message { get; set; } = "Czy na pewno?";
+    [Parameter] public string ConfirmText { get; set; } = "Potwierdź";
+    [Parameter] public string CancelText { get; set; } = "Anuluj";
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+}

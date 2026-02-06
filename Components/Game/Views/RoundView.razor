@@ -1,0 +1,341 @@
+@* 
+    RoundView.razor - SPA Round View
+    Converted from GameRound.razor to work with ClientGameStateService
+*@
+@using NationsCities.Models
+@using NationsCities.Services
+@inject ClientGameStateService GameState
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Runda @_currentRound - Państwa, Miasta</PageTitle>
+
+@if (GameState.CurrentRoom == null || GameState.CurrentGame == null)
+{
+    <div class="flex items-center justify-center min-h-screen bg-bg-light dark:bg-bg-dark">
+        <div class="flex flex-col items-center gap-4">
+            <span class="material-symbols-outlined text-4xl text-primary animate-spin">progress_activity</span>
+            <p class="text-slate-500 dark:text-slate-400">Ładowanie rundy...</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="flex flex-col min-h-screen bg-bg-light dark:bg-bg-dark">
+        <!-- Header -->
+        <header class="sticky top-0 flex items-center justify-between px-4 py-3 bg-bg-light dark:bg-bg-dark shrink-0 z-20">
+            <div class="w-10"></div>
+            <h2 class="text-base font-bold tracking-tight uppercase text-slate-500 dark:text-slate-400">Runda @_currentRound z @GameState.CurrentGame.TotalRounds</h2>
+            <div class="w-10"></div>
+        </header>
+
+        <!-- Letter & Timer Section -->
+        <div class="px-5 pb-6 pt-2 bg-bg-light dark:bg-bg-dark shrink-0 z-10 border-b border-slate-200 dark:border-slate-800 shadow-sm">
+            <div class="flex items-end justify-between gap-6">
+                <!-- Current Letter -->
+                <div class="flex flex-col">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Litera</span>
+                    <h1 class="text-6xl font-black text-primary leading-none tracking-tighter drop-shadow-lg">@GameState.CurrentGame.CurrentLetter</h1>
+                </div>
+                
+                <!-- Timer / Status -->
+                <div class="flex flex-col flex-1 items-end justify-end pb-1">
+                    <div class="flex flex-col items-end w-full">
+                        @if (_isCountdownActive)
+                        {
+                            <!-- Countdown active -->
+                            <div class="flex items-center gap-2 mb-2 @(_secondsRemaining <= 5 ? "bg-red-100 dark:bg-red-900/20 border-red-200 dark:border-red-900/30" : "bg-yellow-100 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-900/30") px-3 py-1 rounded-lg border animate-pulse">
+                                <span class="material-symbols-outlined @(_secondsRemaining <= 5 ? "text-red-500" : "text-yellow-500") text-2xl">hourglass_top</span>
+                                <span class="text-4xl font-black font-mono tabular-nums leading-none @(_secondsRemaining <= 5 ? "text-red-500" : "text-yellow-500") tracking-tight">@_secondsRemaining</span>
+                            </div>
+                            
+                            <!-- Progress Bar -->
+                            <div class="w-full h-3 bg-slate-200 dark:bg-surface-dark rounded-full overflow-hidden mb-2">
+                                <div class="h-full @(_secondsRemaining <= 5 ? "bg-red-500" : "bg-yellow-500") rounded-full transition-all duration-1000" 
+                                     style="width: @(Math.Min(100, (_secondsRemaining / 10.0) * 100))%"></div>
+                            </div>
+
+                            <!-- Add Time Button (only for STOP triggerer) -->
+                            @if (_stopTriggeredByMe)
+                            {
+                                <button @onclick="AddOneSecond" 
+                                        class="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-blue-400 active:scale-95 transition-transform bg-primary/10 px-3 py-1.5 rounded-full border border-primary/20">
+                                    <span class="material-symbols-outlined text-base">add_circle</span>
+                                    <span>+1 sekunda</span>
+                                </button>
+                            }
+                        }
+                        else
+                        {
+                            <!-- No timer - waiting for STOP -->
+                            <div class="flex items-center gap-2 mb-2 bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-700 px-3 py-1 rounded-lg border">
+                                <span class="material-symbols-outlined text-primary text-2xl">all_inclusive</span>
+                                <span class="text-2xl font-black text-primary leading-none tracking-tight">Bez limitu</span>
+                            </div>
+                            <p class="text-xs text-slate-500 dark:text-slate-400 text-right">Wciśnij STOP gdy skończysz</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Answer Inputs -->
+        <main class="flex-1 overflow-y-auto no-scrollbar">
+            <div class="px-5 py-6 flex flex-col gap-6 pb-32">
+                @foreach (var category in GameState.CurrentGame.Categories)
+                {
+                    var inputId = $"answer-{category.Name.Replace(" ", "-").ToLowerInvariant()}";
+                    <div class="group">
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="text-sm font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                                <span class="material-symbols-outlined text-base text-slate-500 dark:text-slate-400">@category.Icon</span>
+                                @category.Name
+                            </label>
+                            @if (!string.IsNullOrEmpty(GetAnswer(category.Name)))
+                            {
+                                <span class="text-xs font-bold text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-xs">check_circle</span>
+                                </span>
+                            }
+                        </div>
+                        <div class="password-visible-wrapper">
+                            <input id="@inputId"
+                                   type="password"
+                                   @bind="@_answers[category.Name]"
+                                   @bind:event="oninput"
+                                   class="password-visible-input w-full border-0 rounded-xl p-4 text-lg shadow-sm ring-1 ring-slate-300 dark:ring-slate-700 focus:ring-2 focus:ring-primary focus:outline-none transition-all disabled:opacity-50"
+                                   autocomplete="off"
+                                   autocorrect="off"
+                                   autocapitalize="off"
+                                   spellcheck="false"
+                                   data-lpignore="true"
+                                   data-1p-ignore="true"
+                                   data-form-type="other"
+                                   readonly
+                                   onfocus="this.removeAttribute('readonly')"
+                                   disabled="@_hasSubmitted" />
+                            <div class="password-visible-overlay @(string.IsNullOrEmpty(GetAnswer(category.Name)) ? "placeholder" : "")">
+                                @(string.IsNullOrEmpty(GetAnswer(category.Name)) ? "Wpisz odpowiedź..." : GetAnswer(category.Name))
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </main>
+
+        <!-- Footer: STOP Button -->
+        <footer class="shrink-0 px-5 py-4 bg-bg-light dark:bg-bg-dark border-t border-slate-200 dark:border-slate-800 fixed bottom-0 w-full z-30 backdrop-blur-md bg-opacity-95 safe-area-bottom">
+            @if (_hasSubmitted)
+            {
+                <div class="text-center py-2">
+                    <p class="text-lg font-bold text-green-500 dark:text-green-400 flex items-center justify-center gap-2">
+                        <span class="material-symbols-outlined">check_circle</span>
+                        Odpowiedzi wysłane!
+                    </p>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Czekam na innych graczy...</p>
+                </div>
+            }
+            else if (_isCountdownActive)
+            {
+                <div class="flex flex-col gap-2">
+                    <button @onclick="SubmitAnswers" 
+                            class="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold text-lg py-4 rounded-xl shadow-lg transition-all btn-press">
+                        <span class="material-symbols-outlined">send</span>
+                        <span>Wyślij odpowiedzi</span>
+                    </button>
+                    <p class="text-center text-xs text-slate-400">Pozostało @_secondsRemaining sekund!</p>
+                </div>
+            }
+            else
+            {
+                <button @onclick="TriggerStop" 
+                        disabled="@(!CanStop)"
+                        class="w-full flex items-center justify-center gap-2 @(CanStop ? "bg-red-500 hover:bg-red-600 shadow-red-500/30" : "bg-slate-200 dark:bg-slate-700 cursor-not-allowed") text-white font-bold text-lg py-4 rounded-xl shadow-lg transition-all btn-press">
+                    <span class="material-symbols-outlined">stop_circle</span>
+                    <span>STOP!</span>
+                </button>
+                @if (!CanStop)
+                {
+                    <p class="text-center text-xs text-orange-400 mt-2">Uzupełnij wszystkie odpowiedzi aby zakończyć</p>
+                }
+                else
+                {
+                    <p class="text-center text-xs text-slate-500 mt-2">Zatrzymujesz rundę - inni dostają 10 sekund</p>
+                }
+            }
+        </footer>
+    </div>
+}
+
+@code {
+    private Dictionary<string, string> _answers = new();
+    private int _currentRound = 1;
+    private int _secondsRemaining = 10;
+    private bool _isCountdownActive = false;
+    private bool _hasSubmitted = false;
+    private bool _stopTriggeredByMe = false;
+    private System.Timers.Timer? _timer;
+    private bool _hasInitialized = false;
+
+    // Can only click STOP if all answers are filled
+    private bool CanStop => GameState.CurrentGame?.Categories.All(c => !string.IsNullOrWhiteSpace(GetAnswer(c.Name))) ?? false;
+
+    protected override void OnInitialized()
+    {
+        GameState.OnStateChanged += HandleStateChanged;
+        GameState.OnStopTriggered += HandleStopTriggered;
+        GameState.OnTimeAdded += HandleTimeAdded;
+        GameState.OnRoundEnded += HandleRoundEnded;
+        
+        InitializeRound();
+    }
+
+    private void InitializeRound()
+    {
+        if (_hasInitialized || GameState.CurrentGame == null) return;
+        _hasInitialized = true;
+        
+        _currentRound = GameState.CurrentGame.CurrentRound;
+        
+        // Initialize answer dictionary
+        foreach (var category in GameState.CurrentGame.Categories)
+        {
+            if (!_answers.ContainsKey(category.Name))
+            {
+                _answers[category.Name] = "";
+            }
+        }
+        
+        // Check if countdown is already active (rejoin scenario)
+        if (GameState.CurrentGame.Phase == RoundPhase.Countdown && GameState.CurrentGame.CountdownEndTime.HasValue)
+        {
+            _isCountdownActive = true;
+            var remaining = (GameState.CurrentGame.CountdownEndTime.Value - DateTime.UtcNow).TotalSeconds;
+            _secondsRemaining = Math.Max(1, (int)Math.Ceiling(remaining));
+            _stopTriggeredByMe = GameState.CurrentGame.StopTriggeredBy == GameState.MyPlayer?.ConnectionId;
+            StartTimer();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && GameState.CurrentGame != null)
+        {
+            // Start anti-cheat tracking via the state service
+            await GameState.StartAntiCheatTrackingAsync(_currentRound);
+        }
+    }
+
+    private void HandleStateChanged()
+    {
+        // Re-initialize if game data changed
+        if (!_hasInitialized && GameState.CurrentGame != null)
+        {
+            InitializeRound();
+        }
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleStopTriggered(string playerId, DateTime endTime)
+    {
+        _isCountdownActive = true;
+        _stopTriggeredByMe = playerId == GameState.MyPlayer?.ConnectionId;
+        
+        var remaining = (endTime - DateTime.UtcNow).TotalSeconds;
+        _secondsRemaining = Math.Max(1, (int)Math.Ceiling(remaining));
+        
+        StartTimer();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleTimeAdded(DateTime endTime)
+    {
+        var remaining = (endTime - DateTime.UtcNow).TotalSeconds;
+        _secondsRemaining = Math.Max(1, (int)Math.Ceiling(remaining));
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async void HandleRoundEnded(int answerCount)
+    {
+        _timer?.Stop();
+        
+        // Pause anti-cheat tracking
+        await GameState.PauseAntiCheatTrackingAsync();
+        
+        // Phase transition handled by GameState hub callbacks
+    }
+
+    private void StartTimer()
+    {
+        _timer?.Stop();
+        _timer = new System.Timers.Timer(1000);
+        _timer.Elapsed += async (s, e) =>
+        {
+            if (_secondsRemaining > 0)
+            {
+                _secondsRemaining--;
+                await InvokeAsync(StateHasChanged);
+            }
+            else
+            {
+                _timer?.Stop();
+                if (!_hasSubmitted)
+                {
+                    await SubmitAnswers();
+                }
+            }
+        };
+        _timer.Start();
+    }
+
+    private async Task TriggerStop()
+    {
+        if (_hasSubmitted) return;
+        
+        _hasSubmitted = true;
+        
+        // Pause anti-cheat
+        await GameState.PauseAntiCheatTrackingAsync();
+        
+        // Send to hub
+        await GameState.TriggerStopAsync(_answers);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task AddOneSecond()
+    {
+        if (_stopTriggeredByMe)
+        {
+            await GameState.AddTimeAsync(1);
+        }
+    }
+
+    private async Task SubmitAnswers()
+    {
+        if (_hasSubmitted) return;
+        _hasSubmitted = true;
+        
+        // Pause anti-cheat
+        await GameState.PauseAntiCheatTrackingAsync();
+        
+        // Send to hub
+        await GameState.SubmitAnswersAsync(_answers);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private string GetAnswer(string category)
+    {
+        return _answers.TryGetValue(category, out var answer) ? answer : "";
+    }
+
+    public void Dispose()
+    {
+        GameState.OnStateChanged -= HandleStateChanged;
+        GameState.OnStopTriggered -= HandleStopTriggered;
+        GameState.OnTimeAdded -= HandleTimeAdded;
+        GameState.OnRoundEnded -= HandleRoundEnded;
+        
+        _timer?.Stop();
+        _timer?.Dispose();
+    }
+}
