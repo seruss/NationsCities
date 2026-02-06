@@ -13,6 +13,7 @@ builder.Services.AddSignalR();
 
 builder.Services.AddSingleton<NationsCities.Services.RoomService>();
 builder.Services.AddSingleton<NationsCities.Services.GameService>();
+builder.Services.AddScoped<NationsCities.Services.ClientGameStateService>();
 builder.Services.AddHostedService<NationsCities.Services.RoomCleanupService>();
 
 var app = builder.Build();

@@ -1,7 +1,11 @@
-﻿@page "/"
-@rendermode InteractiveServer
+@* 
+    HomeView.razor - SPA Home View
+    Converted from Home.razor to work with ClientGameStateService
+*@
 @using Microsoft.AspNetCore.SignalR.Client
 @using NationsCities.Models
+@using NationsCities.Services
+@inject ClientGameStateService GameState
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 
@@ -11,10 +15,10 @@
     <!-- Top Navigation -->
     <header class="relative z-10 flex items-center justify-between p-4 pb-2">
         <div class="w-12"></div>
-        <button id="home-theme-toggle" 
+        <button data-theme-toggle
                 type="button"
                 class="flex w-12 h-12 items-center justify-center rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700/50 transition-colors cursor-pointer">
-            <span id="home-theme-icon" class="material-symbols-outlined text-2xl pointer-events-none">light_mode</span>
+            <span class="material-symbols-outlined text-2xl pointer-events-none">light_mode</span>
         </button>
     </header>
 
@@ -94,10 +98,18 @@
                     }
 
                     <button @onclick="SubmitForm" 
-                            disabled="@(!CanSubmit)"
+                            disabled="@(!CanSubmit || _isLoading)"
                             class="@GetSubmitButtonClass()">
-                        <span class="material-symbols-outlined mr-2 text-2xl">@(_isCreating ? "add_circle" : "login")</span>
-                        <span class="text-lg font-bold">@(_isCreating ? "Stwórz" : "Dołącz")</span>
+                        @if (_isLoading)
+                        {
+                            <div class="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                            <span class="text-lg font-bold">Łączenie...</span>
+                        }
+                        else
+                        {
+                            <span class="material-symbols-outlined mr-2 text-2xl">@(_isCreating ? "add_circle" : "login")</span>
+                            <span class="text-lg font-bold">@(_isCreating ? "Stwórz" : "Dołącz")</span>
+                        }
                     </button>
 
                     <!-- Public Rooms List (only when joining) -->
@@ -112,7 +124,7 @@
                                 @foreach (var publicRoom in _publicRooms)
                                 {
                                     <button @onclick="() => JoinPublicRoom(publicRoom.Code)"
-                                            disabled="@(string.IsNullOrWhiteSpace(_nickname))"
+                                            disabled="@(string.IsNullOrWhiteSpace(_nickname) || _isLoading)"
                                             class="flex items-center justify-between p-3 rounded-xl bg-green-100 dark:bg-green-900/20 border border-green-300 dark:border-green-700/50 hover:bg-green-200 dark:hover:bg-green-900/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                                         <div class="flex items-center gap-2">
                                             <span class="material-symbols-outlined text-green-600 dark:text-green-400">meeting_room</span>
@@ -142,39 +154,54 @@
                     </button>
                 </div>
             }
+
+            <!-- Deep link room code display -->
+            @if (!string.IsNullOrEmpty(_pendingRoomCode) && !_showJoinInput)
+            {
+                <div class="mt-4 p-4 rounded-xl bg-primary/10 border border-primary/30">
+                    <p class="text-center text-sm text-slate-600 dark:text-slate-400 mb-2">Dołączasz do pokoju:</p>
+                    <p class="text-center text-2xl font-bold text-primary tracking-widest">@_pendingRoomCode</p>
+                    <button @onclick="JoinPendingRoom" 
+                            class="w-full mt-3 h-12 rounded-full bg-primary text-white font-semibold hover:bg-primary-dark transition-colors">
+                        Wpisz nick i dołącz
+                    </button>
+                </div>
+            }
         </div>
     </footer>
 </div>
 
 @code {
-    private HubConnection? _hubConnection;
     private bool _showJoinInput;
     private bool _isCreating;
+    private bool _isLoading;
     private string _roomCode = "";
     private string _nickname = "";
     private string? _error;
+    private string? _pendingRoomCode;
     private List<PublicRoomInfo> _publicRooms = new();
-    private bool _isDarkMode = true;
 
     private bool CanSubmit => !string.IsNullOrWhiteSpace(_nickname) && 
-                              (_isCreating || _roomCode.Length == 4);
+                              (_isCreating || _roomCode.Length == 4 || !string.IsNullOrEmpty(_pendingRoomCode));
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override void OnInitialized()
     {
-        // Setup theme toggle button click handler after every render
-        try
+        // Subscribe to error events
+        GameState.OnError += HandleError;
+        
+        // Check if there's a pending room code from deep link
+        if (!string.IsNullOrEmpty(GameState.RoomCode) && string.IsNullOrEmpty(GameState.Nickname))
         {
-            await JS.InvokeVoidAsync("setupThemeToggle", "home-theme-toggle", "home-theme-icon");
-            
-            if (firstRender)
-            {
-                var theme = await JS.InvokeAsync<string>("themeManager.get");
-                _isDarkMode = theme == "dark";
-            }
+            _pendingRoomCode = GameState.RoomCode;
         }
-        catch { /* Ignore if JS not ready */ }
     }
 
+    private void HandleError(string error)
+    {
+        _error = error;
+        _isLoading = false;
+        InvokeAsync(StateHasChanged);
+    }
 
     private void ShowNicknameForCreate()
     {
@@ -197,15 +224,13 @@
     {
         try
         {
-            if (_hubConnection == null)
-            {
-                _hubConnection = new HubConnectionBuilder()
-                    .WithUrl(Navigation.ToAbsoluteUri("/gamehub"))
-                    .Build();
-                await _hubConnection.StartAsync();
-            }
-
-            _publicRooms = await _hubConnection.InvokeAsync<List<PublicRoomInfo>>("GetPublicRooms");
+            // Use a temporary hub connection to fetch public rooms
+            var hubConnection = new HubConnectionBuilder()
+                .WithUrl(Navigation.ToAbsoluteUri("/gamehub"))
+                .Build();
+            await hubConnection.StartAsync();
+            _publicRooms = await hubConnection.InvokeAsync<List<PublicRoomInfo>>("GetPublicRooms");
+            await hubConnection.DisposeAsync();
         }
         catch
         {
@@ -213,10 +238,34 @@
         }
     }
 
-    private void JoinPublicRoom(string roomCode)
+    private async Task JoinPublicRoom(string roomCode)
     {
-        if (string.IsNullOrWhiteSpace(_nickname)) return;
-        Navigation.NavigateTo($"/lobby?code={roomCode}&nick={Uri.EscapeDataString(_nickname)}");
+        if (string.IsNullOrWhiteSpace(_nickname) || _isLoading) return;
+        
+        _isLoading = true;
+        _error = null;
+        StateHasChanged();
+        
+        try
+        {
+            await GameState.JoinRoomAsync(roomCode, _nickname);
+        }
+        catch (Exception ex)
+        {
+            _error = "Nie udało się dołączyć do pokoju.";
+            _isLoading = false;
+        }
+    }
+
+    private void JoinPendingRoom()
+    {
+        if (!string.IsNullOrEmpty(_pendingRoomCode))
+        {
+            _roomCode = _pendingRoomCode;
+            _pendingRoomCode = null;
+            _showJoinInput = true;
+            _isCreating = false;
+        }
     }
 
     private void CancelForm()
@@ -226,19 +275,33 @@
         _roomCode = "";
         _nickname = "";
         _error = null;
+        _pendingRoomCode = null;
     }
 
-    private void SubmitForm()
+    private async Task SubmitForm()
     {
-        if (!CanSubmit) return;
+        if (!CanSubmit || _isLoading) return;
 
-        if (_isCreating)
+        _isLoading = true;
+        _error = null;
+        StateHasChanged();
+
+        try
         {
-            Navigation.NavigateTo($"/lobby?create=true&nick={Uri.EscapeDataString(_nickname)}");
+            if (_isCreating)
+            {
+                await GameState.CreateRoomAsync(_nickname);
+            }
+            else
+            {
+                var code = !string.IsNullOrEmpty(_roomCode) ? _roomCode : _pendingRoomCode ?? "";
+                await GameState.JoinRoomAsync(code.ToUpperInvariant(), _nickname);
+            }
         }
-        else
+        catch (Exception ex)
         {
-            Navigation.NavigateTo($"/lobby?code={_roomCode.ToUpperInvariant()}&nick={Uri.EscapeDataString(_nickname)}");
+            _error = _isCreating ? "Nie udało się utworzyć pokoju." : "Nie udało się dołączyć do pokoju.";
+            _isLoading = false;
         }
     }
 
@@ -246,7 +309,7 @@
     {
         var baseClass = "flex w-full items-center justify-center rounded-full h-14 px-5 transition-all btn-press";
         
-        if (!CanSubmit)
+        if (!CanSubmit || _isLoading)
         {
             return $"{baseClass} bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-400 cursor-not-allowed";
         }
@@ -259,11 +322,8 @@
         Navigation.NavigateTo("/how-to-play");
     }
 
-    public async ValueTask DisposeAsync()
+    public void Dispose()
     {
-        if (_hubConnection != null)
-        {
-            await _hubConnection.DisposeAsync();
-        }
+        GameState.OnError -= HandleError;
     }
 }

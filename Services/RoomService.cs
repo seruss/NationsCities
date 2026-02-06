@@ -16,11 +16,12 @@ public class RoomService
     /// <summary>
     /// Tworzy nowy pokój.
     /// </summary>
-    public Room CreateRoom(string hostConnectionId, string hostNickname)
+    public Room CreateRoom(string hostConnectionId, string hostNickname, string? sessionId = null)
     {
         var roomCode = GenerateUniqueRoomCode();
         var host = new Player
         {
+            SessionId = sessionId ?? string.Empty,
             ConnectionId = hostConnectionId,
             Nickname = hostNickname,
             AvatarColor = Player.GenerateAvatarColor(),
@@ -76,7 +77,7 @@ public class RoomService
     /// <summary>
     /// Dołącza gracza do pokoju.
     /// </summary>
-    public (bool Success, string? Error, Room? Room) JoinRoom(string roomCode, string connectionId, string nickname)
+    public (bool Success, string? Error, Room? Room) JoinRoom(string roomCode, string connectionId, string nickname, string? sessionId = null)
     {
         roomCode = roomCode.ToUpperInvariant();
 
@@ -102,6 +103,7 @@ public class RoomService
 
         var player = new Player
         {
+            SessionId = sessionId ?? string.Empty,
             ConnectionId = connectionId,
             Nickname = nickname,
             AvatarColor = Player.GenerateAvatarColor()

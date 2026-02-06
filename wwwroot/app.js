@@ -4,6 +4,191 @@
 // NOTE: ThemeManager is now defined inline in App.razor <head> 
 // so it's available immediately for onclick handlers.
 
+// ======================================
+// Game Session Management (SPA Support)
+// ======================================
+
+window.gameSession = {
+    _SESSION_KEY: 'game_session',
+    _TAB_KEY: 'game_active_tab',
+    _tabId: null,
+    _dotNetRef: null,
+
+    /**
+     * Get or create a unique session ID for this player
+     */
+    getOrCreateSessionId: function () {
+        let sessionId = localStorage.getItem('game_session_id');
+        if (!sessionId) {
+            sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('game_session_id', sessionId);
+        }
+        return sessionId;
+    },
+
+    /**
+     * Get unique tab ID for multi-tab detection
+     */
+    getTabId: function () {
+        if (!this._tabId) {
+            this._tabId = 'tab_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+        return this._tabId;
+    },
+
+    /**
+     * Save current game session to localStorage
+     */
+    save: function (sessionId, roomCode, nickname) {
+        const data = {
+            sessionId: sessionId,
+            roomCode: roomCode,
+            nickname: nickname,
+            savedAt: Date.now()
+        };
+        localStorage.setItem(this._SESSION_KEY, JSON.stringify(data));
+        console.log('[GameSession] Saved:', data);
+    },
+
+    /**
+     * Load saved game session from localStorage
+     */
+    load: function () {
+        try {
+            const data = localStorage.getItem(this._SESSION_KEY);
+            if (!data) return null;
+
+            const session = JSON.parse(data);
+            // Check if session is stale (>30 min)
+            if (Date.now() - session.savedAt > 30 * 60 * 1000) {
+                console.log('[GameSession] Session expired, clearing');
+                this.clear();
+                return null;
+            }
+            console.log('[GameSession] Loaded:', session);
+            return session;
+        } catch (e) {
+            console.error('[GameSession] Error loading:', e);
+            return null;
+        }
+    },
+
+    /**
+     * Clear saved game session
+     */
+    clear: function () {
+        localStorage.removeItem(this._SESSION_KEY);
+        localStorage.removeItem(this._TAB_KEY);
+        console.log('[GameSession] Cleared');
+    },
+
+    /**
+     * Setup navigation guard for browser back button
+     */
+    setupNavigationGuard: function (dotNetRef) {
+        this._dotNetRef = dotNetRef;
+
+        // Handle beforeunload (refresh/close)
+        window.addEventListener('beforeunload', (e) => {
+            if (window._gamePhase && window._gamePhase !== 'Home') {
+                e.preventDefault();
+                e.returnValue = 'Czy na pewno chcesz opuścić grę?';
+            }
+        });
+
+        // Handle popstate (back/forward button)
+        window.addEventListener('popstate', async (e) => {
+            if (window._gamePhase && window._gamePhase !== 'Home' && this._dotNetRef) {
+                // Prevent navigation by pushing state back
+                history.pushState(null, '', window.location.href);
+                // Notify Blazor
+                try {
+                    await this._dotNetRef.invokeMethodAsync('OnBackButtonPressed');
+                } catch (err) {
+                    console.warn('[GameSession] Could not notify Blazor of back button:', err);
+                }
+            }
+        });
+
+        // Push initial state to enable popstate detection
+        history.pushState(null, '', window.location.href);
+        console.log('[GameSession] Navigation guard setup complete');
+    },
+
+    /**
+     * Setup multi-tab detection
+     */
+    setupTabProtection: function (roomCode) {
+        // Listen for storage changes from other tabs
+        window.addEventListener('storage', (e) => {
+            if (e.key === this._TAB_KEY && e.newValue) {
+                try {
+                    const otherTab = JSON.parse(e.newValue);
+                    if (otherTab.tabId !== this._tabId && otherTab.roomCode === roomCode) {
+                        this._handleDuplicateTab();
+                    }
+                } catch (err) {
+                    console.warn('[GameSession] Error checking tab:', err);
+                }
+            }
+        });
+
+        // Claim this tab as active
+        this.claimTab(roomCode);
+    },
+
+    /**
+     * Claim this tab as the active game tab
+     */
+    claimTab: function (roomCode) {
+        const data = {
+            tabId: this._tabId,
+            roomCode: roomCode,
+            timestamp: Date.now()
+        };
+        localStorage.setItem(this._TAB_KEY, JSON.stringify(data));
+    },
+
+    /**
+     * Handle duplicate tab detected
+     */
+    _handleDuplicateTab: function () {
+        console.warn('[GameSession] Duplicate tab detected!');
+
+        // Create blocking overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-900/95 backdrop-blur-sm';
+        overlay.innerHTML = `
+            <div class="flex flex-col items-center gap-6 p-8 text-center">
+                <span class="material-symbols-outlined text-red-500" style="font-size: 80px;">tab_close</span>
+                <h2 class="text-2xl font-bold text-white">Gra jest otwarta w innej karcie</h2>
+                <p class="text-slate-400 max-w-xs">Zamknij tę kartę lub wróć do poprzedniej karty z grą.</p>
+                <button onclick="window.location.href='/'" class="px-6 py-3 bg-primary text-white rounded-full font-semibold hover:bg-primary/90 transition-colors">
+                    Wróć do strony głównej
+                </button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        // Notify Blazor if reference exists
+        if (this._dotNetRef) {
+            try {
+                this._dotNetRef.invokeMethodAsync('OnDuplicateTabDetected');
+            } catch (err) {
+                console.warn('[GameSession] Could not notify Blazor of duplicate tab:', err);
+            }
+        }
+    }
+};
+
+/**
+ * Sync game phase from Blazor for anti-cheat and navigation guard
+ */
+window.setGamePhase = function (phase) {
+    window._gamePhase = phase;
+    console.log(`[GameFlow] Phase changed to: ${phase}`);
+};
+
 /**
  * Copies text to clipboard using modern Clipboard API with fallback
  */
@@ -311,10 +496,15 @@ window.AntiCheatTracker = class {
     }
 
     _isOnGameRoundPage(roomCode) {
+        // Check URL first (for initial page load / deep links)
         const path = window.location.pathname.toLowerCase();
-        // Check if we're on a game round page (/game/{roomCode})
-        const isGamePage = path.startsWith('/game/');
-        console.log(`[AntiCheat] URL check: path="${path}", isGamePage=${isGamePage}`);
+        const isGamePageByUrl = path.startsWith('/game/');
+
+        // Check SPA state (for in-app phase changes)
+        const isGamePageByPhase = window._gamePhase === 'Playing';
+
+        const isGamePage = isGamePageByUrl || isGamePageByPhase;
+        console.log(`[AntiCheat] Game page check: url=${isGamePageByUrl}, phase=${isGamePageByPhase}, result=${isGamePage}`);
         return isGamePage;
     }
 

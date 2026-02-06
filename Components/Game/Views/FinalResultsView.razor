@@ -1,15 +1,15 @@
-@page "/finalresults/{RoomCode}"
-@rendermode InteractiveServer
-@using Microsoft.AspNetCore.SignalR.Client
+@* 
+    FinalResultsView.razor - SPA Final Results View
+    Displays game summary and winner using ClientGameStateService
+*@
 @using NationsCities.Models
-@inject NavigationManager Navigation
-@inject NationsCities.Services.RoomService RoomService
-@inject IJSRuntime JSRuntime
-@implements IAsyncDisposable
+@using NationsCities.Services
+@inject ClientGameStateService GameState
+@implements IDisposable
 
 <PageTitle>Podsumowanie Gry - Państwa, Miasta</PageTitle>
 
-@if (_isLoading)
+@if (GameState.CurrentRoom == null)
 {
     <div class="flex items-center justify-center min-h-screen bg-bg-light dark:bg-bg-dark">
         <div class="flex flex-col items-center gap-4">
@@ -18,18 +18,17 @@
         </div>
     </div>
 }
-else if (_error != null)
+else
 {
-    <div class="flex items-center justify-center min-h-screen p-4 bg-bg-light dark:bg-bg-dark">
-        <div class="flex flex-col items-center gap-4 text-center">
-            <span class="material-symbols-outlined text-4xl text-red-400">error</span>
-            <p class="text-red-400">@_error</p>
-            <button @onclick="GoHome" class="text-primary hover:underline">Wróć do menu</button>
-        </div>
-    </div>
-}
-else if (_room != null && _winner != null)
-{
+    var sortedPlayers = GameState.CurrentRoom.Players.OrderByDescending(p => p.TotalScore).ToList();
+    var winner = sortedPlayers.FirstOrDefault();
+    var maxScore = winner?.TotalScore ?? 1;
+    var allViolations = GameState.CurrentRoom.Players
+        .SelectMany(p => p.Violations.Select(v => new ViolationWithPlayer(v, p.Nickname)))
+        .OrderBy(v => v.Violation.RoundNumber)
+        .ThenBy(v => v.Violation.OccurredAt)
+        .ToList();
+
     <div class="relative flex flex-col min-h-screen pb-32 bg-bg-light dark:bg-bg-dark">
         <!-- Header -->
         <header class="sticky top-0 z-20 flex items-center justify-center bg-bg-light/80 dark:bg-bg-dark/80 backdrop-blur-md px-4 py-4 border-b border-slate-200 dark:border-white/5">
@@ -37,58 +36,61 @@ else if (_room != null && _winner != null)
         </header>
 
         <!-- Winner Section -->
-        <section class="relative flex flex-col items-center w-full px-4 pt-8 pb-6">
-            <!-- Glow effect -->
-            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-primary/20 rounded-full blur-3xl -z-10 animate-pulse"></div>
-            
-            <h1 class="text-slate-900 dark:text-white tracking-tight text-[32px] font-bold leading-tight px-4 text-center mb-6 drop-shadow-lg">
-                Zwycięstwo!
-            </h1>
-            
-            <div class="flex flex-col gap-4 items-center relative">
-                <!-- Trophy icon above avatar -->
-                <div class="absolute -top-8 text-yellow-400 z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
-                    <span class="material-symbols-outlined" style="font-size: 48px; font-variation-settings: 'FILL' 1;">emoji_events</span>
-                </div>
+        @if (winner != null)
+        {
+            <section class="relative flex flex-col items-center w-full px-4 pt-8 pb-6">
+                <!-- Glow effect -->
+                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-primary/20 rounded-full blur-3xl -z-10 animate-pulse"></div>
                 
-                <!-- Winner avatar -->
-                <div class="relative group">
-                    <div class="h-32 w-32 rounded-full flex items-center justify-center text-3xl font-bold text-white border-4 border-primary shadow-[0_0_30px_-5px_rgba(37,140,244,0.6)] avatar-initials"
-                         style="background-color: @_winner.AvatarColor">
-                        @_winner.GetInitials()
-                    </div>
-                    <div class="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1.5 border-4 border-bg-light dark:border-bg-dark flex items-center justify-center shadow-sm">
-                        <span class="material-symbols-outlined" style="font-size: 18px;">star</span>
-                    </div>
-                </div>
+                <h1 class="text-slate-900 dark:text-white tracking-tight text-[32px] font-bold leading-tight px-4 text-center mb-6 drop-shadow-lg">
+                    Zwycięstwo!
+                </h1>
                 
-                <!-- Winner name and score -->
-                <div class="flex flex-col items-center justify-center">
-                    <p class="text-slate-900 dark:text-white text-[24px] font-bold leading-tight tracking-[-0.015em] text-center">@_winner.Nickname</p>
-                    <div class="mt-2 flex items-center gap-2">
-                        <div class="px-4 py-1 bg-primary/20 rounded-full border border-primary/20">
-                            <p class="text-primary text-sm font-bold leading-normal text-center tracking-wide">@_winner.TotalScore PKT</p>
+                <div class="flex flex-col gap-4 items-center relative">
+                    <!-- Trophy icon above avatar -->
+                    <div class="absolute -top-8 text-yellow-400 z-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+                        <span class="material-symbols-outlined" style="font-size: 48px; font-variation-settings: 'FILL' 1;">emoji_events</span>
+                    </div>
+                    
+                    <!-- Winner avatar -->
+                    <div class="relative group">
+                        <div class="h-32 w-32 rounded-full flex items-center justify-center text-3xl font-bold text-white border-4 border-primary shadow-[0_0_30px_-5px_rgba(37,140,244,0.6)] avatar-initials"
+                             style="background-color: @winner.AvatarColor">
+                            @winner.GetInitials()
                         </div>
-                        @{ var winnerPenalty = GetTotalPenalty(_winner); }
-                        @if (winnerPenalty > 0)
-                        {
-                            <div class="px-3 py-1 bg-red-500/20 rounded-full border border-red-500/20">
-                                <p class="text-red-400 text-sm font-bold leading-normal text-center">-@winnerPenalty</p>
+                        <div class="absolute bottom-0 right-0 bg-primary text-white rounded-full p-1.5 border-4 border-bg-light dark:border-bg-dark flex items-center justify-center shadow-sm">
+                            <span class="material-symbols-outlined" style="font-size: 18px;">star</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Winner name and score -->
+                    <div class="flex flex-col items-center justify-center">
+                        <p class="text-slate-900 dark:text-white text-[24px] font-bold leading-tight tracking-[-0.015em] text-center">@winner.Nickname</p>
+                        <div class="mt-2 flex items-center gap-2">
+                            <div class="px-4 py-1 bg-primary/20 rounded-full border border-primary/20">
+                                <p class="text-primary text-sm font-bold leading-normal text-center tracking-wide">@winner.TotalScore PKT</p>
                             </div>
-                        }
+                            @{ var winnerPenalty = GetTotalPenalty(winner); }
+                            @if (winnerPenalty > 0)
+                            {
+                                <div class="px-3 py-1 bg-red-500/20 rounded-full border border-red-500/20">
+                                    <p class="text-red-400 text-sm font-bold leading-normal text-center">-@winnerPenalty</p>
+                                </div>
+                            }
+                        </div>
                     </div>
                 </div>
-            </div>
-        </section>
+            </section>
+        }
 
         <!-- Final Ranking (starting from #2) -->
         <section class="px-4 mt-4">
             <h3 class="text-slate-500 dark:text-slate-400 text-sm font-bold uppercase tracking-wider mb-4 px-2">Ranking Końcowy</h3>
             <div class="flex flex-col gap-3">
-                @foreach (var (player, index) in _sortedPlayers.Skip(1).Select((p, i) => (p, i + 2)))
+                @foreach (var (player, index) in sortedPlayers.Skip(1).Select((p, i) => (p, i + 2)))
                 {
                     var playerPenalty = GetTotalPenalty(player);
-                    var progressPercent = _maxScore > 0 ? (player.TotalScore * 100 / _maxScore) : 0;
+                    var progressPercent = maxScore > 0 ? (player.TotalScore * 100 / maxScore) : 0;
                     
                     <div class="group relative flex items-center gap-4 bg-surface-light dark:bg-surface-dark p-3 pr-4 rounded-[20px] shadow-sm border border-slate-200 dark:border-white/5 active:scale-[0.99] transition-transform">
                         <div class="flex items-center justify-center w-8 text-slate-500 font-bold text-lg">@index</div>
@@ -120,7 +122,7 @@ else if (_room != null && _winner != null)
         </section>
 
         <!-- Fair Play Section -->
-        @if (_allViolations.Any())
+        @if (allViolations.Any())
         {
             <section class="px-4 mt-8">
                 <div class="flex items-center justify-between mb-4 px-2">
@@ -137,13 +139,13 @@ else if (_room != null && _winner != null)
                             <span class="material-symbols-outlined">warning</span>
                         </div>
                         <p class="text-sm text-slate-700 dark:text-slate-200 font-medium leading-tight">
-                            Wykryto @_allViolations.Count @GetViolationWord(_allViolations.Count) w tej rozgrywce.
+                            Wykryto @allViolations.Count @GetViolationWord(allViolations.Count) w tej rozgrywce.
                         </p>
                     </div>
                     
                     <!-- Violations list -->
                     <div class="divide-y divide-slate-200 dark:divide-white/5">
-                        @foreach (var violation in _allViolations.Take(10))
+                        @foreach (var violation in allViolations.Take(10))
                         {
                             <div class="p-4 flex gap-3">
                                 <div class="h-2 w-2 mt-2 rounded-full bg-orange-500 shrink-0"></div>
@@ -185,77 +187,26 @@ else if (_room != null && _winner != null)
 }
 
 @code {
-    [Parameter] public string RoomCode { get; set; } = "";
-
-    private HubConnection? _hubConnection;
-    private Room? _room;
-    private Player? _winner;
-    private List<Player> _sortedPlayers = [];
-    private List<ViolationWithPlayer> _allViolations = [];
-    private int _maxScore = 1;
-    private string _nickname = "";
-    private string? _error;
-    private bool _isLoading = true;
-
     private record ViolationWithPlayer(Violation Violation, string PlayerNickname);
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        var uri = new Uri(Navigation.Uri);
-        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
-        _nickname = query["nick"] ?? "";
+        GameState.OnStateChanged += HandleStateChanged;
+    }
 
-        try
-        {
-            _hubConnection = new HubConnectionBuilder()
-                .WithUrl(Navigation.ToAbsoluteUri("/gamehub"))
-                .Build();
+    private void HandleStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
 
-            _hubConnection.On("OnGameEnded", () =>
-            {
-                Navigation.NavigateTo("/");
-            });
+    private async Task ReturnToLobby()
+    {
+        await GameState.ReturnToLobbyAsync();
+    }
 
-            _hubConnection.On<string>("OnReturnToLobby", (roomCode) =>
-            {
-                Navigation.NavigateTo($"/lobby?code={roomCode}&nick={Uri.EscapeDataString(_nickname)}");
-            });
-
-            await _hubConnection.StartAsync();
-
-            if (!string.IsNullOrEmpty(_nickname))
-            {
-                await _hubConnection.InvokeAsync<bool>("JoinGame", RoomCode, _nickname);
-            }
-
-            _room = RoomService.GetRoom(RoomCode);
-
-            if (_room == null)
-            {
-                _error = "Gra nie istnieje.";
-                _isLoading = false;
-                return;
-            }
-
-            // Sort players by total score
-            _sortedPlayers = _room.Players.OrderByDescending(p => p.TotalScore).ToList();
-            _winner = _sortedPlayers.FirstOrDefault();
-            _maxScore = _winner?.TotalScore ?? 1;
-
-            // Gather all violations with player names
-            _allViolations = _room.Players
-                .SelectMany(p => p.Violations.Select(v => new ViolationWithPlayer(v, p.Nickname)))
-                .OrderBy(v => v.Violation.RoundNumber)
-                .ThenBy(v => v.Violation.OccurredAt)
-                .ToList();
-
-            _isLoading = false;
-        }
-        catch (Exception ex)
-        {
-            _error = $"Błąd: {ex.Message}";
-            _isLoading = false;
-        }
+    private int GetTotalPenalty(Player player)
+    {
+        return player.Violations.Sum(v => v.Penalty);
     }
 
     private string GetViolationWord(int count)
@@ -276,40 +227,8 @@ else if (_room != null && _winner != null)
         };
     }
 
-    private void ShareResults()
+    public void Dispose()
     {
-        // TODO: Implement share functionality
-    }
-
-    private async Task ReturnToLobby()
-    {
-        // Clear anti-cheat session so next game starts fresh
-        try
-        {
-            await JSRuntime.InvokeVoidAsync("antiCheatTracker.clearSession");
-        }
-        catch { /* Ignore if not available */ }
-        
-        // Just navigate this player to lobby - no broadcast needed
-        // Each player clicks independently when ready to return
-        Navigation.NavigateTo($"/lobby?code={RoomCode}&nick={Uri.EscapeDataString(_nickname)}&rejoin=true");
-    }
-
-    private int GetTotalPenalty(Player player)
-    {
-        return player.Violations.Sum(v => v.Penalty);
-    }
-
-    private void GoHome()
-    {
-        Navigation.NavigateTo("/");
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_hubConnection != null)
-        {
-            await _hubConnection.DisposeAsync();
-        }
+        GameState.OnStateChanged -= HandleStateChanged;
     }
 }
