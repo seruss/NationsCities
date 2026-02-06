@@ -67,17 +67,4 @@ public enum ViolationType
     ConnectionUnstable
 }
 
-/// <summary>
-/// Poziom naruszenia.
-/// </summary>
-public enum ViolationSeverity
-{
-    /// <summary>Tylko informacja.</summary>
-    Notice,
-    
-    /// <summary>Ostrzeżenie.</summary>
-    Warning,
-    
-    /// <summary>Kara punktowa.</summary>
-    Penalty
-}
+
