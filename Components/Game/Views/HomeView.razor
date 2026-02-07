@@ -88,6 +88,7 @@
                     }
 
                     <input @bind="_nickname" 
+                           @bind:event="oninput"
                            placeholder="Twój nick"
                            maxlength="20"
                            class="w-full h-14 px-5 rounded-full bg-surface-light dark:bg-surface-dark border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-center text-lg placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-primary" />

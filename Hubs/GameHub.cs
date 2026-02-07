@@ -46,17 +46,52 @@ public class GameHub : Hub
             return;
         }
         
-        // Only remove player when they're in the lobby (no active game)
-        var result = _roomService.LeaveRoom(Context.ConnectionId);
-        if (result.Room != null && !result.RoomDeleted)
+        // LOBBY DISCONNECTION: Schedule removal with grace period instead of immediate removal
+        // This allows the player to reconnect after a page refresh
+        if (!string.IsNullOrEmpty(player.SessionId))
         {
-            await Clients.Group(result.Room.Code).SendAsync("OnPlayerLeft", Context.ConnectionId);
+            var removalTime = _roomService.SchedulePlayerRemoval(
+                player.SessionId, 
+                player.ConnectionId, 
+                roomCode, 
+                player.Nickname);
             
-            if (result.NewHostId != null)
+            // Schedule the actual removal processing after the grace period
+            _ = Task.Run(async () =>
             {
-                await Clients.Group(result.Room.Code).SendAsync("OnNewHost", result.NewHostId);
+                await Task.Delay(TimeSpan.FromSeconds(6)); // Slightly longer than grace period
+                var removals = _roomService.ProcessExpiredDisconnections();
+                
+                foreach (var removal in removals)
+                {
+                    if (!removal.RoomDeleted)
+                    {
+                        // Notify remaining players about the player leaving
+                        await Clients.Group(removal.RoomCode).SendAsync("OnPlayerLeft", removal.Nickname);
+                        
+                        if (removal.NewHostId != null)
+                        {
+                            await Clients.Group(removal.RoomCode).SendAsync("OnNewHost", removal.NewHostId);
+                        }
+                    }
+                }
+            });
+        }
+        else
+        {
+            // No session ID - immediate removal (legacy behavior)
+            var result = _roomService.LeaveRoom(Context.ConnectionId);
+            if (result.Room != null && !result.RoomDeleted)
+            {
+                await Clients.Group(result.Room.Code).SendAsync("OnPlayerLeft", Context.ConnectionId);
+                
+                if (result.NewHostId != null)
+                {
+                    await Clients.Group(result.Room.Code).SendAsync("OnNewHost", result.NewHostId);
+                }
             }
         }
+        
         await base.OnDisconnectedAsync(exception);
     }
 
@@ -97,6 +132,13 @@ public class GameHub : Hub
     /// </summary>
     public async Task<GameStateSnapshot?> ReconnectSession(string roomCode, string sessionId, string? nickname)
     {
+        // Cancel any pending disconnection for this session (lobby refresh scenario)
+        _roomService.CancelPendingRemoval(sessionId);
+        if (!string.IsNullOrEmpty(nickname))
+        {
+            _roomService.CancelPendingRemovalByNickname(roomCode, nickname);
+        }
+        
         var room = _roomService.GetRoom(roomCode);
         if (room == null) return null;
 

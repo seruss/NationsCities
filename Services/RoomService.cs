@@ -10,8 +10,12 @@ public class RoomService
 {
     private readonly ConcurrentDictionary<string, Room> _rooms = new();
     private readonly ConcurrentDictionary<string, string> _playerRooms = new(); // ConnectionId -> RoomCode
-
+    
+    // Pending disconnections for lobby grace period (SessionId -> PendingDisconnection)
+    private readonly ConcurrentDictionary<string, PendingDisconnection> _pendingDisconnections = new();
+    
     private const string RoomCodeChars = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // bez I, O
+    private static readonly TimeSpan LobbyDisconnectGracePeriod = TimeSpan.FromSeconds(5);
 
     /// <summary>
     /// Tworzy nowy pokój.
@@ -356,4 +360,150 @@ public class RoomService
     /// Pobiera całkowitą liczbę aktywnych pokoi.
     /// </summary>
     public int GetRoomCount() => _rooms.Count;
+
+    #region Lobby Disconnection Grace Period
+
+    /// <summary>
+    /// Schedules a player for removal after grace period (for lobby refresh handling).
+    /// Returns the scheduled removal time.
+    /// </summary>
+    public DateTime SchedulePlayerRemoval(string sessionId, string connectionId, string roomCode, string nickname)
+    {
+        var removalTime = DateTime.UtcNow.Add(LobbyDisconnectGracePeriod);
+        
+        var pending = new PendingDisconnection
+        {
+            SessionId = sessionId,
+            ConnectionId = connectionId,
+            RoomCode = roomCode,
+            Nickname = nickname,
+            ScheduledRemovalTime = removalTime
+        };
+        
+        _pendingDisconnections[sessionId] = pending;
+        Console.WriteLine($"[RoomService] Scheduled removal for {nickname} (session {sessionId}) at {removalTime:HH:mm:ss}");
+        
+        return removalTime;
+    }
+
+    /// <summary>
+    /// Cancels a pending disconnection if player reconnects.
+    /// Returns true if a pending disconnection was cancelled.
+    /// </summary>
+    public bool CancelPendingRemoval(string sessionId)
+    {
+        if (_pendingDisconnections.TryRemove(sessionId, out var pending))
+        {
+            Console.WriteLine($"[RoomService] Cancelled pending removal for {pending.Nickname} (session {sessionId})");
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Cancels pending removal by nickname (fallback when sessionId not matched).
+    /// </summary>
+    public bool CancelPendingRemovalByNickname(string roomCode, string nickname)
+    {
+        foreach (var kvp in _pendingDisconnections)
+        {
+            if (kvp.Value.RoomCode == roomCode && 
+                kvp.Value.Nickname.Equals(nickname, StringComparison.OrdinalIgnoreCase))
+            {
+                if (_pendingDisconnections.TryRemove(kvp.Key, out var pending))
+                {
+                    Console.WriteLine($"[RoomService] Cancelled pending removal for {pending.Nickname} by nickname");
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Processes expired pending disconnections. Should be called periodically or after delay.
+    /// Returns list of removed players for notification.
+    /// </summary>
+    public List<(string RoomCode, string Nickname, string? NewHostId, bool RoomDeleted)> ProcessExpiredDisconnections()
+    {
+        var results = new List<(string RoomCode, string Nickname, string? NewHostId, bool RoomDeleted)>();
+        var now = DateTime.UtcNow;
+
+        foreach (var kvp in _pendingDisconnections.ToList())
+        {
+            if (kvp.Value.ScheduledRemovalTime <= now)
+            {
+                if (_pendingDisconnections.TryRemove(kvp.Key, out var pending))
+                {
+                    Console.WriteLine($"[RoomService] Processing expired disconnection for {pending.Nickname}");
+                    
+                    // Actually remove the player now
+                    var room = GetRoom(pending.RoomCode);
+                    if (room != null)
+                    {
+                        var player = room.Players.FirstOrDefault(p => 
+                            p.SessionId == pending.SessionId || 
+                            p.Nickname.Equals(pending.Nickname, StringComparison.OrdinalIgnoreCase));
+                        
+                        if (player != null)
+                        {
+                            room.Players.Remove(player);
+                            _playerRooms.TryRemove(player.ConnectionId, out _);
+                            
+                            string? newHostId = null;
+                            bool roomDeleted = false;
+                            
+                            if (room.Players.Count == 0)
+                            {
+                                _rooms.TryRemove(pending.RoomCode, out _);
+                                roomDeleted = true;
+                            }
+                            else if (player.IsHost)
+                            {
+                                var newHost = room.Players.First();
+                                newHost.IsHost = true;
+                                room.HostConnectionId = newHost.ConnectionId;
+                                newHostId = newHost.ConnectionId;
+                            }
+                            
+                            results.Add((pending.RoomCode, pending.Nickname, newHostId, roomDeleted));
+                        }
+                    }
+                }
+            }
+        }
+
+        return results;
+    }
+
+    /// <summary>
+    /// Checks if there's a pending disconnection for this session.
+    /// </summary>
+    public bool HasPendingDisconnection(string sessionId)
+    {
+        return _pendingDisconnections.ContainsKey(sessionId);
+    }
+
+    /// <summary>
+    /// Gets pending disconnection info if exists.
+    /// </summary>
+    public PendingDisconnection? GetPendingDisconnection(string sessionId)
+    {
+        _pendingDisconnections.TryGetValue(sessionId, out var pending);
+        return pending;
+    }
+
+    #endregion
+}
+
+/// <summary>
+/// Represents a player pending removal after grace period.
+/// </summary>
+public record PendingDisconnection
+{
+    public required string SessionId { get; init; }
+    public required string ConnectionId { get; init; }
+    public required string RoomCode { get; init; }
+    public required string Nickname { get; init; }
+    public required DateTime ScheduledRemovalTime { get; init; }
 }
