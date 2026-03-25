@@ -538,6 +538,8 @@ html.dark .toggle-switch.checked {
     color: transparent !important;
     -webkit-text-fill-color: transparent; /* iOS ignores color, uses this instead */
     -webkit-text-security: none;          /* tell WebKit: no masking dots */
+    -webkit-appearance: none;             /* prevent iOS from applying its own sizing */
+    appearance: none;
     caret-color: #1e293b;
     /* Light mode: dark caret */
     position: relative;
@@ -545,6 +547,8 @@ html.dark .toggle-switch.checked {
     font-family: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
     font-size: 1.125rem;
     letter-spacing: 0.02em;
+    min-height: 3.5rem;                   /* consistent height across platforms */
+    height: auto;
 }
 
 html.dark .password-visible-input {
