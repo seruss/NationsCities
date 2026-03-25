@@ -99,7 +99,7 @@
         if (_shouldPreventNavigation)
         {
             _showLeaveConfirmation = true;
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
 
             _leaveCompletionSource = new TaskCompletionSource<bool>();
             var canLeave = await _leaveCompletionSource.Task;

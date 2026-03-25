@@ -667,7 +667,10 @@ public class ClientGameStateService : IAsyncDisposable
         var currentPath = new Uri(_navigation.Uri).AbsolutePath;
         if (currentPath != targetUrl && (currentPath == "/" || currentPath.StartsWith("/room")))
         {
-            _navigation.NavigateTo(targetUrl, replace: true);
+            // Use JS history.replaceState to update the URL without triggering
+            // Blazor's navigation pipeline. This avoids NavigationLock firing
+            // on non-dispatcher threads when hub callbacks change the phase.
+            _ = _jsRuntime.InvokeVoidAsync("history.replaceState", null, "", targetUrl);
         }
     }
 
