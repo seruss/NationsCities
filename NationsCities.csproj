@@ -10,6 +10,26 @@
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.1" />
   </ItemGroup>
 
+  <Target Name="DownloadTailwindWindows" BeforeTargets="TailwindWindows" Condition="'$(OS)' == 'Windows_NT' And !Exists('tailwindcss.exe')">
+    <Message Text="Downloading Tailwind CLI for Windows..." Importance="high" />
+    <Exec Command="powershell -Command &quot;Invoke-WebRequest -Uri 'https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-windows-x64.exe' -OutFile 'tailwindcss.exe'&quot;" />
+  </Target>
+
+  <Target Name="TailwindWindows" BeforeTargets="Build" Condition="'$(OS)' == 'Windows_NT'">
+    <Exec Command=".\tailwindcss.exe -i .\Styles\app.css -o .\wwwroot\app.css" Condition="'$(Configuration)' == 'Debug'" />
+    <Exec Command=".\tailwindcss.exe -i .\Styles\app.css -o .\wwwroot\app.css --minify" Condition="'$(Configuration)' == 'Release'" />
+  </Target>
+
+  <Target Name="DownloadTailwindUnix" BeforeTargets="TailwindUnix" Condition="'$(OS)' == 'Unix' And !Exists('tailwindcss')">
+    <Message Text="Downloading Tailwind CLI for Unix..." Importance="high" />
+    <Exec Command="curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-x64 &amp;&amp; mv tailwindcss-linux-x64 tailwindcss &amp;&amp; chmod +x tailwindcss" />
+  </Target>
+
+  <Target Name="TailwindUnix" BeforeTargets="Build" Condition="'$(OS)' == 'Unix'">
+    <Exec Command="./tailwindcss -i ./Styles/app.css -o ./wwwroot/app.css" Condition="'$(Configuration)' == 'Debug'" />
+    <Exec Command="./tailwindcss -i ./Styles/app.css -o ./wwwroot/app.css --minify" Condition="'$(Configuration)' == 'Release'" />
+  </Target>
+
   <ItemGroup>
     <Content Update="wwwroot\favicon.ico">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
