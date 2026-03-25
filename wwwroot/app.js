@@ -83,10 +83,42 @@ window.gameSession = {
     },
 
     /**
-     * Set Blazor reference for callbacks
+     * Setup navigation guard for browser back button and refresh/close
      */
-    setDotNetRef: function (dotNetRef) {
+    setupNavigationGuard: function (dotNetRef) {
         this._dotNetRef = dotNetRef;
+
+        // Handle beforeunload (refresh/close) - shows native ugly browser popup
+        window.addEventListener('beforeunload', (e) => {
+            if (window._gamePhase && window._gamePhase !== 'Home') {
+                e.preventDefault();
+                e.returnValue = 'Czy na pewno chcesz opuścić grę?';
+            }
+        });
+
+        // Handle popstate (back/forward button) - shows custom Blazor modal
+        // CRITICAL: stopImmediatePropagation prevents Blazor's own popstate handler
+        // (in blazor.web.js) from processing this event, which caused the old
+        // "flash and disappear" bug. Since app.js loads before blazor.web.js,
+        // our handler is registered first and runs first.
+        window.addEventListener('popstate', async (e) => {
+            if (window._gamePhase && window._gamePhase !== 'Home' && this._dotNetRef) {
+                // Stop Blazor from seeing this event
+                e.stopImmediatePropagation();
+                // Prevent navigation by pushing state back
+                history.pushState(null, '', window.location.href);
+                // Notify Blazor to show the pretty modal
+                try {
+                    await this._dotNetRef.invokeMethodAsync('OnBackButtonPressed');
+                } catch (err) {
+                    console.warn('[GameSession] Could not notify Blazor of back button:', err);
+                }
+            }
+        });
+
+        // Push initial state to enable popstate detection
+        history.pushState(null, '', window.location.href);
+        console.log('[GameSession] Navigation guard setup complete');
     },
 
     /**

@@ -39,7 +39,7 @@
     }
 </div>
 
-<NavigationLock ConfirmExternalNavigation="@_shouldPreventNavigation" OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
+<NavigationLock ConfirmExternalNavigation="@_shouldPreventNavigation" />
 
 @* Back button confirmation modal *@
 @if (_showLeaveConfirmation)
@@ -59,13 +59,13 @@
     
     private bool _initialized = false;
     private bool _showLeaveConfirmation = false;
-    private TaskCompletionSource<bool>? _leaveCompletionSource;
     
     private bool _shouldPreventNavigation => GameState.CurrentPhase != GamePhase.Home;
 
     protected override async Task OnInitializedAsync()
     {
         GameState.OnStateChanged += HandleStateChanged;
+        GameState.OnNavigateAway += ShowLeaveConfirmation;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -94,40 +94,27 @@
         InvokeAsync(StateHasChanged);
     }
 
-    private async Task OnBeforeInternalNavigation(LocationChangingContext context)
+    private void ShowLeaveConfirmation()
     {
-        if (_shouldPreventNavigation)
-        {
-            _showLeaveConfirmation = true;
-            await InvokeAsync(StateHasChanged);
-
-            _leaveCompletionSource = new TaskCompletionSource<bool>();
-            var canLeave = await _leaveCompletionSource.Task;
-
-            if (!canLeave)
-            {
-                context.PreventNavigation();
-            }
-        }
+        _showLeaveConfirmation = true;
+        InvokeAsync(StateHasChanged);
     }
 
     private async Task ConfirmLeave()
     {
         _showLeaveConfirmation = false;
         await GameState.LeaveGameAsync();
-        _leaveCompletionSource?.SetResult(true);
-        StateHasChanged();
     }
 
     private void CancelLeave()
     {
         _showLeaveConfirmation = false;
-        _leaveCompletionSource?.SetResult(false);
         StateHasChanged();
     }
 
     public void Dispose()
     {
         GameState.OnStateChanged -= HandleStateChanged;
+        GameState.OnNavigateAway -= ShowLeaveConfirmation;
     }
 }

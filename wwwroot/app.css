@@ -2848,12 +2848,16 @@ html.dark .toggle-switch.checked {
   color: transparent !important;
   -webkit-text-fill-color: transparent;
   -webkit-text-security: none;
+  -webkit-appearance: none;
+  appearance: none;
   caret-color: #1e293b;
   position: relative;
   z-index: 2;
   font-family: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
   font-size: 1.125rem;
   letter-spacing: 0.02em;
+  min-height: 3.5rem;
+  height: auto;
 }
 html.dark .password-visible-input {
   caret-color: white;
