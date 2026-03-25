@@ -111,8 +111,6 @@ else
                                    data-lpignore="true"
                                    data-1p-ignore="true"
                                    data-form-type="other"
-                                   readonly
-                                   onfocus="this.removeAttribute('readonly')"
                                    disabled="@_hasSubmitted" />
                             <div class="password-visible-overlay @(string.IsNullOrEmpty(GetAnswer(category.Name)) ? "placeholder" : "")">
                                 @(string.IsNullOrEmpty(GetAnswer(category.Name)) ? "Wpisz odpowiedź..." : GetAnswer(category.Name))
