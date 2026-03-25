@@ -545,13 +545,6 @@ html.dark .password-visible-input {
     display: none !important;
 }
 
-/* Hide native search clear button (iOS/Chrome) */
-.password-visible-input::-webkit-search-cancel-button,
-.password-visible-input::-webkit-search-decoration {
-    -webkit-appearance: none;
-    display: none;
-}
-
 .password-visible-overlay {
     position: absolute;
     top: 1px;
