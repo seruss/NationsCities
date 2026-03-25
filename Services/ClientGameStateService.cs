@@ -63,9 +63,6 @@ public class ClientGameStateService : IAsyncDisposable
     /// <summary>Fired when an error occurs.</summary>
     public event Action<string>? OnError;
     
-    /// <summary>Fired when user tries to navigate away (back button).</summary>
-    public event Action? OnNavigateAway;
-    
     /// <summary>Fired when a chat message is received.</summary>
     public event Action<string, string, bool>? OnChatMessage;
     
@@ -113,9 +110,9 @@ public class ClientGameStateService : IAsyncDisposable
             SessionId = await _jsRuntime.InvokeAsync<string?>("gameSession.getOrCreateSessionId");
             _tabId = await _jsRuntime.InvokeAsync<string>("gameSession.getTabId");
             
-            // Setup navigation guard for back button
+            // Provide .NET reference to JS game session
             _dotNetRef = DotNetObjectReference.Create(this);
-            await _jsRuntime.InvokeVoidAsync("gameSession.setupNavigationGuard", _dotNetRef);
+            await _jsRuntime.InvokeVoidAsync("gameSession.setDotNetRef", _dotNetRef);
             
             // Check for existing session to reconnect
             var savedSession = await _jsRuntime.InvokeAsync<SavedGameSession?>("gameSession.load");
@@ -629,16 +626,6 @@ public class ClientGameStateService : IAsyncDisposable
         catch (Exception ex)
         {
             Console.WriteLine($"[ClientGameState] Report violation error: {ex.Message}");
-        }
-    }
-
-    /// <summary>Called from JavaScript when back button is pressed.</summary>
-    [JSInvokable]
-    public void OnBackButtonPressed()
-    {
-        if (CurrentPhase != GamePhase.Home)
-        {
-            OnNavigateAway?.Invoke();
         }
     }
 

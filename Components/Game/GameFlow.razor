@@ -39,6 +39,8 @@
     }
 </div>
 
+<NavigationLock ConfirmExternalNavigation="@_shouldPreventNavigation" OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
+
 @* Back button confirmation modal *@
 @if (_showLeaveConfirmation)
 {
@@ -55,13 +57,15 @@
     [Parameter]
     public string? RoomCodeFromUrl { get; set; }
     
-    private bool _showLeaveConfirmation = false;
     private bool _initialized = false;
+    private bool _showLeaveConfirmation = false;
+    private TaskCompletionSource<bool>? _leaveCompletionSource;
+    
+    private bool _shouldPreventNavigation => GameState.CurrentPhase != GamePhase.Home;
 
     protected override async Task OnInitializedAsync()
     {
         GameState.OnStateChanged += HandleStateChanged;
-        GameState.OnNavigateAway += ShowLeaveConfirmation;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -90,27 +94,40 @@
         InvokeAsync(StateHasChanged);
     }
 
-    private void ShowLeaveConfirmation()
+    private async Task OnBeforeInternalNavigation(LocationChangingContext context)
     {
-        _showLeaveConfirmation = true;
-        StateHasChanged();
+        if (_shouldPreventNavigation)
+        {
+            _showLeaveConfirmation = true;
+            StateHasChanged();
+
+            _leaveCompletionSource = new TaskCompletionSource<bool>();
+            var canLeave = await _leaveCompletionSource.Task;
+
+            if (!canLeave)
+            {
+                context.PreventNavigation();
+            }
+        }
     }
 
     private async Task ConfirmLeave()
     {
         _showLeaveConfirmation = false;
         await GameState.LeaveGameAsync();
+        _leaveCompletionSource?.SetResult(true);
+        StateHasChanged();
     }
 
     private void CancelLeave()
     {
         _showLeaveConfirmation = false;
+        _leaveCompletionSource?.SetResult(false);
         StateHasChanged();
     }
 
     public void Dispose()
     {
         GameState.OnStateChanged -= HandleStateChanged;
-        GameState.OnNavigateAway -= ShowLeaveConfirmation;
     }
 }

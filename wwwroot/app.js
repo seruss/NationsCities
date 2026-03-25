@@ -83,36 +83,10 @@ window.gameSession = {
     },
 
     /**
-     * Setup navigation guard for browser back button
+     * Set Blazor reference for callbacks
      */
-    setupNavigationGuard: function (dotNetRef) {
+    setDotNetRef: function (dotNetRef) {
         this._dotNetRef = dotNetRef;
-
-        // Handle beforeunload (refresh/close)
-        window.addEventListener('beforeunload', (e) => {
-            if (window._gamePhase && window._gamePhase !== 'Home') {
-                e.preventDefault();
-                e.returnValue = 'Czy na pewno chcesz opuścić grę?';
-            }
-        });
-
-        // Handle popstate (back/forward button)
-        window.addEventListener('popstate', async (e) => {
-            if (window._gamePhase && window._gamePhase !== 'Home' && this._dotNetRef) {
-                // Prevent navigation by pushing state back
-                history.pushState(null, '', window.location.href);
-                // Notify Blazor
-                try {
-                    await this._dotNetRef.invokeMethodAsync('OnBackButtonPressed');
-                } catch (err) {
-                    console.warn('[GameSession] Could not notify Blazor of back button:', err);
-                }
-            }
-        });
-
-        // Push initial state to enable popstate detection
-        history.pushState(null, '', window.location.href);
-        console.log('[GameSession] Navigation guard setup complete');
     },
 
     /**
