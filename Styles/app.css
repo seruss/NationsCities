@@ -1,5 +1,28 @@
 @import "tailwindcss";
-@config "../tailwind.config.js";
+
+@source "../**/*.razor";
+@source "../**/*.html";
+@source "../**/*.cshtml";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary: #258cf4;
+  --color-primary-dark: #1a6fc0;
+  --color-bg-light: #f5f7f8;
+  --color-bg-dark: #101922;
+  --color-surface-light: #ffffff;
+  --color-surface-dark: #1A2633;
+  --color-surface-darker: #151e29;
+
+  --font-sans: "Inter", sans-serif;
+
+  --radius: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-full: 9999px;
+}
 /* ===========================================
    Państwa, Miasta - Mobile-First CSS
    =========================================== */
