@@ -81,6 +81,7 @@ else
 
         <!-- Answer Inputs -->
         <main class="flex-1 overflow-y-auto no-scrollbar">
+            <form autocomplete="off" action="javascript:void(0)" onsubmit="return false;">
             <div class="px-5 py-6 flex flex-col gap-6 pb-32">
                 @foreach (var category in GameState.CurrentGame.Categories)
                 {
@@ -100,19 +101,17 @@ else
                         </div>
                         <div class="password-visible-wrapper">
                             <input id="@inputId"
-                                   type="password"
+                                   type="search"
                                    @bind="@_answers[category.Name]"
                                    @bind:event="oninput"
                                    class="password-visible-input w-full border-0 rounded-xl p-4 text-lg shadow-sm ring-1 ring-slate-300 dark:ring-slate-700 focus:ring-2 focus:ring-primary focus:outline-none transition-all disabled:opacity-50"
-                                   autocomplete="off"
+                                   autocomplete="one-time-code"
                                    autocorrect="off"
                                    autocapitalize="off"
                                    spellcheck="false"
                                    data-lpignore="true"
                                    data-1p-ignore="true"
                                    data-form-type="other"
-                                   readonly
-                                   onfocus="this.removeAttribute('readonly')"
                                    disabled="@_hasSubmitted" />
                             <div class="password-visible-overlay @(string.IsNullOrEmpty(GetAnswer(category.Name)) ? "placeholder" : "")">
                                 @(string.IsNullOrEmpty(GetAnswer(category.Name)) ? "Wpisz odpowiedź..." : GetAnswer(category.Name))
@@ -121,6 +120,7 @@ else
                     </div>
                 }
             </div>
+            </form>
         </main>
 
         <!-- Footer: STOP Button -->

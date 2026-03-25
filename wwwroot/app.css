@@ -511,6 +511,8 @@ html.dark .toggle-switch.checked {
     width: 100%;
     background: transparent !important;
     color: transparent !important;
+    -webkit-text-fill-color: transparent; /* iOS ignores color, uses this instead */
+    -webkit-text-security: none;          /* tell WebKit: no masking dots */
     caret-color: #1e293b;
     /* Light mode: dark caret */
     position: relative;
@@ -539,6 +541,13 @@ html.dark .password-visible-input {
 .password-visible-input::-webkit-credentials-auto-fill-button,
 .password-visible-input::-webkit-textfield-decoration-container {
     display: none !important;
+}
+
+/* Hide native search clear button (iOS/Chrome) */
+.password-visible-input::-webkit-search-cancel-button,
+.password-visible-input::-webkit-search-decoration {
+    -webkit-appearance: none;
+    display: none;
 }
 
 .password-visible-overlay {
