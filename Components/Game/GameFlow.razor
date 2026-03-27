@@ -59,6 +59,7 @@
     
     private bool _initialized = false;
     private bool _showLeaveConfirmation = false;
+    private GamePhase _lastPhase = GamePhase.Home;
     
     private bool _shouldPreventNavigation => GameState.CurrentPhase != GamePhase.Home;
 
@@ -91,7 +92,20 @@
 
     private void HandleStateChanged()
     {
-        InvokeAsync(StateHasChanged);
+        InvokeAsync(async () =>
+        {
+            if (GameState.CurrentPhase != _lastPhase)
+            {
+                _lastPhase = GameState.CurrentPhase;
+                StateHasChanged();
+                await Task.Yield();
+                try { await JS.InvokeVoidAsync("window.scrollTo", 0, 0); } catch { }
+            }
+            else
+            {
+                StateHasChanged();
+            }
+        });
     }
 
     private void ShowLeaveConfirmation()

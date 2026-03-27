@@ -193,8 +193,8 @@ else
                 @if (!AllReady)
                 {
                     <span class="text-orange-400 font-medium flex items-center gap-1">
-                        <span class="material-symbols-outlined text-sm">info</span>
-                        Czeka na @(room.Players.Count - ReadyCount) graczy
+                        <span class="material-symbols-outlined" style="font-size: 14px;">info</span>
+                        Czeka na @(room.Players.Count - ReadyCount) @GetPlayerWord(room.Players.Count - ReadyCount)
                     </span>
                 }
             </div>
@@ -596,6 +596,12 @@ else
         if (count == 1) return "runda";
         if (count >= 2 && count <= 4) return "rundy";
         return "rund";
+    }
+
+    private string GetPlayerWord(int count)
+    {
+        if (count == 1) return "gracza";
+        return "graczy";
     }
 
     // Letter modal methods
