@@ -33,7 +33,7 @@ else
     var answersForCurrentCategory = _filteredAnswers.Where(a => a.Category == categoryName).ToList();
     var myAnswer = GetMyAnswerForCategory(categoryName);
     
-    <div class="flex flex-col min-h-screen bg-bg-light dark:bg-bg-dark">
+    <div class="flex flex-col min-h-dvh bg-bg-light dark:bg-bg-dark">
         <!-- Header with category name and progress -->
         <div class="sticky top-0 z-50 bg-bg-light/95 dark:bg-bg-dark/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
             <div class="flex items-center px-4 h-16 justify-center max-w-lg mx-auto w-full">
@@ -50,7 +50,7 @@ else
         </div>
 
         <!-- Main content -->
-        <main class="flex-1 w-full max-w-lg mx-auto px-4 py-4 pb-28">
+        <main class="flex-1 w-full max-w-lg mx-auto px-4 pt-6 pb-28">
             <!-- "Twoja odpowiedź" header -->
             @if (!string.IsNullOrWhiteSpace(myAnswer))
             {
