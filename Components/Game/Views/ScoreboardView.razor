@@ -210,18 +210,30 @@ else
             }
             @if (GameState.IsHost)
             {
-                <button @onclick="EndGame"
+                <button @onclick="ShowEndGameConfirmation"
                         class="w-full text-center text-sm font-medium text-slate-400 hover:text-red-400 py-2 transition-colors">
                     Zakończ grę
                 </button>
             }
         </div>
     </div>
+
+    @if (_showEndGameConfirmation)
+    {
+        <NationsCities.Components.Game.Shared.ConfirmationModal 
+            Title="Zakończyć grę?"
+            Message="Czy na pewno chcesz zakończyć grę? Wszyscy gracze zostaną przeniesieni do podsumowania."
+            ConfirmText="Zakończ"
+            CancelText="Zostań"
+            OnConfirm="ConfirmEndGame"
+            OnCancel="CancelEndGame" />
+    }
 }
 
 @code {
     private bool _isStartingRound = false;
     private string _chatInput = "";
+    private bool _showEndGameConfirmation = false;
 
     protected override void OnInitialized()
     {
@@ -269,12 +281,23 @@ else
         if (e.Key == "Enter") await SendChat();
     }
 
-    private async Task EndGame()
+    private void ShowEndGameConfirmation()
     {
+        _showEndGameConfirmation = true;
+    }
+
+    private async Task ConfirmEndGame()
+    {
+        _showEndGameConfirmation = false;
         if (GameState.IsHost)
         {
             await GameState.EndGameAsync();
         }
+    }
+
+    private void CancelEndGame()
+    {
+        _showEndGameConfirmation = false;
     }
 
     private int GetRoundPenalty(Player player, int roundNumber)
