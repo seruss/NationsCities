@@ -240,8 +240,8 @@ else
                 <div class="modal-body category-modal-body">
                     <div class="flex items-center gap-2 bg-surface-light dark:bg-surface-dark rounded-xl p-2 pl-4 mb-4 border border-slate-200 dark:border-slate-700 overflow-hidden">
                         <span class="material-symbols-outlined text-slate-400 shrink-0">edit</span>
-                        <input @bind="_customCategoryInput" @bind:event="oninput" class="bg-transparent border-none text-sm text-slate-900 dark:text-white placeholder-slate-400 flex-1 min-w-0 focus:ring-0 focus:outline-none p-0" placeholder="Nowa kategoria..." type="text" />
-                        <button @onclick="AddCustomCategory" class="bg-primary hover:bg-primary-dark text-white rounded-lg w-10 h-10 flex items-center justify-center transition-colors shrink-0">
+                        <input @bind="_customCategoryInput" @bind:event="oninput" class="no-focus-glow bg-transparent border-none text-sm text-slate-900 dark:text-white placeholder-slate-400 flex-1 min-w-0 focus:ring-0 focus:outline-none p-0" placeholder="Nowa kategoria..." type="text" />
+                        <button @onclick="AddCustomCategory" disabled="@(string.IsNullOrWhiteSpace(_customCategoryInput))" class="@(string.IsNullOrWhiteSpace(_customCategoryInput) ? "bg-slate-300 dark:bg-slate-600 text-slate-400 dark:text-slate-500 cursor-not-allowed" : "bg-primary hover:bg-primary-dark text-white") rounded-lg w-10 h-10 flex items-center justify-center transition-colors shrink-0">
                             <span class="material-symbols-outlined">add</span>
                         </button>
                     </div>
@@ -511,9 +511,9 @@ else
 
     private string GetCategoryToggleClass() => _categoryToggleState switch
     {
-        ToggleState.All => "text-primary drop-shadow-[0_0_6px_rgba(37,140,244,0.5)]",
-        ToggleState.None => "text-red-400/60 dark:text-red-500/40",
-        _ => "text-slate-500 dark:text-slate-400 hover:text-primary"
+        ToggleState.All => "text-green-500 dark:text-green-400",
+        ToggleState.None => "text-red-500 dark:text-red-400",
+        _ => "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
     };
 
     private async Task SaveCategorySettings()
@@ -657,9 +657,9 @@ else
 
     private string GetLetterToggleClass() => _letterToggleState switch
     {
-        ToggleState.All => "text-primary drop-shadow-[0_0_6px_rgba(37,140,244,0.5)]",
-        ToggleState.None => "text-red-400/60 dark:text-red-500/40",
-        _ => "text-slate-500 dark:text-slate-400 hover:text-primary"
+        ToggleState.All => "text-green-500 dark:text-green-400",
+        ToggleState.None => "text-red-500 dark:text-red-400",
+        _ => "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
     };
 
     private async Task SaveLetterSettings()

@@ -145,6 +145,11 @@ textarea:focus {
     box-shadow: 0 0 0 2px rgba(37, 140, 244, 0.3);
 }
 
+input.no-focus-glow:focus {
+    box-shadow: none;
+    outline: none;
+}
+
 /* Chat input: focus ring handled by parent container (focus-within:border-primary) */
 .chat-input:focus {
     box-shadow: none;
