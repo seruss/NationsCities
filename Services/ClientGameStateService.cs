@@ -412,10 +412,16 @@ public class ClientGameStateService : IAsyncDisposable
                 CurrentRoom = snapshot.Room;
                 Nickname = snapshot.Nickname;
                 
-                // Resume anti-cheat if needed
+                // Resume anti-cheat if in active game phase
                 if (snapshot.Phase == GamePhase.Playing)
                 {
                     _ = ResumeAntiCheatAsync(CurrentGame?.CurrentRound ?? 1);
+                }
+                else if (snapshot.Phase == GamePhase.Voting || snapshot.Phase == GamePhase.RoundResults)
+                {
+                    // Flush any pending violations that occurred while disconnected
+                    // (e.g., player left during Playing, returned during Voting)
+                    _ = FlushPendingAntiCheatViolationsAsync();
                 }
                 
                 SetPhase(snapshot.Phase);
@@ -669,6 +675,28 @@ public class ClientGameStateService : IAsyncDisposable
         catch { }
     }
 
+    /// <summary>
+    /// Registers the anti-cheat handler and flushes any pending violations from the JS queue.
+    /// Used when reconnecting to a game that's already past the Playing phase.
+    /// </summary>
+    private async Task FlushPendingAntiCheatViolationsAsync()
+    {
+        try
+        {
+            // Register handler so pending violations can be sent to Blazor
+            if (_dotNetRef != null)
+            {
+                await _jsRuntime.InvokeVoidAsync("registerAntiCheatHandler", _dotNetRef);
+            }
+            // Also try explicit flush in case the handler registration didn't trigger processing
+            await _jsRuntime.InvokeVoidAsync("antiCheatTracker.flushPendingViolations", _dotNetRef);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ClientGameState] Flush pending violations error: {ex.Message}");
+        }
+    }
+
     private async Task ClearAntiCheatAsync()
     {
         try
@@ -682,7 +710,10 @@ public class ClientGameStateService : IAsyncDisposable
     [JSInvokable]
     public async Task ReportViolationFromJS(string violationType, double durationSeconds, int roundNumber)
     {
-        if (_hubConnection == null || CurrentPhase != GamePhase.Playing || string.IsNullOrEmpty(RoomCode)) 
+        // Allow reporting during any active game phase (Playing, Voting, RoundResults)
+        // Violations detected on reconnect may arrive after phase transitioned from Playing to Voting
+        var activePhases = new[] { GamePhase.Playing, GamePhase.Voting, GamePhase.RoundResults };
+        if (_hubConnection == null || !activePhases.Contains(CurrentPhase) || string.IsNullOrEmpty(RoomCode)) 
             return;
         
         try
