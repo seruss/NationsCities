@@ -953,8 +953,9 @@ public class GameHub : Hub
             
             player.Violations.Add(violation);
             player.TotalScore -= penalty;
+            player.RoundScore -= penalty; // Dolicz karę do wyniku bieżącej rundy
             
-            Console.WriteLine($"[AntiCheat] Violation added. Player {player.Nickname} now has TotalScore={player.TotalScore}, Violations={player.Violations.Count}, Round={roundNumber}");
+            Console.WriteLine($"[AntiCheat] Violation added. Player {player.Nickname} now has TotalScore={player.TotalScore}, RoundScore={player.RoundScore}, Violations={player.Violations.Count}, Round={roundNumber}");
 
             await Clients.Group(roomCode).SendAsync("OnAntiCheatViolation", 
                 Context.ConnectionId, 
