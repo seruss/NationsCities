@@ -49,7 +49,8 @@ body {
 }
 
 .safe-area-bottom {
-    padding-bottom: env(safe-area-inset-bottom);
+    /* min 1.5rem (24px) + dodatkowy padding dla iPhona z notchem */
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
 }
 
 #blazor-error-ui {
