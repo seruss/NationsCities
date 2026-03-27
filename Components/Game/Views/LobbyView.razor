@@ -308,18 +308,12 @@ else
                         <span class="material-symbols-outlined text-2xl">arrow_back</span>
                     </button>
                     <h2 class="text-lg font-bold text-slate-900 dark:text-white flex-1 text-center">Wybór liter</h2>
-                    <div class="flex gap-1">
-                        <button @onclick="SelectAllLetters" class="px-2 py-1 rounded-lg bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wide hover:bg-primary/20 transition-colors">
-                            Wszystkie
-                        </button>
-                        <button @onclick="DeselectAllLetters" class="px-2 py-1 rounded-lg bg-red-500/10 text-red-500 text-[10px] font-bold uppercase tracking-wide hover:bg-red-500/20 transition-colors">
-                            Żadna
-                        </button>
-                    </div>
+                    <button @onclick="ToggleAllLetters" class="text-slate-500 dark:text-slate-400 hover:text-primary transition-colors">
+                        <span class="material-symbols-outlined text-2xl">checklist</span>
+                    </button>
                 </div>
 
                 <div class="modal-body">
-                    <p class="text-xs text-slate-500 dark:text-slate-400 mb-4 text-center">Zaznacz litery, które mogą być losowane (min. 5)</p>
                     <div class="grid grid-cols-5 gap-2">
                         @foreach (var letter in GameSettings.FullAlphabet)
                         {
@@ -330,7 +324,7 @@ else
                             </button>
                         }
                     </div>
-                    <p class="text-xs text-center mt-4 @(_selectedLetters.Count < MinLetterCount ? "text-red-400" : "text-slate-500 dark:text-slate-400")">Wybrano: @_selectedLetters.Count / @GameSettings.FullAlphabet.Length (min. @MinLetterCount)</p>
+                    <p class="text-xs text-center mt-4 @(_selectedLetters.Count < MinLetterCount ? "text-red-400" : "text-slate-500 dark:text-slate-400")">Wybrano: @_selectedLetters.Count / @GameSettings.FullAlphabet.Length</p>
                 </div>
 
                 <div class="modal-footer">
@@ -621,14 +615,16 @@ else
         }
     }
 
-    private void SelectAllLetters()
+    private void ToggleAllLetters()
     {
-        _selectedLetters = GameSettings.FullAlphabet.ToHashSet();
-    }
-
-    private void DeselectAllLetters()
-    {
-        _selectedLetters.Clear();
+        if (_selectedLetters.Count == GameSettings.FullAlphabet.Length)
+        {
+            _selectedLetters.Clear();
+        }
+        else
+        {
+            _selectedLetters = GameSettings.FullAlphabet.ToHashSet();
+        }
     }
 
     private async Task SaveLetterSettings()
