@@ -4,6 +4,7 @@
 *@
 @using NationsCities.Models
 @using NationsCities.Services
+@implements IDisposable
 @inject ClientGameStateService GameState
 
 @if (Variant == ChatVariant.Card)
@@ -79,6 +80,16 @@ else
 
     private List<ChatMessage> Messages => GameState.CurrentRoom?.ChatMessages ?? new List<ChatMessage>();
 
+    protected override void OnInitialized()
+    {
+        GameState.OnChatMessage += HandleChatMessage;
+    }
+
+    private void HandleChatMessage(string nickname, string msg, bool isSystem)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
     private async Task SendMessage()
     {
         if (!string.IsNullOrWhiteSpace(_chatInput))
@@ -91,5 +102,10 @@ else
     private async Task HandleKeyPress(KeyboardEventArgs e)
     {
         if (e.Key == "Enter") await SendMessage();
+    }
+
+    public void Dispose()
+    {
+        GameState.OnChatMessage -= HandleChatMessage;
     }
 }

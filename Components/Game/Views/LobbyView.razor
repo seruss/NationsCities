@@ -368,6 +368,7 @@ else
     protected override void OnInitialized()
     {
         GameState.OnStateChanged += HandleStateChanged;
+        GameState.OnChatMessage += HandleChatMessage;
         InitializeCategoryColors();
     }
 
@@ -680,8 +681,14 @@ else
         return $"{count} wybranych";
     }
 
+    private void HandleChatMessage(string nickname, string message, bool isSystem)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
     public void Dispose()
     {
         GameState.OnStateChanged -= HandleStateChanged;
+        GameState.OnChatMessage -= HandleChatMessage;
     }
 }
