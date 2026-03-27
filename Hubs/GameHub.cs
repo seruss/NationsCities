@@ -454,9 +454,10 @@ public class GameHub : Hub
             return;
         }
 
-        if (letters == null || letters.Count < 5)
+        var minLetters = room.Settings.RoundCount;
+        if (letters == null || letters.Count < minLetters)
         {
-            await Clients.Caller.SendAsync("OnError", "Wybierz co najmniej 5 liter.");
+            await Clients.Caller.SendAsync("OnError", $"Wybierz co najmniej {minLetters} liter (tyle ile rund).");
             return;
         }
 
@@ -466,9 +467,9 @@ public class GameHub : Hub
             .Distinct()
             .ToList();
 
-        if (validLetters.Count < 5)
+        if (validLetters.Count < minLetters)
         {
-            await Clients.Caller.SendAsync("OnError", "Wybierz co najmniej 5 poprawnych liter.");
+            await Clients.Caller.SendAsync("OnError", $"Wybierz co najmniej {minLetters} poprawnych liter.");
             return;
         }
 

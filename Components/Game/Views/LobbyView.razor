@@ -85,7 +85,6 @@ else
                             <button @onclick="DecrementRoundsInline" disabled="@(room.Settings.RoundCount <= 1)" class="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                                 <span class="material-symbols-outlined text-slate-600 dark:text-slate-300 text-lg">remove</span>
                             </button>
-                            <span class="text-lg font-bold text-slate-900 dark:text-white w-8 text-center tabular-nums">@room.Settings.RoundCount</span>
                             <button @onclick="IncrementRoundsInline" disabled="@(room.Settings.RoundCount >= 20)" class="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                                 <span class="material-symbols-outlined text-slate-600 dark:text-slate-300 text-lg">add</span>
                             </button>
@@ -331,12 +330,12 @@ else
                             </button>
                         }
                     </div>
-                    <p class="text-xs text-center mt-4 @(_selectedLetters.Count < 5 ? "text-red-400" : "text-slate-500 dark:text-slate-400")">Wybrano: @_selectedLetters.Count / @GameSettings.FullAlphabet.Length</p>
+                    <p class="text-xs text-center mt-4 @(_selectedLetters.Count < MinLetterCount ? "text-red-400" : "text-slate-500 dark:text-slate-400")">Wybrano: @_selectedLetters.Count / @GameSettings.FullAlphabet.Length (min. @MinLetterCount)</p>
                 </div>
 
                 <div class="modal-footer">
                     <button @onclick="SaveLetterSettings" 
-                            disabled="@(_selectedLetters.Count < 5)"
+                            disabled="@(_selectedLetters.Count < MinLetterCount)"
                             class="w-full h-12 bg-primary hover:bg-primary-dark text-white rounded-xl font-bold transition-colors shadow-lg shadow-blue-500/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">
                         Zapisz
                     </button>
@@ -369,6 +368,8 @@ else
 
     private record CategoryWithColor(Category Category, string BgClass, string TextClass);
     private List<CategoryWithColor> _categoriesWithColors = new();
+
+    private int MinLetterCount => GameState.CurrentRoom?.Settings.RoundCount ?? 5;
 
     private bool IsHost => GameState.CurrentRoom?.Players.FirstOrDefault(p => p.Nickname == GameState.Nickname)?.IsHost ?? false;
     private bool AmIReady => GameState.CurrentRoom?.Players.FirstOrDefault(p => p.Nickname == GameState.Nickname)?.IsReady ?? false;
@@ -632,7 +633,7 @@ else
 
     private async Task SaveLetterSettings()
     {
-        if (_selectedLetters.Count < 5) return;
+        if (_selectedLetters.Count < MinLetterCount) return;
 
         // Zachowaj kolejność z FullAlphabet
         var orderedLetters = GameSettings.FullAlphabet.Where(l => _selectedLetters.Contains(l)).ToList();
