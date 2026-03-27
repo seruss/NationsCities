@@ -34,10 +34,14 @@
 html {
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none;
+    height: 100%;
 }
 
 body {
     overscroll-behavior: none;
+    overscroll-behavior-y: none;
+    height: 100%;
 }
 
 .safe-area-top {

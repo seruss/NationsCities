@@ -5,6 +5,36 @@
 // so it's available immediately for onclick handlers.
 
 // ======================================
+// Disable Pull-to-Refresh on iOS Safari
+// ======================================
+// CSS overscroll-behavior is not reliable on iOS Safari.
+// This JS approach is the most robust cross-platform solution.
+(function () {
+    let lastTouchY = 0;
+    document.addEventListener('touchstart', function (e) {
+        if (e.touches.length === 1) {
+            lastTouchY = e.touches[0].clientY;
+        }
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function (e) {
+        const touchY = e.touches[0].clientY;
+        const touchYDelta = touchY - lastTouchY;
+        lastTouchY = touchY;
+
+        // Block pull-down when at the top of the page (native pull-to-refresh)
+        // Only block if: not inside a scrollable element that is itself scrollable upward
+        const target = e.target;
+        const scrollableParent = target.closest('[data-scrollable]') ||
+            (target.scrollHeight > target.clientHeight ? target : null);
+
+        if (!scrollableParent && touchYDelta > 0 && window.scrollY === 0) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+})();
+
+// ======================================
 // Game Session Management (SPA Support)
 // ======================================
 

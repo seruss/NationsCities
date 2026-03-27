@@ -115,8 +115,8 @@ else
                             </div>
                             @if (player.IsHost)
                             {
-                                <div class="absolute -bottom-0.5 -right-0.5 bg-yellow-400 text-black p-0.5 rounded-full border border-surface-light dark:border-surface-dark flex items-center justify-center">
-                                    <span class="material-symbols-outlined text-xs">crown</span>
+                                <div class="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-yellow-400 text-black rounded-full border border-surface-light dark:border-surface-dark flex items-center justify-center">
+                                    <span class="material-symbols-outlined" style="font-size: 10px;">crown</span>
                                 </div>
                             }
                         </div>
@@ -178,7 +178,7 @@ else
                            @onkeypress="HandleChatKeyPress"
                            placeholder="Napisz wiadomość..."
                            class="flex-1 bg-transparent text-sm text-slate-900 dark:text-white placeholder-slate-400 border-none p-0 focus:ring-0 focus:outline-none" />
-                    <button @onclick="SendChat" class="text-slate-400 hover:text-primary transition-colors">
+                    <button @onclick="SendChat" class="shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:text-primary hover:bg-primary/10 transition-colors">
                         <span class="material-symbols-outlined text-xl">send</span>
                     </button>
                 </div>
