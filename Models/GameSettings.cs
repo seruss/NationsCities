@@ -21,11 +21,6 @@ public class GameSettings
     public int CountdownSeconds { get; set; } = 10;
 
     /// <summary>
-    /// Czas na głosowanie w sekundach (domyślnie 45).
-    /// </summary>
-    public int VotingTimeSeconds { get; set; } = 45;
-
-    /// <summary>
     /// Wybrane kategorie gry.
     /// </summary>
     public List<Category> SelectedCategories { get; set; } = Category.StandardCategories.Take(5).ToList();

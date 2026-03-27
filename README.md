@@ -131,6 +131,9 @@ NationsCities/
 │   ├── Player.cs               # Player data (nick, score, violations)
 │   ├── Room.cs                 # Room state
 │   ├── GameState.cs            # Current game state
+│   ├── GameStateSnapshot.cs    # Reconnection state snapshot
+│   ├── GamePhase.cs            # Client-side view phase enum
+│   ├── GameSettings.cs         # Game configuration & defaults
 │   ├── PublicRoomInfo.cs       # Snapshot of room for public listing
 │   ├── Category.cs             # Category definitions
 │   ├── Violation.cs            # Anti-cheat violation tracking
