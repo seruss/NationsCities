@@ -156,6 +156,7 @@ else
                 <!-- Input -->
                 <div class="flex gap-2 items-center border-t border-slate-200 dark:border-slate-700 px-3 py-2">
                     <input @bind="_chatInput"
+                           @bind:event="oninput"
                            @onkeypress="HandleChatKeyPress"
                            placeholder="Napisz wiadomość..."
                            class="chat-input flex-1 bg-transparent text-sm text-slate-900 dark:text-white placeholder-slate-400 border-none p-0 focus:ring-0 focus:outline-none" />
