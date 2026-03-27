@@ -380,44 +380,18 @@ window.AntiCheatTracker = class {
     // Flush all pending violations NOW before navigating away
     // This ensures violations are reported before showing scoreboard
     async flushPendingViolations(dotNetRef) {
-        const queue = this._getPendingQueue();
-        if (queue.length === 0) {
-            console.log('[AntiCheat] No pending violations to flush');
-            return;
+        // Temporarily set the dotNetRef so _processQueue can use it
+        const prevRef = window._antiCheatDotNetRef;
+        const prevReady = window._antiCheatReady;
+        window._antiCheatDotNetRef = dotNetRef;
+        window._antiCheatReady = true;
+        try {
+            await this._processQueue();
+        } finally {
+            // Restore previous state
+            window._antiCheatDotNetRef = prevRef;
+            window._antiCheatReady = prevReady;
         }
-
-        console.log(`[AntiCheat] Flushing ${queue.length} pending violation(s) before navigation`);
-
-        const session = this._getSession();
-        const currentRoom = session?.roomCode;
-
-        for (const violation of [...queue]) {  // Copy array to avoid mutation issues
-            // Skip violations from different rooms
-            if (currentRoom && violation.roomCode !== currentRoom) {
-                this._removeFromPendingQueue(violation);
-                continue;
-            }
-
-            // Skip very old violations (> 5 minutes)
-            if (Date.now() - violation.timestamp > 5 * 60 * 1000) {
-                this._removeFromPendingQueue(violation);
-                continue;
-            }
-
-            try {
-                await dotNetRef.invokeMethodAsync('ReportViolationFromJS',
-                    violation.violationType,
-                    violation.durationSeconds,
-                    violation.roundNumber || 1);
-                console.log(`[AntiCheat] Flushed violation (round ${violation.roundNumber}) successfully`);
-                this._removeFromPendingQueue(violation);
-            } catch (err) {
-                console.warn(`[AntiCheat] Failed to flush violation: ${err.message}`);
-                // Keep in queue for next attempt
-            }
-        }
-
-        console.log('[AntiCheat] Flush complete');
     }
 
     isTracking() {
@@ -676,30 +650,86 @@ window.AntiCheatTracker = class {
     }
 
     _getPenalty(violationNumber) {
-        // Match server-side Violation.CalculatePenalty - EVERY violation has penalty
+        // Match server-side Violation.CalculatePenalty
+        // Server uses previousViolations.Count (0-based, before adding current violation)
+        // JS violationNumber is 1-based (already incremented), so offset by 1
         switch (violationNumber) {
-            case 1: return 5;   // 1st = -5 pkt
-            case 2: return 10;  // 2nd = -10 pkt
-            case 3: return 20;  // 3rd = -20 pkt
-            default: return 30; // 4th+ = -30 pkt
+            case 1: return 0;   // 1st = warning only (server: previousCount=0 → 0)
+            case 2: return 10;  // 2nd = -10 pkt (server: previousCount=1 → 10)
+            case 3: return 20;  // 3rd = -20 pkt (server: previousCount=2 → 20)
+            default: return 30; // 4th+ = -30 pkt (server: previousCount=3+ → 30)
         }
     }
 
-    // === BLAZOR COMMUNICATION ===
+    // === BLAZOR COMMUNICATION (single queue-based path) ===
 
     _tryReportToBlazor(roomCode, violationType, durationSeconds, roundNumber) {
-        // Add to pending queue first (will be processed by handler)
-        this._addToPendingQueue({ roomCode, violationType, durationSeconds, roundNumber, timestamp: Date.now() });
+        const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        this._addToPendingQueue({ id, roomCode, violationType, durationSeconds, roundNumber, timestamp: Date.now() });
+        console.log(`[AntiCheat] Violation queued (id=${id}): ${violationType}, round ${roundNumber}, ${durationSeconds.toFixed(2)}s`);
 
-        // Dispatch event for Blazor handler (if connected)
-        const event = new CustomEvent('anticheat-report', {
-            detail: { roomCode, violationType, durationSeconds, roundNumber }
-        });
-        window.dispatchEvent(event);
-        console.log(`[AntiCheat] Report event dispatched: ${violationType}, round ${roundNumber}, ${durationSeconds.toFixed(2)}s`);
+        // Try to drain the queue immediately
+        this._processQueue();
     }
 
-    // === PENDING QUEUE (for circuit reconnection scenarios) ===
+    // Single processing loop — guarded against concurrent execution
+    async _processQueue() {
+        if (this._processingQueue) return; // already running
+        if (!window._antiCheatDotNetRef || !window._antiCheatReady) return; // Blazor not connected
+
+        this._processingQueue = true;
+        try {
+            const session = this._getSession();
+            const currentRoom = session?.roomCode;
+
+            // Work on a snapshot; queue may grow while we're awaiting
+            let queue = this._getPendingQueue();
+            while (queue.length > 0) {
+                const violation = queue[0];
+
+                // Drop stale violations from other rooms
+                if (currentRoom && violation.roomCode !== currentRoom) {
+                    console.log(`[AntiCheat] Dropping stale violation from room ${violation.roomCode}`);
+                    this._removeById(violation.id);
+                    queue = this._getPendingQueue();
+                    continue;
+                }
+
+                // Drop very old violations (>5 min)
+                if (Date.now() - violation.timestamp > 5 * 60 * 1000) {
+                    console.log(`[AntiCheat] Dropping old violation (${((Date.now() - violation.timestamp) / 1000).toFixed(0)}s ago)`);
+                    this._removeById(violation.id);
+                    queue = this._getPendingQueue();
+                    continue;
+                }
+
+                try {
+                    const reported = await window._antiCheatDotNetRef.invokeMethodAsync(
+                        'ReportViolationFromJS',
+                        violation.violationType,
+                        violation.durationSeconds,
+                        violation.roundNumber || 1);
+
+                    if (reported) {
+                        console.log(`[AntiCheat] Violation ${violation.id} (round ${violation.roundNumber}) reported to server`);
+                        this._removeById(violation.id);
+                    } else {
+                        console.warn(`[AntiCheat] Violation ${violation.id} rejected by Blazor — keeping in queue`);
+                        break; // Don't spin on a rejection; wait for next trigger
+                    }
+                } catch (err) {
+                    console.warn(`[AntiCheat] Report failed (${err.message}) — will retry later`);
+                    break; // Circuit probably reconnecting; stop processing
+                }
+
+                queue = this._getPendingQueue();
+            }
+        } finally {
+            this._processingQueue = false;
+        }
+    }
+
+    // === PENDING QUEUE ===
 
     _getPendingQueue() {
         try {
@@ -723,16 +753,11 @@ window.AntiCheatTracker = class {
         const queue = this._getPendingQueue();
         queue.push(violation);
         this._savePendingQueue(queue);
-        console.log(`[AntiCheat] Added to pending queue (${queue.length} pending)`);
+        console.log(`[AntiCheat] Queue size: ${queue.length}`);
     }
 
-    _removeFromPendingQueue(violation) {
-        let queue = this._getPendingQueue();
-        // Remove by matching roomCode, violationType, and timestamp
-        queue = queue.filter(v =>
-            !(v.roomCode === violation.roomCode &&
-                v.violationType === violation.violationType &&
-                v.timestamp === violation.timestamp));
+    _removeById(id) {
+        const queue = this._getPendingQueue().filter(v => v.id !== id);
         this._savePendingQueue(queue);
     }
 
@@ -778,94 +803,15 @@ window.antiCheatTracker = new window.AntiCheatTracker();
 
 // Handler registration for Blazor communication
 window.registerAntiCheatHandler = function (dotNetHelper) {
-    if (window._antiCheatHandler) {
-        window.removeEventListener('anticheat-report', window._antiCheatHandler);
-    }
-
     window._antiCheatDotNetRef = dotNetHelper;
     window._antiCheatReady = true;
+    console.log('[AntiCheat] Blazor handler registered — draining queue');
 
-    // Process any pending violations from queue
-    const processPendingViolations = async () => {
-        const queue = window.antiCheatTracker._getPendingQueue();
-        if (queue.length === 0) return;
-
-        console.log(`[AntiCheat] Processing ${queue.length} pending violation(s)`);
-
-        // Get session to check room code
-        const session = window.antiCheatTracker._getSession();
-        const currentRoom = session?.roomCode;
-
-        for (const violation of queue) {
-            // Skip violations from different rooms (stale data)
-            if (currentRoom && violation.roomCode !== currentRoom) {
-                console.log(`[AntiCheat] Skipping stale violation from room ${violation.roomCode}`);
-                window.antiCheatTracker._removeFromPendingQueue(violation);
-                continue;
-            }
-
-            // Skip very old violations (> 5 minutes)
-            if (Date.now() - violation.timestamp > 5 * 60 * 1000) {
-                console.log(`[AntiCheat] Skipping old violation (${((Date.now() - violation.timestamp) / 1000).toFixed(0)}s ago)`);
-                window.antiCheatTracker._removeFromPendingQueue(violation);
-                continue;
-            }
-
-            try {
-                await window._antiCheatDotNetRef.invokeMethodAsync('ReportViolationFromJS',
-                    violation.violationType,
-                    violation.durationSeconds,
-                    violation.roundNumber || 1);  // Pass round number!
-                console.log(`[AntiCheat] Pending violation (round ${violation.roundNumber}) reported to Blazor successfully`);
-                window.antiCheatTracker._removeFromPendingQueue(violation);
-            } catch (err) {
-                console.warn(`[AntiCheat] Failed to report pending violation: ${err.message}`);
-                // Keep in queue for next attempt
-            }
-        }
-    };
-
-    // Process pending immediately and also listen for new events
-    processPendingViolations();
-
-    window._antiCheatHandler = async (e) => {
-        if (!window._antiCheatDotNetRef || !window._antiCheatReady) {
-            console.warn('[AntiCheat] Blazor not ready, violation queued');
-            return; // Violation is already in queue from _tryReportToBlazor
-        }
-
-        const report = e.detail;
-        try {
-            await window._antiCheatDotNetRef.invokeMethodAsync('ReportViolationFromJS',
-                report.violationType,
-                report.durationSeconds,
-                report.roundNumber || 1);  // Pass round number!
-            console.log(`[AntiCheat] Reported to Blazor successfully (round ${report.roundNumber})`);
-            // Remove from pending queue (find by matching violationType and roundNumber)
-            const queue = window.antiCheatTracker._getPendingQueue();
-            const matchIdx = queue.findIndex(v =>
-                v.violationType === report.violationType &&
-                v.roundNumber === report.roundNumber &&
-                Math.abs(v.durationSeconds - report.durationSeconds) < 0.1);
-            if (matchIdx >= 0) {
-                queue.splice(matchIdx, 1);
-                window.antiCheatTracker._savePendingQueue(queue);
-            }
-        } catch (err) {
-            console.warn('[AntiCheat] Could not report to Blazor (circuit may be reconnecting):', err.message);
-            // Violation is already in pending queue, will be retried
-        }
-    };
-
-    window.addEventListener('anticheat-report', window._antiCheatHandler);
-    console.log('[AntiCheat] Blazor handler registered');
+    // Drain any violations that were queued while Blazor was disconnected
+    window.antiCheatTracker._processQueue();
 };
 
 window.unregisterAntiCheatHandler = function () {
-    if (window._antiCheatHandler) {
-        window.removeEventListener('anticheat-report', window._antiCheatHandler);
-        window._antiCheatHandler = null;
-    }
     window._antiCheatDotNetRef = null;
     window._antiCheatReady = false;
     console.log('[AntiCheat] Blazor handler unregistered');

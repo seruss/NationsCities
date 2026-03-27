@@ -343,6 +343,14 @@ public class ClientGameStateService : IAsyncDisposable
             SetPhase(GamePhase.Home);
         });
 
+        // Anti-cheat: server recorded a violation — refresh state so UI re-renders
+        _hubConnection.On<string, string, double, int>("OnAntiCheatViolation", 
+            (connectionId, violationType, durationSeconds, penalty) =>
+        {
+            CurrentRoom = _roomService.GetRoom(RoomCode ?? "");
+            NotifyStateChanged();
+        });
+
         // Chat
         _hubConnection.On<string, string, bool>("OnChatMessage", (nickname, message, isSystem) =>
         {
@@ -412,16 +420,17 @@ public class ClientGameStateService : IAsyncDisposable
                 CurrentRoom = snapshot.Room;
                 Nickname = snapshot.Nickname;
                 
-                // Resume anti-cheat if in active game phase
+                // Resume anti-cheat if playing; register handler for all active phases
+                // so pending violations from the queue can still be flushed to the server
                 if (snapshot.Phase == GamePhase.Playing)
                 {
                     _ = ResumeAntiCheatAsync(CurrentGame?.CurrentRound ?? 1);
                 }
                 else if (snapshot.Phase == GamePhase.Voting || snapshot.Phase == GamePhase.RoundResults)
                 {
-                    // Flush any pending violations that occurred while disconnected
-                    // (e.g., player left during Playing, returned during Voting)
-                    _ = FlushPendingAntiCheatViolationsAsync();
+                    // Register handler so pending violations (detected while disconnected)
+                    // can be flushed to the server even though we're past Playing phase
+                    _ = RegisterAntiCheatHandlerOnlyAsync();
                 }
                 
                 SetPhase(snapshot.Phase);
@@ -676,24 +685,21 @@ public class ClientGameStateService : IAsyncDisposable
     }
 
     /// <summary>
-    /// Registers the anti-cheat handler and flushes any pending violations from the JS queue.
-    /// Used when reconnecting to a game that's already past the Playing phase.
+    /// Registers the Blazor handler so pending violations in the JS queue can be flushed.
+    /// Does NOT start/resume tracking — used when reconnecting to Voting/Results phase.
     /// </summary>
-    private async Task FlushPendingAntiCheatViolationsAsync()
+    private async Task RegisterAntiCheatHandlerOnlyAsync()
     {
         try
         {
-            // Register handler so pending violations can be sent to Blazor
             if (_dotNetRef != null)
             {
                 await _jsRuntime.InvokeVoidAsync("registerAntiCheatHandler", _dotNetRef);
             }
-            // Also try explicit flush in case the handler registration didn't trigger processing
-            await _jsRuntime.InvokeVoidAsync("antiCheatTracker.flushPendingViolations", _dotNetRef);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ClientGameState] Flush pending violations error: {ex.Message}");
+            Console.WriteLine($"[ClientGameState] Register anti-cheat handler error: {ex.Message}");
         }
     }
 
@@ -706,23 +712,29 @@ public class ClientGameStateService : IAsyncDisposable
         catch { }
     }
 
-    /// <summary>Called from JavaScript when a violation is detected.</summary>
+    /// <summary>Called from JavaScript when a violation is detected. Returns true if reported to server.</summary>
     [JSInvokable]
-    public async Task ReportViolationFromJS(string violationType, double durationSeconds, int roundNumber)
+    public async Task<bool> ReportViolationFromJS(string violationType, double durationSeconds, int roundNumber)
     {
-        // Allow reporting during any active game phase (Playing, Voting, RoundResults)
-        // Violations detected on reconnect may arrive after phase transitioned from Playing to Voting
-        var activePhases = new[] { GamePhase.Playing, GamePhase.Voting, GamePhase.RoundResults };
-        if (_hubConnection == null || !activePhases.Contains(CurrentPhase) || string.IsNullOrEmpty(RoomCode)) 
-            return;
+        // Allow reporting during any active game phase — violations may be detected
+        // after returning from alt-tab when phase has already moved past Playing.
+        // The server-side ReportViolation has no phase restriction and handles it correctly.
+        if (_hubConnection == null || string.IsNullOrEmpty(RoomCode))
+            return false;
+
+        // Only block reporting when there's no active game at all
+        if (CurrentPhase == GamePhase.Home || CurrentPhase == GamePhase.Lobby || CurrentPhase == GamePhase.Error)
+            return false;
         
         try
         {
             await _hubConnection.InvokeAsync("ReportViolation", RoomCode, violationType, durationSeconds, roundNumber);
+            return true;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[ClientGameState] Report violation error: {ex.Message}");
+            return false;
         }
     }
 
