@@ -100,30 +100,46 @@ flowchart TD
 ```
 NationsCities/
 ├── Components/
-│   ├── App.razor           # Root component with theme config
-│   ├── Pages/
-│   │   ├── Home.razor      # Landing page, create/join room
-│   │   ├── Lobby.razor     # Room lobby, settings, player list
-│   │   ├── GameRound.razor # Main game round screen
-│   │   ├── Validation.razor # Voting phase
-│   │   ├── Scoreboard.razor # Round results
-│   │   └── FinalResults.razor # End game summary
+│   ├── App.razor               # Root component with theme config
+│   ├── Routes.razor            # Routing configuration
+│   ├── Game/                   # Main SPA game components
+│   │   ├── GameFlow.razor      # Manages the transition between different game views
+│   │   ├── Shared/             # Shared UI components across views
+│   │   └── Views/              # The actual screens of the game
+│   │       ├── HomeView.razor         # Landing page, create/join room
+│   │       ├── LobbyView.razor        # Room lobby, settings, player list
+│   │       ├── RoundView.razor        # Main game round screen
+│   │       ├── VotingView.razor       # Voting phase
+│   │       ├── ScoreboardView.razor   # Round results
+│   │       ├── FinalResultsView.razor # End game summary
+│   │       ├── ErrorView.razor        # In-game errors processing
+│   │       └── ReconnectingView.razor # Connection loss handling
+│   ├── Pages/                  # Blazor routable pages
+│   │   ├── SPAGame.razor       # The wrapper page containing GameFlow
+│   │   ├── HowToPlay.razor     # Instructions page
+│   │   └── Error.razor         # Application-level error page
 │   └── Layout/
+│       └── MainLayout.razor    # Main layout template
 ├── Hubs/
-│   └── GameHub.cs          # SignalR hub for real-time events
+│   └── GameHub.cs              # SignalR hub for real-time events
 ├── Services/
-│   ├── GameService.cs      # Game logic, scoring
-│   └── RoomService.cs      # Room management
+│   ├── GameService.cs          # Game logic, scoring
+│   ├── RoomService.cs          # Room management
+│   ├── RoomCleanupService.cs   # Background service to remove inactive rooms
+│   └── ClientGameStateService.cs # Manages client-side game state for the SPA
 ├── Models/
-│   ├── Player.cs           # Player data (nick, score, violations)
-│   ├── Room.cs             # Room state
-│   ├── GameState.cs        # Current game state
-│   ├── Category.cs         # Category definitions
-│   ├── Violation.cs        # Anti-cheat violation tracking
-│   └── Answer.cs           # Answer data structures
+│   ├── Player.cs               # Player data (nick, score, violations)
+│   ├── Room.cs                 # Room state
+│   ├── GameState.cs            # Current game state
+│   ├── PublicRoomInfo.cs       # Snapshot of room for public listing
+│   ├── Category.cs             # Category definitions
+│   ├── Violation.cs            # Anti-cheat violation tracking
+│   └── Answer.cs               # Answer data structures
+├── Styles/
+│   └── app.css                 # Main CSS file (Tailwind input)
 └── wwwroot/
-    ├── app.css             # Custom CSS styles
-    └── app.js              # Anti-cheat, theme, utilities
+    ├── app.css                 # Compiled Tailwind output
+    └── app.js                  # Anti-cheat, theme, utilities
 ```
 
 ## 📋 Categories

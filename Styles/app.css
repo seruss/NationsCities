@@ -197,6 +197,8 @@ textarea:focus {
     justify-content: center;
     padding: 1rem;
     animation: fadeIn 0.2s ease-out;
+    overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 html.dark .modal-backdrop {

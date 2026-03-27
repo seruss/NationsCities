@@ -800,7 +800,7 @@ public class GameHub : Hub
     }
 
     /// <summary>
-    /// Kończy grę i usuwa pokój (tylko host).
+    /// Kończy grę wcześniej i przechodzi do wyników końcowych (tylko host).
     /// </summary>
     public async Task EndGame(string roomCode)
     {
@@ -809,7 +809,6 @@ public class GameHub : Hub
         // Only host can end game
         if (room == null) return;
         
-        var hostPlayer = room.Players.FirstOrDefault(p => p.IsHost);
         var caller = room.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
         
         if (caller?.IsHost != true)
@@ -818,11 +817,21 @@ public class GameHub : Hub
             return;
         }
 
-        // Notify all players game is ending
-        await Clients.Group(roomCode).SendAsync("OnGameEnded");
-        
-        // Delete the room
-        _roomService.DeleteRoom(roomCode);
+        // Force the game to final results by setting current round = total rounds
+        if (room.CurrentGame != null)
+        {
+            room.CurrentGame.CurrentRound = room.CurrentGame.TotalRounds;
+            room.CurrentGame.Phase = RoundPhase.Results;
+            
+            // Reset ready states for potential return to lobby
+            foreach (var player in room.Players)
+            {
+                player.IsReady = player.IsHost;
+            }
+        }
+
+        // Notify all players - client will see isLastRound=true and go to FinalResults
+        await Clients.Group(roomCode).SendAsync("OnVotingEnded");
     }
 
     /// <summary>
