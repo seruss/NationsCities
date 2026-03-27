@@ -364,6 +364,8 @@ else
     private bool _showLeaveConfirmation = false;
     private HashSet<string> _selectedCategoryNames = new();
     private HashSet<char> _selectedLetters = new();
+    private HashSet<string> _originalCategoryNames = new();
+    private HashSet<char> _originalLetters = new();
     private string _customCategoryInput = "";
     private string _chatInput = "";
 
@@ -497,6 +499,7 @@ else
     private void OpenCategoryModal()
     {
         _selectedCategoryNames = GameState.CurrentRoom?.Settings.SelectedCategories.Select(c => c.Name).ToHashSet() ?? new();
+        _originalCategoryNames = new HashSet<string>(_selectedCategoryNames);
         _categoryToggleState = ToggleState.Default;
         _showCategoryModal = true;
     }
@@ -525,7 +528,7 @@ else
         {
             ToggleState.Default => ToggleState.All,
             ToggleState.All => ToggleState.None,
-            ToggleState.None => ToggleState.All,
+            ToggleState.None => ToggleState.Default,
             _ => ToggleState.All
         };
 
@@ -533,9 +536,13 @@ else
         {
             _selectedCategoryNames = _categoriesWithColors.Select(c => c.Category.Name).ToHashSet();
         }
-        else
+        else if (_categoryToggleState == ToggleState.None)
         {
             _selectedCategoryNames.Clear();
+        }
+        else
+        {
+            _selectedCategoryNames = new HashSet<string>(_originalCategoryNames);
         }
     }
 
@@ -632,6 +639,7 @@ else
     private void OpenLetterModal()
     {
         _selectedLetters = GameState.CurrentRoom?.Settings.AvailableLetters.ToHashSet() ?? GameSettings.DefaultPolishLetters.ToHashSet();
+        _originalLetters = new HashSet<char>(_selectedLetters);
         _letterToggleState = ToggleState.Default;
         _showLetterModal = true;
     }
@@ -660,7 +668,7 @@ else
         {
             ToggleState.Default => ToggleState.All,
             ToggleState.All => ToggleState.None,
-            ToggleState.None => ToggleState.All,
+            ToggleState.None => ToggleState.Default,
             _ => ToggleState.All
         };
 
@@ -668,9 +676,13 @@ else
         {
             _selectedLetters = GameSettings.FullAlphabet.ToHashSet();
         }
-        else
+        else if (_letterToggleState == ToggleState.None)
         {
             _selectedLetters.Clear();
+        }
+        else
+        {
+            _selectedLetters = new HashSet<char>(_originalLetters);
         }
     }
 
