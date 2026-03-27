@@ -435,6 +435,48 @@ public class GameHub : Hub
             roundCount);
     }
 
+    /// <summary>
+    /// Aktualizuje dostępne litery (tylko host, w lobby).
+    /// </summary>
+    public async Task UpdateLetterSettings(string roomCode, List<char> letters)
+    {
+        var room = _roomService.GetRoom(roomCode);
+        if (room == null)
+        {
+            await Clients.Caller.SendAsync("OnError", "Pokój nie istnieje.");
+            return;
+        }
+
+        var caller = room.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+        if (caller?.IsHost != true)
+        {
+            await Clients.Caller.SendAsync("OnError", "Tylko host może zmieniać ustawienia.");
+            return;
+        }
+
+        if (letters == null || letters.Count < 5)
+        {
+            await Clients.Caller.SendAsync("OnError", "Wybierz co najmniej 5 liter.");
+            return;
+        }
+
+        // Filtruj tylko litery z dozwolonego alfabetu
+        var validLetters = letters
+            .Where(l => GameSettings.FullAlphabet.Contains(l))
+            .Distinct()
+            .ToList();
+
+        if (validLetters.Count < 5)
+        {
+            await Clients.Caller.SendAsync("OnError", "Wybierz co najmniej 5 poprawnych liter.");
+            return;
+        }
+
+        room.Settings.AvailableLetters = validLetters;
+
+        await Clients.Group(roomCode).SendAsync("OnLetterSettingsUpdated", validLetters.Count);
+    }
+
     #endregion
 
     #region Gra
@@ -649,6 +691,23 @@ public class GameHub : Hub
         else
         {
             await Clients.Caller.SendAsync("OnError", roundResult.Error);
+        }
+    }
+
+    /// <summary>
+    /// Losuje nową literę w trakcie rundy (tylko host).
+    /// </summary>
+    public async Task RerollLetter(string roomCode)
+    {
+        var result = _gameService.RerollLetter(roomCode, Context.ConnectionId);
+
+        if (result.Success)
+        {
+            await Clients.Group(roomCode).SendAsync("OnLetterRerolled", result.NewLetter);
+        }
+        else
+        {
+            await Clients.Caller.SendAsync("OnError", result.Error);
         }
     }
 

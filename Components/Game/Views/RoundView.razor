@@ -35,7 +35,17 @@ else
                 <!-- Current Letter -->
                 <div class="flex flex-col">
                     <span class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Litera</span>
-                    <h1 class="text-6xl font-black text-primary leading-none tracking-tighter drop-shadow-lg">@GameState.CurrentGame.CurrentLetter</h1>
+                    <div class="flex items-end gap-3">
+                        <h1 class="text-6xl font-black text-primary leading-none tracking-tighter drop-shadow-lg">@GameState.CurrentGame.CurrentLetter</h1>
+                        @if (GameState.IsHost && !_isCountdownActive && !_hasSubmitted)
+                        {
+                            <button @onclick="ShowRerollConfirmation"
+                                    class="flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-primary/10 border border-slate-200 dark:border-slate-700 transition-all mb-1"
+                                    title="Losuj nową literę">
+                                <span class="material-symbols-outlined text-xl text-slate-500 dark:text-slate-400 hover:text-primary">refresh</span>
+                            </button>
+                        }
+                    </div>
                 </div>
                 
                 <!-- Timer / Status -->
@@ -163,6 +173,17 @@ else
             }
         </footer>
     </div>
+
+    @if (_showRerollConfirmation)
+    {
+        <NationsCities.Components.Game.Shared.ConfirmationModal
+            Title="Losować nową literę?"
+            Message="Odpowiedzi wszystkich graczy zostaną wyczyszczone."
+            ConfirmText="Losuj"
+            CancelText="Anuluj"
+            OnConfirm="ConfirmReroll"
+            OnCancel="CancelReroll" />
+    }
 }
 
 @code {
@@ -174,6 +195,7 @@ else
     private bool _stopTriggeredByMe = false;
     private System.Timers.Timer? _timer;
     private bool _hasInitialized = false;
+    private bool _showRerollConfirmation = false;
 
     // Can only click STOP if all answers are filled
     private bool CanStop => GameState.CurrentGame?.Categories.All(c => !string.IsNullOrWhiteSpace(GetAnswer(c.Name))) ?? false;
@@ -184,6 +206,7 @@ else
         GameState.OnStopTriggered += HandleStopTriggered;
         GameState.OnTimeAdded += HandleTimeAdded;
         GameState.OnRoundEnded += HandleRoundEnded;
+        GameState.OnLetterRerolled += HandleLetterRerolled;
         
         InitializeRound();
     }
@@ -321,6 +344,33 @@ else
         await InvokeAsync(StateHasChanged);
     }
 
+    private void ShowRerollConfirmation()
+    {
+        _showRerollConfirmation = true;
+    }
+
+    private async Task ConfirmReroll()
+    {
+        _showRerollConfirmation = false;
+        await GameState.RerollLetterAsync();
+    }
+
+    private void CancelReroll()
+    {
+        _showRerollConfirmation = false;
+    }
+
+    private void HandleLetterRerolled(char newLetter)
+    {
+        // Clear all local answers
+        foreach (var key in _answers.Keys.ToList())
+        {
+            _answers[key] = "";
+        }
+        _hasSubmitted = false;
+        InvokeAsync(StateHasChanged);
+    }
+
     private string GetAnswer(string category)
     {
         return _answers.TryGetValue(category, out var answer) ? answer : "";
@@ -332,6 +382,7 @@ else
         GameState.OnStopTriggered -= HandleStopTriggered;
         GameState.OnTimeAdded -= HandleTimeAdded;
         GameState.OnRoundEnded -= HandleRoundEnded;
+        GameState.OnLetterRerolled -= HandleLetterRerolled;
         
         _timer?.Stop();
         _timer?.Dispose();

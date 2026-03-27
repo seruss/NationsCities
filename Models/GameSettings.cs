@@ -34,4 +34,22 @@ public class GameSettings
     /// Maksymalna liczba graczy.
     /// </summary>
     public int MaxPlayers { get; set; } = 10;
+
+    /// <summary>
+    /// Litery dostępne do losowania (konfigurowalne przez hosta).
+    /// Domyślnie polskie litery bez trudnych znaków diakrytycznych.
+    /// </summary>
+    public List<char> AvailableLetters { get; set; } = DefaultPolishLetters.ToList();
+
+    /// <summary>
+    /// Domyślny zestaw liter (bez Ć, Ł, Ń, Ó, Ś, Ź, Ż, Q, V, X, Y).
+    /// </summary>
+    public static readonly char[] DefaultPolishLetters =
+        "ABCDEFGHIJKLMNOPRSTUWZ".ToCharArray();
+
+    /// <summary>
+    /// Pełny alfabet do wyboru w ustawieniach (wszystkie litery z blueprintu).
+    /// </summary>
+    public static readonly char[] FullAlphabet =
+        "ABCĆDEFĘGHIJKLŁMNŃOÓPRSŚTUWXYZ".ToCharArray();
 }

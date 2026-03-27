@@ -49,6 +49,11 @@ public class Room
     /// Historia wiadomości czatu pokoju.
     /// </summary>
     public List<ChatMessage> ChatMessages { get; set; } = [];
+
+    /// <summary>
+    /// Pula użytych liter na poziomie lobby (przeżywa wiele gier, odnawia się gdy wyczerpana).
+    /// </summary>
+    public List<char> UsedLettersPool { get; set; } = [];
 }
 
 /// <summary>

@@ -14,10 +14,6 @@ public class GameService
     
     // Per-room locks to prevent race conditions in TriggerStop
     private readonly ConcurrentDictionary<string, object> _roomLocks = new();
-    
-    // Litery bez trudnych polskich znaków diakrytycznych (Ć, Ł, Ń, Ó, Ś, Ź, Ż) oraz Q, V, X, Y
-    private static readonly char[] PolishLetters = 
-        "ABCDEFGHIJKLMNOPRSTUWZ".ToCharArray();
 
     public GameService(RoomService roomService)
     {
@@ -99,7 +95,7 @@ public class GameService
             return (false, default, "Gra zakończona.");
         }
 
-        var letter = SelectRandomLetter(game.UsedLetters);
+        var letter = SelectRandomLetter(room);
         game.CurrentLetter = letter;
         game.UsedLetters.Add(letter);
         game.Phase = RoundPhase.Answering;
@@ -403,19 +399,49 @@ public class GameService
     }
 
     /// <summary>
-    /// Losuje literę (wykluczając użyte).
+    /// Losuje nową literę w trakcie rundy (reroll, tylko host).
+    /// Czyści odpowiedzi wszystkich graczy.
     /// </summary>
-    private static char SelectRandomLetter(List<char> usedLetters)
+    public (bool Success, char NewLetter, string? Error) RerollLetter(string roomCode, string hostConnectionId)
     {
-        var available = PolishLetters.Except(usedLetters).ToArray();
+        var room = _roomService.GetRoom(roomCode);
+        if (room?.CurrentGame == null)
+            return (false, default, "Gra nie jest aktywna.");
+
+        var caller = room.Players.FirstOrDefault(p => p.ConnectionId == hostConnectionId);
+        if (caller?.IsHost != true)
+            return (false, default, "Tylko host może zmienić literę.");
+
+        var game = room.CurrentGame;
+        if (game.Phase != RoundPhase.Answering)
+            return (false, default, "Nie można zmienić litery w tej fazie.");
+
+        var letter = SelectRandomLetter(room);
+        game.CurrentLetter = letter;
+        game.UsedLetters.Add(letter);
+        game.RoundAnswers.Clear();
+
+        return (true, letter, null);
+    }
+
+    /// <summary>
+    /// Losuje literę (wykluczając użyte) z puli pokoju.
+    /// </summary>
+    private static char SelectRandomLetter(Room room)
+    {
+        var pool = room.Settings.AvailableLetters;
+        var available = pool.Except(room.UsedLettersPool).ToArray();
         if (available.Length == 0)
         {
-            // Wszystkie użyte - reset
-            available = PolishLetters;
+            // Wszystkie użyte - reset puli lobby
+            room.UsedLettersPool.Clear();
+            available = pool.ToArray();
         }
 
         var random = new Random();
-        return available[random.Next(available.Length)];
+        var letter = available[random.Next(available.Length)];
+        room.UsedLettersPool.Add(letter);
+        return letter;
     }
 
     /// <summary>

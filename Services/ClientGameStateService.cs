@@ -90,6 +90,9 @@ public class ClientGameStateService : IAsyncDisposable
     /// <summary>Fired when a new round starts (letter).</summary>
     public event Action<char>? OnNewRound;
 
+    /// <summary>Fired when the letter is rerolled mid-round (new letter).</summary>
+    public event Action<char>? OnLetterRerolled;
+
     public ClientGameStateService(
         NavigationManager navigation, 
         IJSRuntime jsRuntime,
@@ -288,6 +291,19 @@ public class ClientGameStateService : IAsyncDisposable
         {
             CurrentRoom = _roomService.GetRoom(RoomCode ?? "");
             OnStopTriggered?.Invoke(triggeredBy, endTime);
+            NotifyStateChanged();
+        });
+
+        _hubConnection.On<char>("OnLetterRerolled", newLetter =>
+        {
+            CurrentRoom = _roomService.GetRoom(RoomCode ?? "");
+            OnLetterRerolled?.Invoke(newLetter);
+            NotifyStateChanged();
+        });
+
+        _hubConnection.On<int>("OnLetterSettingsUpdated", letterCount =>
+        {
+            CurrentRoom = _roomService.GetRoom(RoomCode ?? "");
             NotifyStateChanged();
         });
 
@@ -498,6 +514,20 @@ public class ClientGameStateService : IAsyncDisposable
     {
         if (_hubConnection == null || string.IsNullOrEmpty(RoomCode)) return;
         await _hubConnection.InvokeAsync("StartNextRound", RoomCode);
+    }
+
+    /// <summary>Reroll the letter mid-round (host only).</summary>
+    public async Task RerollLetterAsync()
+    {
+        if (_hubConnection == null || string.IsNullOrEmpty(RoomCode)) return;
+        await _hubConnection.InvokeAsync("RerollLetter", RoomCode);
+    }
+
+    /// <summary>Update available letters (host only, in lobby).</summary>
+    public async Task UpdateLetterSettingsAsync(List<char> letters)
+    {
+        if (_hubConnection == null || string.IsNullOrEmpty(RoomCode)) return;
+        await _hubConnection.InvokeAsync("UpdateLetterSettings", RoomCode, letters);
     }
 
     /// <summary>Return to lobby after game.</summary>

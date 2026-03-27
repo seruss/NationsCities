@@ -53,7 +53,7 @@ else
                         <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Ustawienia gry</h2>
                         <span class="px-2 py-0.5 rounded text-xs font-bold bg-primary/10 text-primary uppercase border border-primary/20">Host</span>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-3 gap-3">
                         <button @onclick="OpenCategoryModal" class="flex flex-col items-start gap-1 p-3 rounded-xl bg-slate-100 dark:bg-surface-darker hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-all text-left group">
                             <div class="flex items-center justify-between w-full">
                                 <span class="material-symbols-outlined text-purple-500 dark:text-purple-400">category</span>
@@ -67,8 +67,16 @@ else
                                 <span class="material-symbols-outlined text-cyan-500 dark:text-cyan-400">repeat</span>
                                 <span class="material-symbols-outlined text-base text-slate-400 group-hover:text-cyan-400">edit</span>
                             </div>
-                            <span class="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">Liczba rund</span>
+                            <span class="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">Rundy</span>
                             <span class="text-sm font-bold text-slate-900 dark:text-white">@room.Settings.RoundCount rund</span>
+                        </button>
+                        <button @onclick="OpenLetterModal" class="flex flex-col items-start gap-1 p-3 rounded-xl bg-slate-100 dark:bg-surface-darker hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-all text-left group">
+                            <div class="flex items-center justify-between w-full">
+                                <span class="material-symbols-outlined text-primary">font_download</span>
+                                <span class="material-symbols-outlined text-base text-slate-400 group-hover:text-primary">edit</span>
+                            </div>
+                            <span class="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">Litery</span>
+                            <span class="text-sm font-bold text-slate-900 dark:text-white">@GetLetterCountLabel()</span>
                         </button>
                     </div>
                     <!-- Public/Private Toggle -->
@@ -313,13 +321,61 @@ else
             </div>
         </div>
     }
+
+    <!-- Letter Selection Modal -->
+    @if (_showLetterModal)
+    {
+        <div class="modal-backdrop" @onclick="CloseLetterModal">
+            <div class="modal-content category-list-modal" @onclick:stopPropagation="true">
+                <div class="modal-header">
+                    <button @onclick="CloseLetterModal" class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+                        <span class="material-symbols-outlined text-2xl">arrow_back</span>
+                    </button>
+                    <h2 class="text-lg font-bold text-slate-900 dark:text-white flex-1 text-center">Wybór liter</h2>
+                    <div class="flex gap-1">
+                        <button @onclick="SelectAllLetters" class="px-2 py-1 rounded-lg bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wide hover:bg-primary/20 transition-colors">
+                            Wszystkie
+                        </button>
+                        <button @onclick="DeselectAllLetters" class="px-2 py-1 rounded-lg bg-red-500/10 text-red-500 text-[10px] font-bold uppercase tracking-wide hover:bg-red-500/20 transition-colors">
+                            Żadna
+                        </button>
+                    </div>
+                </div>
+
+                <div class="modal-body">
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mb-4 text-center">Zaznacz litery, które mogą być losowane (min. 5)</p>
+                    <div class="grid grid-cols-5 gap-3">
+                        @foreach (var letter in GameSettings.FullAlphabet)
+                        {
+                            var isSelected = _selectedLetters.Contains(letter);
+                            <button @onclick="() => ToggleLetterSelection(letter)"
+                                    class="@(isSelected ? "bg-primary text-white shadow-md" : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600") aspect-square flex items-center justify-center rounded-xl font-bold text-xl transition-all btn-press">
+                                @letter
+                            </button>
+                        }
+                    </div>
+                    <p class="text-xs text-center mt-4 @(_selectedLetters.Count < 5 ? "text-red-400" : "text-slate-500 dark:text-slate-400")">Wybrano: @_selectedLetters.Count / @GameSettings.FullAlphabet.Length</p>
+                </div>
+
+                <div class="modal-footer">
+                    <button @onclick="SaveLetterSettings" 
+                            disabled="@(_selectedLetters.Count < 5)"
+                            class="w-full h-12 bg-primary hover:bg-primary-dark text-white rounded-xl font-bold transition-colors shadow-lg shadow-blue-500/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">
+                        Zapisz
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
 }
 
 @code {
     // Modal state
     private bool _showCategoryModal = false;
     private bool _showRoundCountModal = false;
+    private bool _showLetterModal = false;
     private HashSet<string> _selectedCategoryNames = new();
+    private HashSet<char> _selectedLetters = new();
     private int _tempRoundCount = 10;
     private string _customCategoryInput = "";
     private string _chatInput = "";
@@ -514,6 +570,57 @@ else
             await GameState.UpdateGameSettingsAsync(categoryNames, _tempRoundCount);
         }
         _showRoundCountModal = false;
+    }
+
+    // Letter modal methods
+    private void OpenLetterModal()
+    {
+        _selectedLetters = GameState.CurrentRoom?.Settings.AvailableLetters.ToHashSet() ?? GameSettings.DefaultPolishLetters.ToHashSet();
+        _showLetterModal = true;
+    }
+
+    private void CloseLetterModal()
+    {
+        _showLetterModal = false;
+    }
+
+    private void ToggleLetterSelection(char letter)
+    {
+        if (_selectedLetters.Contains(letter))
+        {
+            _selectedLetters.Remove(letter);
+        }
+        else
+        {
+            _selectedLetters.Add(letter);
+        }
+    }
+
+    private void SelectAllLetters()
+    {
+        _selectedLetters = GameSettings.FullAlphabet.ToHashSet();
+    }
+
+    private void DeselectAllLetters()
+    {
+        _selectedLetters.Clear();
+    }
+
+    private async Task SaveLetterSettings()
+    {
+        if (_selectedLetters.Count < 5) return;
+
+        // Zachowaj kolejność z FullAlphabet
+        var orderedLetters = GameSettings.FullAlphabet.Where(l => _selectedLetters.Contains(l)).ToList();
+        await GameState.UpdateLetterSettingsAsync(orderedLetters);
+        _showLetterModal = false;
+    }
+
+    private string GetLetterCountLabel()
+    {
+        var count = GameState.CurrentRoom?.Settings.AvailableLetters.Count ?? GameSettings.DefaultPolishLetters.Length;
+        var total = GameSettings.FullAlphabet.Length;
+        return count == total ? "Wszystkie" : $"{count} / {total}";
     }
 
     public void Dispose()
