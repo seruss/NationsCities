@@ -105,7 +105,7 @@ public class GameHub : Hub
     public async Task CreateRoom(string nickname, string? sessionId = null)
     {
         var room = _roomService.CreateRoom(Context.ConnectionId, nickname, sessionId);
-        AddSystemMessageInternal(room, $"Pokój {room.Code} utworzony. Udostępnij kod znajomym!");
+        AddSystemMessageInternal(room, "Kliknij 'Jestem gotowy' gdy chcesz grać!");
         await Groups.AddToGroupAsync(Context.ConnectionId, room.Code);
         await Clients.Caller.SendAsync("OnRoomCreated", room.Code);
     }
