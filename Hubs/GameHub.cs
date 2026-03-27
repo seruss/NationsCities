@@ -410,6 +410,13 @@ public class GameHub : Hub
             return;
         }
 
+        // Cap round count at available letter count
+        var maxRounds = room.Settings.AvailableLetters.Count;
+        if (roundCount > maxRounds)
+        {
+            roundCount = maxRounds;
+        }
+
         // Update settings - include both standard and custom categories
         var selectedCategories = new List<Category>();
         foreach (var name in categoryNames)
@@ -474,6 +481,12 @@ public class GameHub : Hub
         }
 
         room.Settings.AvailableLetters = validLetters;
+
+        // Auto-reduce round count if it exceeds new letter count
+        if (room.Settings.RoundCount > validLetters.Count)
+        {
+            room.Settings.RoundCount = validLetters.Count;
+        }
 
         await Clients.Group(roomCode).SendAsync("OnLetterSettingsUpdated", validLetters.Count);
     }

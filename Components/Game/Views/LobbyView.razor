@@ -85,7 +85,7 @@ else
                             <button @onclick="DecrementRoundsInline" disabled="@(room.Settings.RoundCount <= 1)" class="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                                 <span class="material-symbols-outlined text-slate-600 dark:text-slate-300 text-lg">remove</span>
                             </button>
-                            <button @onclick="IncrementRoundsInline" disabled="@(room.Settings.RoundCount >= 20)" class="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                            <button @onclick="IncrementRoundsInline" disabled="@(room.Settings.RoundCount >= MaxRoundCount)" class="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                                 <span class="material-symbols-outlined text-slate-600 dark:text-slate-300 text-lg">add</span>
                             </button>
                         </div>
@@ -251,7 +251,7 @@ else
                         <span class="material-symbols-outlined text-2xl">arrow_back</span>
                     </button>
                     <h2 class="text-lg font-bold text-slate-900 dark:text-white flex-1 text-center">Kategorie</h2>
-                    <button @onclick="SelectAllCategories" class="text-slate-500 dark:text-slate-400 hover:text-primary transition-colors">
+                    <button @onclick="CycleCategoryToggle" class="@GetCategoryToggleClass() transition-colors">
                         <span class="material-symbols-outlined text-2xl">checklist</span>
                     </button>
                 </div>
@@ -308,7 +308,7 @@ else
                         <span class="material-symbols-outlined text-2xl">arrow_back</span>
                     </button>
                     <h2 class="text-lg font-bold text-slate-900 dark:text-white flex-1 text-center">Wybór liter</h2>
-                    <button @onclick="ToggleAllLetters" class="text-slate-500 dark:text-slate-400 hover:text-primary transition-colors">
+                    <button @onclick="CycleLetterToggle" class="@GetLetterToggleClass() transition-colors">
                         <span class="material-symbols-outlined text-2xl">checklist</span>
                     </button>
                 </div>
@@ -324,7 +324,13 @@ else
                             </button>
                         }
                     </div>
-                    <p class="text-xs text-center mt-4 @(_selectedLetters.Count < MinLetterCount ? "text-red-400" : "text-slate-500 dark:text-slate-400")">Wybrano: @_selectedLetters.Count / @GameSettings.FullAlphabet.Length</p>
+                    <p class="text-xs text-center mt-4 @(_selectedLetters.Count < MinLetterCount ? "text-red-400" : "text-slate-500 dark:text-slate-400")">
+                        Wybrano: <span class="font-bold">@_selectedLetters.Count</span> / @GameSettings.FullAlphabet.Length
+                        @if (_selectedLetters.Count < MinLetterCount)
+                        {
+                            <span> · min. @MinLetterCount</span>
+                        }
+                    </p>
                 </div>
 
                 <div class="modal-footer">
@@ -360,10 +366,16 @@ else
     private string _customCategoryInput = "";
     private string _chatInput = "";
 
+    // 3-state toggle: Default (white), All (blue), None (faded)
+    private enum ToggleState { Default, All, None }
+    private ToggleState _categoryToggleState = ToggleState.Default;
+    private ToggleState _letterToggleState = ToggleState.Default;
+
     private record CategoryWithColor(Category Category, string BgClass, string TextClass);
     private List<CategoryWithColor> _categoriesWithColors = new();
 
     private int MinLetterCount => GameState.CurrentRoom?.Settings.RoundCount ?? 5;
+    private int MaxRoundCount => GameState.CurrentRoom?.Settings.AvailableLetters.Count ?? GameSettings.DefaultPolishLetters.Length;
 
     private bool IsHost => GameState.CurrentRoom?.Players.FirstOrDefault(p => p.Nickname == GameState.Nickname)?.IsHost ?? false;
     private bool AmIReady => GameState.CurrentRoom?.Players.FirstOrDefault(p => p.Nickname == GameState.Nickname)?.IsReady ?? false;
@@ -484,6 +496,7 @@ else
     private void OpenCategoryModal()
     {
         _selectedCategoryNames = GameState.CurrentRoom?.Settings.SelectedCategories.Select(c => c.Name).ToHashSet() ?? new();
+        _categoryToggleState = ToggleState.Default;
         _showCategoryModal = true;
     }
 
@@ -502,12 +515,35 @@ else
         {
             _selectedCategoryNames.Add(categoryName);
         }
+        _categoryToggleState = ToggleState.Default;
     }
 
-    private void SelectAllCategories()
+    private void CycleCategoryToggle()
     {
-        _selectedCategoryNames = Category.StandardCategories.Select(c => c.Name).ToHashSet();
+        _categoryToggleState = _categoryToggleState switch
+        {
+            ToggleState.Default => ToggleState.All,
+            ToggleState.All => ToggleState.None,
+            ToggleState.None => ToggleState.All,
+            _ => ToggleState.All
+        };
+
+        if (_categoryToggleState == ToggleState.All)
+        {
+            _selectedCategoryNames = _categoriesWithColors.Select(c => c.Category.Name).ToHashSet();
+        }
+        else
+        {
+            _selectedCategoryNames.Clear();
+        }
     }
+
+    private string GetCategoryToggleClass() => _categoryToggleState switch
+    {
+        ToggleState.All => "text-primary",
+        ToggleState.None => "text-slate-300 dark:text-slate-600",
+        _ => "text-slate-500 dark:text-slate-400 hover:text-primary"
+    };
 
     private async Task SaveCategorySettings()
     {
@@ -551,7 +587,7 @@ else
 
     private async Task IncrementRoundsInline()
     {
-        if (GameState.CurrentRoom != null && GameState.CurrentRoom.Settings.RoundCount < 20)
+        if (GameState.CurrentRoom != null && GameState.CurrentRoom.Settings.RoundCount < MaxRoundCount)
         {
             var newCount = GameState.CurrentRoom.Settings.RoundCount + 1;
             var categoryNames = GameState.CurrentRoom.Settings.SelectedCategories.Select(c => c.Name).ToList();
@@ -595,6 +631,7 @@ else
     private void OpenLetterModal()
     {
         _selectedLetters = GameState.CurrentRoom?.Settings.AvailableLetters.ToHashSet() ?? GameSettings.DefaultPolishLetters.ToHashSet();
+        _letterToggleState = ToggleState.Default;
         _showLetterModal = true;
     }
 
@@ -613,19 +650,35 @@ else
         {
             _selectedLetters.Add(letter);
         }
+        _letterToggleState = ToggleState.Default;
     }
 
-    private void ToggleAllLetters()
+    private void CycleLetterToggle()
     {
-        if (_selectedLetters.Count == GameSettings.FullAlphabet.Length)
+        _letterToggleState = _letterToggleState switch
         {
-            _selectedLetters.Clear();
-        }
-        else
+            ToggleState.Default => ToggleState.All,
+            ToggleState.All => ToggleState.None,
+            ToggleState.None => ToggleState.All,
+            _ => ToggleState.All
+        };
+
+        if (_letterToggleState == ToggleState.All)
         {
             _selectedLetters = GameSettings.FullAlphabet.ToHashSet();
         }
+        else
+        {
+            _selectedLetters.Clear();
+        }
     }
+
+    private string GetLetterToggleClass() => _letterToggleState switch
+    {
+        ToggleState.All => "text-primary",
+        ToggleState.None => "text-slate-300 dark:text-slate-600",
+        _ => "text-slate-500 dark:text-slate-400 hover:text-primary"
+    };
 
     private async Task SaveLetterSettings()
     {
