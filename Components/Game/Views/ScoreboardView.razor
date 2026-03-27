@@ -131,6 +131,40 @@ else
         </section>
 
         <div class="h-8"></div>
+
+        <!-- Chat -->
+        <section class="px-4 pb-48">
+            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 px-1 flex items-center gap-2">
+                <span class="material-symbols-outlined text-base">chat</span>
+                Czat
+            </h2>
+            <div class="bg-surface-light dark:bg-surface-dark rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
+                <!-- Messages -->
+                <div class="overflow-y-auto max-h-48 p-3 space-y-2 no-scrollbar" id="scoreboard-chat-messages">
+                    @foreach (var msg in (GameState.CurrentRoom?.ChatMessages ?? new List<ChatMessage>()).TakeLast(20))
+                    {
+                        <div class="flex gap-2 items-start">
+                            <span class="text-xs font-bold @(msg.IsSystem ? "text-primary" : "text-slate-900 dark:text-white") shrink-0">@(msg.IsSystem ? "System:" : $"{msg.Nickname}:")</span>
+                            <span class="text-xs text-slate-600 dark:text-slate-300">@msg.Text</span>
+                        </div>
+                    }
+                    @if (!(GameState.CurrentRoom?.ChatMessages?.Any() ?? false))
+                    {
+                        <p class="text-xs text-slate-400 dark:text-slate-600 text-center py-2">Brak wiadomości. Napisz coś!</p>
+                    }
+                </div>
+                <!-- Input -->
+                <div class="flex gap-2 items-center border-t border-slate-200 dark:border-slate-700 px-3 py-2">
+                    <input @bind="_chatInput"
+                           @onkeypress="HandleChatKeyPress"
+                           placeholder="Napisz wiadomość..."
+                           class="chat-input flex-1 bg-transparent text-sm text-slate-900 dark:text-white placeholder-slate-400 border-none p-0 focus:ring-0 focus:outline-none" />
+                    <button @onclick="SendChat" class="shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:text-primary hover:bg-primary/10 transition-colors">
+                        <span class="material-symbols-outlined text-xl">send</span>
+                    </button>
+                </div>
+            </div>
+        </section>
     </div>
 
     <!-- Footer Actions -->
@@ -187,11 +221,18 @@ else
 
 @code {
     private bool _isStartingRound = false;
+    private string _chatInput = "";
 
     protected override void OnInitialized()
     {
         GameState.OnStateChanged += HandleStateChanged;
         GameState.OnNewRound += HandleNewRound;
+        GameState.OnChatMessage += HandleChatMessage;
+    }
+
+    private void HandleChatMessage(string nickname, string message, bool isSystem)
+    {
+        InvokeAsync(StateHasChanged);
     }
 
     private void HandleStateChanged()
@@ -214,6 +255,20 @@ else
         }
     }
 
+    private async Task SendChat()
+    {
+        if (!string.IsNullOrWhiteSpace(_chatInput))
+        {
+            await GameState.SendChatMessageAsync(_chatInput);
+            _chatInput = "";
+        }
+    }
+
+    private async Task HandleChatKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await SendChat();
+    }
+
     private async Task EndGame()
     {
         if (GameState.IsHost)
@@ -233,5 +288,6 @@ else
     {
         GameState.OnStateChanged -= HandleStateChanged;
         GameState.OnNewRound -= HandleNewRound;
+        GameState.OnChatMessage -= HandleChatMessage;
     }
 }

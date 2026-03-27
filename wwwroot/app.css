@@ -527,6 +527,9 @@
   .max-h-40 {
     max-height: calc(var(--spacing) * 40);
   }
+  .max-h-48 {
+    max-height: calc(var(--spacing) * 48);
+  }
   .min-h-\[120px\] {
     min-height: 120px;
   }
@@ -1230,6 +1233,9 @@
   }
   .pb-32 {
     padding-bottom: calc(var(--spacing) * 32);
+  }
+  .pb-48 {
+    padding-bottom: calc(var(--spacing) * 48);
   }
   .pl-4 {
     padding-left: calc(var(--spacing) * 4);
@@ -2537,6 +2543,10 @@ body {
 input:focus, textarea:focus {
   outline: none;
   box-shadow: 0 0 0 2px rgba(37, 140, 244, 0.3);
+}
+.chat-input:focus {
+  box-shadow: none;
+  outline: none;
 }
 @keyframes pulse-fast {
   0%, 100% {
