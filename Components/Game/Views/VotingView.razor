@@ -33,9 +33,9 @@ else
     var answersForCurrentCategory = _filteredAnswers.Where(a => a.Category == categoryName).ToList();
     var myAnswer = GetMyAnswerForCategory(categoryName);
     
-    <div class="flex flex-col min-h-dvh bg-bg-light dark:bg-bg-dark">
+    <div class="flex flex-col min-h-screen bg-bg-light dark:bg-bg-dark">
         <!-- Header with category name and progress -->
-        <div class="sticky top-0 z-50 bg-bg-light/95 dark:bg-bg-dark/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors safe-area-top">
+        <header class="sticky top-0 z-20 bg-surface-light dark:bg-surface-dark border-b border-slate-200 dark:border-slate-800 shadow-sm">
             <div class="flex items-center px-4 h-16 justify-center max-w-lg mx-auto w-full">
                 <div class="text-center">
                     <h1 class="text-lg font-bold text-slate-900 dark:text-white">@categoryName</h1>
@@ -47,10 +47,10 @@ else
             <div class="h-1 w-full bg-slate-200 dark:bg-slate-700">
                 <div class="h-full bg-primary transition-all duration-300" style="width: @((_currentCategoryIndex + 1) * 100 / _categoriesWithAnswers.Count)%"></div>
             </div>
-        </div>
+        </header>
 
         <!-- Main content -->
-        <main class="flex-1 w-full max-w-lg mx-auto px-4 pt-4 pb-28">
+        <main class="flex-1 flex flex-col overflow-y-auto w-full max-w-lg mx-auto px-4 pt-4 pb-4">
             <!-- "Twoja odpowiedź" header -->
             @if (!string.IsNullOrWhiteSpace(myAnswer))
             {
@@ -132,8 +132,8 @@ else
         </main>
 
         <!-- Footer -->
-        <div class="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-bg-light dark:from-bg-dark via-bg-light dark:via-bg-dark to-transparent z-40 safe-area-bottom pointer-events-none">
-            <div class="max-w-lg mx-auto w-full flex flex-col gap-2 pointer-events-auto">
+        <footer class="sticky bottom-0 p-4 bg-surface-light dark:bg-surface-dark border-t border-slate-200 dark:border-slate-800 z-20 w-full max-w-lg mx-auto safe-area-bottom">
+            <div class="max-w-lg mx-auto w-full flex flex-col gap-2">
                 @if (_hasSubmittedVotes)
                 {
                     <div class="text-center py-4">
@@ -153,7 +153,7 @@ else
                     }
                 }
             </div>
-        </div>
+        </footer>
     </div>
 }
 
