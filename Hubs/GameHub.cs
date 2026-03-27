@@ -105,6 +105,7 @@ public class GameHub : Hub
     public async Task CreateRoom(string nickname, string? sessionId = null)
     {
         var room = _roomService.CreateRoom(Context.ConnectionId, nickname, sessionId);
+        AddSystemMessageInternal(room, $"Pokój {room.Code} utworzony. Udostępnij kod znajomym!");
         await Groups.AddToGroupAsync(Context.ConnectionId, room.Code);
         await Clients.Caller.SendAsync("OnRoomCreated", room.Code);
     }
@@ -122,9 +123,15 @@ public class GameHub : Hub
             return;
         }
 
-        await Groups.AddToGroupAsync(Context.ConnectionId, roomCode.ToUpperInvariant());
-        await Clients.Caller.SendAsync("OnRoomCreated", roomCode.ToUpperInvariant()); // Reuse for join
-        await Clients.OthersInGroup(roomCode.ToUpperInvariant()).SendAsync("OnPlayerJoined", nickname, Context.ConnectionId);
+        var rCode = roomCode.ToUpperInvariant();
+        var room = _roomService.GetRoom(rCode);
+        AddSystemMessageInternal(room, $"{nickname} dołączył do pokoju.");
+        
+        await Groups.AddToGroupAsync(Context.ConnectionId, rCode);
+        await Clients.Caller.SendAsync("OnRoomCreated", rCode); // Reuse for join
+        await Clients.OthersInGroup(rCode).SendAsync("OnPlayerJoined", nickname, Context.ConnectionId);
+        // Broadcast system message to everyone (caller will get room state via OnRoomCreated)
+        await Clients.OthersInGroup(rCode).SendAsync("OnChatMessage", "System", $"{nickname} dołączył do pokoju.", true);
     }
 
     /// <summary>
@@ -784,9 +791,10 @@ public class GameHub : Hub
             {
                 room.ChatMessages.RemoveAt(0);
             }
-        }
 
-        await Clients.Group(roomCode).SendAsync("OnChatMessage", Context.ConnectionId, message);
+            // Broadcast with nickname + isSystem flag so clients match the listener signature
+            await Clients.Group(roomCode).SendAsync("OnChatMessage", player.Nickname, message, false);
+        }
     }
 
     /// <summary>
@@ -795,12 +803,20 @@ public class GameHub : Hub
     public void AddSystemMessage(string roomCode, string text)
     {
         var room = _roomService.GetRoom(roomCode);
-        room?.ChatMessages.Add(new ChatMessage
+        AddSystemMessageInternal(room, text);
+    }
+
+    private void AddSystemMessageInternal(Room? room, string text)
+    {
+        if (room == null) return;
+        room.ChatMessages.Add(new ChatMessage
         {
             Nickname = "System",
             Text = text,
             IsSystem = true
         });
+        if (room.ChatMessages.Count > 50)
+            room.ChatMessages.RemoveAt(0);
     }
 
     #endregion

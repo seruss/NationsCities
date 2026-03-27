@@ -327,7 +327,10 @@ public class ClientGameStateService : IAsyncDisposable
         // Chat
         _hubConnection.On<string, string, bool>("OnChatMessage", (nickname, message, isSystem) =>
         {
+            // Refresh room so ChatMessages list is up-to-date
+            CurrentRoom = _roomService.GetRoom(RoomCode ?? "");
             OnChatMessage?.Invoke(nickname, message, isSystem);
+            NotifyStateChanged();
         });
 
         // Voting events
