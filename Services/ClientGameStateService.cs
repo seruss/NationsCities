@@ -68,6 +68,9 @@ public class ClientGameStateService : IAsyncDisposable
     
     /// <summary>Fired when a chat message is received.</summary>
     public event Action<string, string, bool>? OnChatMessage;
+
+    /// <summary>Fired when public rooms list changes (for join screen).</summary>
+    public event Action<List<PublicRoomInfo>>? OnPublicRoomsUpdated;
     
     /// <summary>Fired when stop is triggered (playerId, endTime).</summary>
     public event Action<string, DateTime>? OnStopTriggered;
@@ -333,6 +336,12 @@ public class ClientGameStateService : IAsyncDisposable
             NotifyStateChanged();
         });
 
+        // Public rooms real-time updates
+        _hubConnection.On<List<PublicRoomInfo>>("OnPublicRoomsUpdated", rooms =>
+        {
+            OnPublicRoomsUpdated?.Invoke(rooms);
+        });
+
         // Voting events
         _hubConnection.On<string, int, int, int>("OnVoteCast", (answerId, valid, invalid, duplicate) =>
         {
@@ -512,6 +521,27 @@ public class ClientGameStateService : IAsyncDisposable
     {
         if (_hubConnection == null || string.IsNullOrEmpty(RoomCode)) return;
         await _hubConnection.InvokeAsync("SendChatMessage", RoomCode, message);
+    }
+
+    /// <summary>Connect, fetch initial public rooms list and subscribe to real-time updates.</summary>
+    public async Task<List<PublicRoomInfo>> StartPublicRoomsBrowsingAsync()
+    {
+        await EnsureConnectedAsync();
+        if (_hubConnection == null) return [];
+        var rooms = await _hubConnection.InvokeAsync<List<PublicRoomInfo>>("GetPublicRooms");
+        await _hubConnection.InvokeAsync("SubscribePublicRooms");
+        return rooms;
+    }
+
+    /// <summary>Unsubscribe from real-time public rooms updates.</summary>
+    public async Task StopPublicRoomsBrowsingAsync()
+    {
+        try
+        {
+            if (_hubConnection?.State == HubConnectionState.Connected)
+                await _hubConnection.InvokeAsync("UnsubscribePublicRooms");
+        }
+        catch { }
     }
 
     /// <summary>Update game settings - categories and round count (host only).</summary>

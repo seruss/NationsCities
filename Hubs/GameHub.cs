@@ -105,7 +105,7 @@ public class GameHub : Hub
     public async Task CreateRoom(string nickname, string? sessionId = null)
     {
         var room = _roomService.CreateRoom(Context.ConnectionId, nickname, sessionId);
-        AddSystemMessageInternal(room, "Kliknij 'Jestem gotowy' gdy chcesz grać!");
+        AddSystemMessageInternal(room, "Naciśnij 'Jestem gotowy' gdy chcesz grać!");
         await Groups.AddToGroupAsync(Context.ConnectionId, room.Code);
         await Clients.Caller.SendAsync("OnRoomCreated", room.Code);
     }
@@ -237,6 +237,22 @@ public class GameHub : Hub
     }
 
     /// <summary>
+    /// Subskrybuje aktualizacje listy pub. pokoi (ekran dołączania).
+    /// </summary>
+    public async Task SubscribePublicRooms()
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, "public-lobby");
+    }
+
+    /// <summary>
+    /// Odsubskrybowuje aktualizacje listy pub. pokoi.
+    /// </summary>
+    public async Task UnsubscribePublicRooms()
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, "public-lobby");
+    }
+
+    /// <summary>
     /// Ustawia pokój jako publiczny lub prywatny (tylko host).
     /// </summary>
     public async Task SetRoomPublic(string roomCode, bool isPublic)
@@ -257,6 +273,10 @@ public class GameHub : Hub
 
         _roomService.SetRoomPublic(roomCode, isPublic);
         await Clients.Group(roomCode).SendAsync("OnRoomVisibilityChanged", isPublic);
+
+        // Notify public rooms browsers about the updated list
+        var updatedRooms = _roomService.GetPublicRooms();
+        await Clients.Group("public-lobby").SendAsync("OnPublicRoomsUpdated", updatedRooms);
     }
 
     /// <summary>
