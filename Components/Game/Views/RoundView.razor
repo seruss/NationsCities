@@ -108,24 +108,14 @@ else
                                 </span>
                             }
                         </div>
-                        <div class="password-visible-wrapper">
-                            <input id="@inputId"
-                                   type="password"
-                                   @bind="@_answers[category.Name]"
-                                   @bind:event="oninput"
-                                   class="password-visible-input w-full border-0 rounded-xl p-4 text-lg shadow-sm ring-1 ring-slate-300 dark:ring-slate-700 focus:ring-2 focus:ring-primary focus:outline-none transition-all disabled:opacity-50"
-                                   autocomplete="off"
-                                   autocorrect="off"
-                                   autocapitalize="off"
-                                   spellcheck="false"
-                                   data-lpignore="true"
-                                   data-1p-ignore="true"
-                                   data-form-type="other"
-                                   disabled="@_hasSubmitted" />
-                            <div class="password-visible-overlay @(string.IsNullOrEmpty(GetAnswer(category.Name)) ? "placeholder" : "")">
-                                @(string.IsNullOrEmpty(GetAnswer(category.Name)) ? "Wpisz odpowiedź..." : GetAnswer(category.Name))
-                            </div>
-                        </div>
+                        <input id="@inputId"
+                               type="text"
+                               @bind="@_answers[category.Name]"
+                               @bind:event="oninput"
+                               placeholder="Wpisz odpowiedź..."
+                               class="w-full border-0 rounded-xl p-4 text-lg shadow-sm ring-1 ring-slate-300 dark:ring-slate-700 focus:ring-2 focus:ring-primary focus:outline-none transition-all disabled:opacity-50 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                               autocomplete="off"
+                               disabled="@_hasSubmitted" />
                     </div>
                 }
             </div>
