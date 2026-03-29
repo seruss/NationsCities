@@ -28,7 +28,7 @@ public class GameSettings
     /// <summary>
     /// Maksymalna liczba graczy.
     /// </summary>
-    public int MaxPlayers { get; set; } = 10;
+    public int MaxPlayers { get; set; } = 20;
 
     /// <summary>
     /// Litery dostępne do losowania (konfigurowalne przez hosta).

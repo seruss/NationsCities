@@ -816,36 +816,3 @@ window.unregisterAntiCheatHandler = function () {
     window._antiCheatReady = false;
     console.log('[AntiCheat] Blazor handler unregistered');
 };
-
-// ======================================
-// iOS Safari Password Input Focus Fix
-// ======================================
-// iOS Safari has a bug where type="password" inputs with transparent text
-// don't connect keyboard input on first tap. The native form nav arrows
-// fix this by doing a blur→refocus cycle. We replicate that behavior.
-
-(function () {
-    var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-    if (!isIOS) return;
-
-    document.addEventListener('touchend', function (e) {
-        var input = e.target;
-        // Walk up in case tap hit the overlay (pointer-events: none should prevent this, but safety)
-        if (!input.classList || !input.classList.contains('password-visible-input')) {
-            input = e.target.closest && e.target.closest('.password-visible-input');
-        }
-        if (!input || input.tagName !== 'INPUT') return;
-
-        // Blur and refocus after a tick — this forces iOS to properly connect the keyboard
-        setTimeout(function () {
-            input.blur();
-            setTimeout(function () {
-                input.focus();
-            }, 10);
-        }, 50);
-    }, { passive: true });
-
-    console.log('[iOS] Password input focus fix installed');
-})();
