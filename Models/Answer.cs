@@ -6,9 +6,9 @@ namespace NationsCities.Models;
 public class PlayerAnswers
 {
     /// <summary>
-    /// ConnectionId gracza.
+    /// SessionId gracza (stabilny identyfikator).
     /// </summary>
-    public string PlayerConnectionId { get; set; } = string.Empty;
+    public string PlayerSessionId { get; set; } = string.Empty;
 
     /// <summary>
     /// Odpowiedzi gracza (Key = nazwa kategorii, Value = odpowiedź).
@@ -47,7 +47,7 @@ public class AnswerForVoting
     public string Answer { get; set; } = string.Empty;
 
     /// <summary>
-    /// Lista ConnectionId graczy którzy dali tę odpowiedź.
+    /// Lista SessionId graczy którzy dali tę odpowiedź.
     /// </summary>
     public List<string> SubmittedBy { get; set; } = [];
 
@@ -57,17 +57,17 @@ public class AnswerForVoting
     public List<string> SubmitterNicknames { get; set; } = [];
 
     /// <summary>
-    /// Głosy za (valid).
+    /// Głosy za (valid) — lista SessionId.
     /// </summary>
     public List<string> VotesValid { get; set; } = [];
 
     /// <summary>
-    /// Głosy przeciw (invalid).
+    /// Głosy przeciw (invalid) — lista SessionId.
     /// </summary>
     public List<string> VotesInvalid { get; set; } = [];
 
     /// <summary>
-    /// Głosy za duplikatem.
+    /// Głosy za duplikatem — lista SessionId.
     /// </summary>
     public List<string> VotesDuplicate { get; set; } = [];
 

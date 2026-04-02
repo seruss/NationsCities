@@ -23,15 +23,15 @@ public class GameService
     /// <summary>
     /// Rozpoczyna grę w pokoju.
     /// </summary>
-    public (bool Success, string? Error) StartGame(string hostConnectionId)
+    public (bool Success, string? Error) StartGame(string hostSessionId)
     {
-        var room = _roomService.GetRoomByPlayer(hostConnectionId);
+        var room = _roomService.GetRoomBySession(hostSessionId);
         if (room == null)
         {
             return (false, "Nie jesteś w pokoju.");
         }
 
-        if (room.HostConnectionId != hostConnectionId)
+        if (room.HostSessionId != hostSessionId)
         {
             return (false, "Tylko host może rozpocząć grę.");
         }
@@ -116,7 +116,7 @@ public class GameService
     /// <summary>
     /// Gracz wciska STOP.
     /// </summary>
-    public (bool Success, DateTime EndTime, string? Error) TriggerStop(string roomCode, string connectionId, int countdownSeconds)
+    public (bool Success, DateTime EndTime, string? Error) TriggerStop(string roomCode, string sessionId, int countdownSeconds)
     {
         // Get or create a lock object for this room
         var roomLock = _roomLocks.GetOrAdd(roomCode, _ => new object());
@@ -141,7 +141,7 @@ public class GameService
                 return (false, default, "STOP już wciśnięty.");
             }
 
-            game.StopTriggeredBy = connectionId;
+            game.StopTriggeredBy = sessionId;
             game.Phase = RoundPhase.Countdown;
             game.CountdownEndTime = DateTime.UtcNow.AddSeconds(countdownSeconds);
 
@@ -152,7 +152,7 @@ public class GameService
     /// <summary>
     /// Dodaje czas do countdown (tylko gracz który wcisnął STOP).
     /// </summary>
-    public (bool Success, DateTime NewEndTime, string? Error) AddTime(string roomCode, string connectionId, int additionalSeconds)
+    public (bool Success, DateTime NewEndTime, string? Error) AddTime(string roomCode, string sessionId, int additionalSeconds)
     {
         var room = _roomService.GetRoom(roomCode);
         if (room?.CurrentGame == null)
@@ -167,7 +167,7 @@ public class GameService
             return (false, default, "Nie ma aktywnego countdown.");
         }
 
-        if (game.StopTriggeredBy != connectionId)
+        if (game.StopTriggeredBy != sessionId)
         {
             return (false, default, "Tylko gracz który wcisnął STOP może dodać czas.");
         }
@@ -179,7 +179,7 @@ public class GameService
     /// <summary>
     /// Zapisuje odpowiedzi gracza.
     /// </summary>
-    public bool SubmitAnswers(string roomCode, string connectionId, Dictionary<string, string> answers, bool autoSubmitted = false)
+    public bool SubmitAnswers(string roomCode, string sessionId, Dictionary<string, string> answers, bool autoSubmitted = false)
     {
         var room = _roomService.GetRoom(roomCode);
         if (room?.CurrentGame == null) return false;
@@ -192,9 +192,9 @@ public class GameService
             kvp => NormalizeAnswer(kvp.Value)
         );
 
-        game.RoundAnswers[connectionId] = new PlayerAnswers
+        game.RoundAnswers[sessionId] = new PlayerAnswers
         {
-            PlayerConnectionId = connectionId,
+            PlayerSessionId = sessionId,
             Answers = normalizedAnswers,
             AutoSubmitted = autoSubmitted
         };
@@ -221,20 +221,20 @@ public class GameService
             // Dictionary: normalized answer -> (primary answer, list of all original variants)
             var categoryAnswerGroups = new Dictionary<string, (AnswerForVoting Primary, HashSet<string> Variants)>();
 
-            foreach (var (playerId, playerAnswers) in game.RoundAnswers)
+            foreach (var (sessionId, playerAnswers) in game.RoundAnswers)
             {
                 if (playerAnswers?.Answers == null) continue;
                 if (!playerAnswers.Answers.TryGetValue(category.Name, out var answer)) continue;
                 if (string.IsNullOrWhiteSpace(answer)) continue;
 
-                var player = room.Players.FirstOrDefault(p => p.ConnectionId == playerId);
+                var player = room.Players.FirstOrDefault(p => p.SessionId == sessionId);
                 var nickname = player?.Nickname ?? "";
                 var normalizedAnswer = NormalizeForDuplicateCheck(answer);
 
                 if (categoryAnswerGroups.TryGetValue(normalizedAnswer, out var existing))
                 {
                     // Add this player to existing group
-                    existing.Primary.SubmittedBy.Add(playerId);
+                    existing.Primary.SubmittedBy.Add(sessionId);
                     if (!string.IsNullOrEmpty(nickname))
                         existing.Primary.SubmitterNicknames.Add(nickname);
                     
@@ -248,7 +248,7 @@ public class GameService
                     {
                         Category = category.Name,
                         Answer = answer.Trim(),
-                        SubmittedBy = [playerId],
+                        SubmittedBy = [sessionId],
                         SubmitterNicknames = string.IsNullOrEmpty(nickname) ? [] : [nickname]
                     };
                     var variants = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { answer.Trim() };
@@ -402,13 +402,13 @@ public class GameService
     /// Losuje nową literę w trakcie rundy (reroll, tylko host).
     /// Czyści odpowiedzi wszystkich graczy.
     /// </summary>
-    public (bool Success, char NewLetter, string? Error) RerollLetter(string roomCode, string hostConnectionId)
+    public (bool Success, char NewLetter, string? Error) RerollLetter(string roomCode, string hostSessionId)
     {
         var room = _roomService.GetRoom(roomCode);
         if (room?.CurrentGame == null)
             return (false, default, "Gra nie jest aktywna.");
 
-        var caller = room.Players.FirstOrDefault(p => p.ConnectionId == hostConnectionId);
+        var caller = room.Players.FirstOrDefault(p => p.SessionId == hostSessionId);
         if (caller?.IsHost != true)
             return (false, default, "Tylko host może zmienić literę.");
 

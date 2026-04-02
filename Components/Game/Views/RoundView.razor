@@ -223,7 +223,7 @@ else
             _isCountdownActive = true;
             var remaining = (GameState.CurrentGame.CountdownEndTime.Value - DateTime.UtcNow).TotalSeconds;
             _secondsRemaining = Math.Max(1, (int)Math.Ceiling(remaining));
-            _stopTriggeredByMe = GameState.CurrentGame.StopTriggeredBy == GameState.MyPlayer?.ConnectionId;
+            _stopTriggeredByMe = GameState.CurrentGame.StopTriggeredBy == GameState.MyPlayer?.SessionId;
             StartTimer();
         }
     }
@@ -250,7 +250,7 @@ else
     private void HandleStopTriggered(string playerId, DateTime endTime)
     {
         _isCountdownActive = true;
-        _stopTriggeredByMe = playerId == GameState.MyPlayer?.ConnectionId;
+        _stopTriggeredByMe = playerId == GameState.MyPlayer?.SessionId;
         
         var remaining = (endTime - DateTime.UtcNow).TotalSeconds;
         _secondsRemaining = Math.Max(1, (int)Math.Ceiling(remaining));

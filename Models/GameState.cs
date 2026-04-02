@@ -36,7 +36,7 @@ public class GameState
     public RoundPhase Phase { get; set; } = RoundPhase.Waiting;
 
     /// <summary>
-    /// ConnectionId gracza który wcisnął STOP (null jeśli nikt).
+    /// SessionId gracza który wcisnął STOP (null jeśli nikt).
     /// </summary>
     public string? StopTriggeredBy { get; set; }
 
@@ -47,7 +47,7 @@ public class GameState
 
     /// <summary>
     /// Odpowiedzi graczy w bieżącej rundzie.
-    /// Key = ConnectionId gracza, Value = odpowiedzi.
+    /// Key = SessionId gracza, Value = odpowiedzi.
     /// </summary>
     public Dictionary<string, PlayerAnswers> RoundAnswers { get; set; } = [];
 
@@ -57,7 +57,7 @@ public class GameState
     public List<AnswerForVoting> AnswersForVoting { get; set; } = [];
 
     /// <summary>
-    /// ConnectionId graczy którzy przesłali głosy.
+    /// SessionId graczy którzy przesłali głosy.
     /// </summary>
     public HashSet<string> VotesSubmittedBy { get; set; } = [];
 }

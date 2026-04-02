@@ -214,7 +214,7 @@ public class ClientGameStateService : IAsyncDisposable
             SetPhase(GamePhase.Lobby);
         });
 
-        _hubConnection.On<string, string>("OnPlayerJoined", (nickname, connectionId) =>
+        _hubConnection.On<string, string>("OnPlayerJoined", (nickname, sessionId) =>
         {
             CurrentRoom = _roomService.GetRoom(RoomCode ?? "");
             NotifyStateChanged();
@@ -226,13 +226,19 @@ public class ClientGameStateService : IAsyncDisposable
             NotifyStateChanged();
         });
 
-        _hubConnection.On<string, bool>("OnPlayerReadyChanged", (connectionId, isReady) =>
+        _hubConnection.On<string>("OnPlayerKicked", sessionId =>
         {
             CurrentRoom = _roomService.GetRoom(RoomCode ?? "");
             NotifyStateChanged();
         });
 
-        _hubConnection.On<string, string>("OnNewHost", (nickname, connectionId) =>
+        _hubConnection.On<string, bool>("OnPlayerReadyChanged", (sessionId, isReady) =>
+        {
+            CurrentRoom = _roomService.GetRoom(RoomCode ?? "");
+            NotifyStateChanged();
+        });
+
+        _hubConnection.On<string, string>("OnNewHost", (nickname, sessionId) =>
         {
             CurrentRoom = _roomService.GetRoom(RoomCode ?? "");
             NotifyStateChanged();
@@ -345,7 +351,7 @@ public class ClientGameStateService : IAsyncDisposable
 
         // Anti-cheat: server recorded a violation — refresh state so UI re-renders
         _hubConnection.On<string, string, double, int>("OnAntiCheatViolation", 
-            (connectionId, violationType, durationSeconds, penalty) =>
+            (sessionId, violationType, durationSeconds, penalty) =>
         {
             CurrentRoom = _roomService.GetRoom(RoomCode ?? "");
             NotifyStateChanged();
@@ -604,10 +610,10 @@ public class ClientGameStateService : IAsyncDisposable
     }
 
     /// <summary>Kick player (host only).</summary>
-    public async Task KickPlayerAsync(string connectionId)
+    public async Task KickPlayerAsync(string sessionId)
     {
         if (_hubConnection == null || string.IsNullOrEmpty(RoomCode)) return;
-        await _hubConnection.InvokeAsync("KickPlayer", RoomCode, connectionId);
+        await _hubConnection.InvokeAsync("KickPlayer", RoomCode, sessionId);
     }
 
     // ===== ANTI-CHEAT =====
@@ -728,8 +734,14 @@ public class ClientGameStateService : IAsyncDisposable
         
         try
         {
-            await _hubConnection.InvokeAsync("ReportViolation", RoomCode, violationType, durationSeconds, roundNumber);
-            return true;
+            var reported = await _hubConnection.InvokeAsync<bool>(
+                "ReportViolation",
+                RoomCode,
+                violationType,
+                durationSeconds,
+                roundNumber);
+
+            return reported;
         }
         catch (Exception ex)
         {
