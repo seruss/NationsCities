@@ -206,6 +206,7 @@ public class RoomService
         {
             var newHost = room.Players.First();
             newHost.IsHost = true;
+            newHost.IsReady = true;
             room.HostSessionId = newHost.SessionId;
             newHostSessionId = newHost.SessionId;
             newHostNickname = newHost.Nickname;
