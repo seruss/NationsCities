@@ -374,6 +374,7 @@ window.AntiCheatTracker = class {
     // Clear session completely - call when returning to lobby between games
     clearSession() {
         this._stopHeartbeat();
+        this._stopQueueRetry();
         this._clearSession();
         this._clearPendingQueue(); // Clear pending violations too
         this._hideBlockOverlay();
@@ -501,6 +502,16 @@ window.AntiCheatTracker = class {
 
             if (gap > this.NOTICE_THRESHOLD_MS) {
                 this._handleViolation(gap, session);
+            } else {
+                // No new violation, but there may be pending violations from
+                // a previous visibility change whose report failed because
+                // the Blazor circuit was still reconnecting. Retry now.
+                const pendingQueue = this._getPendingQueue();
+                if (pendingQueue.length > 0) {
+                    console.log(`[AntiCheat] Page visible, retrying ${pendingQueue.length} pending violations`);
+                    this._processQueue();
+                    this._startQueueRetry();
+                }
             }
 
             // Resume heartbeat
@@ -671,8 +682,39 @@ window.AntiCheatTracker = class {
         this._addToPendingQueue({ id, roomCode, violationType, durationSeconds, roundNumber, timestamp: Date.now() });
         console.log(`[AntiCheat] Violation queued (id=${id}): ${violationType}, round ${roundNumber}, ${durationSeconds.toFixed(2)}s`);
 
-        // Try to drain the queue immediately
+        // Try to drain the queue immediately, and schedule retries
+        // in case the Blazor circuit is still reconnecting after mobile resume
         this._processQueue();
+        this._startQueueRetry();
+    }
+
+    /**
+     * Start a self-stopping interval that retries _processQueue every 2s.
+     * Stops automatically when the queue is empty or after 30s.
+     */
+    _startQueueRetry() {
+        if (this._queueRetryInterval) return; // already running
+        const startedAt = Date.now();
+        this._queueRetryInterval = setInterval(() => {
+            const queue = this._getPendingQueue();
+            if (queue.length === 0 || Date.now() - startedAt > 30000) {
+                clearInterval(this._queueRetryInterval);
+                this._queueRetryInterval = null;
+                if (queue.length > 0) {
+                    console.warn('[AntiCheat] Queue retry timed out, items remain');
+                }
+                return;
+            }
+            console.log(`[AntiCheat] Retry: draining queue (${queue.length} pending)`);
+            this._processQueue();
+        }, 2000);
+    }
+
+    _stopQueueRetry() {
+        if (this._queueRetryInterval) {
+            clearInterval(this._queueRetryInterval);
+            this._queueRetryInterval = null;
+        }
     }
 
     // Single processing loop — guarded against concurrent execution
@@ -812,6 +854,11 @@ window.registerAntiCheatHandler = function (dotNetHelper) {
 
     // Drain any violations that were queued while Blazor was disconnected
     window.antiCheatTracker._processQueue();
+    // Also start retry loop in case _processQueue partially fails
+    const pending = window.antiCheatTracker._getPendingQueue();
+    if (pending.length > 0) {
+        window.antiCheatTracker._startQueueRetry();
+    }
 };
 
 window.unregisterAntiCheatHandler = function () {
