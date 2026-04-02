@@ -386,7 +386,8 @@ window.AntiCheatTracker = class {
             this._startHeartbeat();
             GameLog.info('AntiCheat', `Tracking resumed: round=${session.roundNumber}, violations=${session.violationCount}`);
             
-            // Drain any pending violations queued while disconnected
+            // Reset & drain any pending violations queued while disconnected
+            this._processingQueue = false;
             this._processQueue();
         } else if (roomCode) {
             // No session to resume - start fresh (fallback)
@@ -556,7 +557,9 @@ window.AntiCheatTracker = class {
                 const pendingQueue = this._getPendingQueue();
                 if (pendingQueue.length > 0) {
                     GameLog.info('AntiCheat', `Page visible, retrying ${pendingQueue.length} pending violations`);
-                    this._processQueue();
+                    // Reset processing flag in case a previous call hung
+                    this._processingQueue = false;
+                    setTimeout(() => this._processQueue(), 500);
                     this._startQueueRetry();
                 }
             }
@@ -729,9 +732,9 @@ window.AntiCheatTracker = class {
         this._addToPendingQueue({ id, roomCode, violationType, durationSeconds, roundNumber, timestamp: Date.now() });
         GameLog.info('AntiCheat', `Violation QUEUED: id=${id}, type=${violationType}, round=${roundNumber}, duration=${durationSeconds.toFixed(2)}s`);
 
-        // Try to drain the queue immediately, and schedule retries
-        // in case the Blazor circuit is still reconnecting after mobile resume
-        this._processQueue();
+        // Delay processing slightly to allow Blazor circuit/WebSocket to stabilize
+        // after mobile resume — visibilitychange fires before WebSocket fully wakes up
+        setTimeout(() => this._processQueue(), 500);
         this._startQueueRetry();
     }
 
@@ -762,6 +765,14 @@ window.AntiCheatTracker = class {
             clearInterval(this._queueRetryInterval);
             this._queueRetryInterval = null;
         }
+    }
+
+    // Promise timeout helper — prevents hanging invokeMethodAsync from blocking the queue
+    _withTimeout(promise, ms) {
+        return Promise.race([
+            promise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms))
+        ]);
     }
 
     // Single processing loop — guarded against concurrent execution
@@ -804,11 +815,15 @@ window.AntiCheatTracker = class {
 
                 try {
                     GameLog.debug('AntiCheat', `_processQueue: invoking ReportViolationFromJS for id=${violation.id}, type=${violation.violationType}, round=${violation.roundNumber}`);
-                    const reported = await window._antiCheatDotNetRef.invokeMethodAsync(
-                        'ReportViolationFromJS',
-                        violation.violationType,
-                        violation.durationSeconds,
-                        violation.roundNumber || 1);
+                    // 5s timeout prevents hanging promise from blocking the queue forever
+                    // (mobile WebSocket may be in a frozen state after resume)
+                    const reported = await this._withTimeout(
+                        window._antiCheatDotNetRef.invokeMethodAsync(
+                            'ReportViolationFromJS',
+                            violation.violationType,
+                            violation.durationSeconds,
+                            violation.roundNumber || 1),
+                        5000);
 
                     if (reported) {
                         GameLog.info('AntiCheat', `Violation REPORTED to server: id=${violation.id}, round=${violation.roundNumber}`);
@@ -907,6 +922,9 @@ window.registerAntiCheatHandler = function (dotNetHelper) {
     const hadPrevious = !!window._antiCheatDotNetRef;
     window._antiCheatDotNetRef = dotNetHelper;
     window._antiCheatReady = true;
+    // Force-reset processing flag — a previous invokeMethodAsync may have hung
+    // (e.g., mobile WebSocket frozen after background), leaving this flag stuck true
+    window.antiCheatTracker._processingQueue = false;
     const pending = window.antiCheatTracker._getPendingQueue();
     GameLog.info('AntiCheat', `Blazor handler registered: hadPrevious=${hadPrevious}, pendingViolations=${pending.length}, phase=${window._gamePhase}`);
 
