@@ -782,8 +782,24 @@ public class GameHub : Hub
 
     public async Task ReturnToLobby(string roomCode)
     {
+        var sessionId = ResolveSessionId();
+        if (sessionId == null) return;
+
         var room = _roomService.GetRoom(roomCode);
         if (room == null) return;
+
+        // When the host returns to lobby, reset game state so the room
+        // becomes joinable again and reappears in the public list.
+        if (room.HostSessionId == sessionId && room.CurrentGame != null)
+        {
+            room.CurrentGame = null;
+
+            if (room.IsPublic)
+            {
+                var updatedRooms = _roomService.GetPublicRooms();
+                await Clients.Group("public-lobby").SendAsync("OnPublicRoomsUpdated", updatedRooms);
+            }
+        }
 
         await Clients.Caller.SendAsync("OnReturnToLobby", roomCode);
     }
