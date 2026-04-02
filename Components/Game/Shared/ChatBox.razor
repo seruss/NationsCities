@@ -47,7 +47,7 @@
 else
 {
     <div class="flex-1 min-h-[120px] bg-surface-light dark:bg-surface-dark rounded-2xl p-3 shadow-inner border border-slate-200 dark:border-slate-800 flex flex-col justify-end">
-        <div class="flex-1 overflow-y-auto space-y-2 mb-2 pr-1 no-scrollbar">
+        <div class="flex-1 overflow-y-auto space-y-2 mb-2 pr-1 no-scrollbar" data-scrollable="true">
             @foreach (var msg in Messages.TakeLast(MaxMessages))
             {
                 <div class="flex gap-2 items-start">
