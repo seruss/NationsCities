@@ -25,6 +25,7 @@ public class GameHub : Hub
         var roomCode = _roomService.GetRoomCode(Context.ConnectionId);
         if (roomCode == null)
         {
+            Console.WriteLine($"[GameHub] OnDisconnectedAsync: {Context.ConnectionId} — no room mapping, skipping.");
             await base.OnDisconnectedAsync(exception);
             return;
         }
@@ -35,6 +36,7 @@ public class GameHub : Hub
         // They're just navigating between pages (lobby -> game -> scoreboard -> etc)
         if (room?.CurrentGame != null)
         {
+            Console.WriteLine($"[GameHub] OnDisconnectedAsync: {Context.ConnectionId} — game in progress in room {roomCode}, keeping player.");
             await base.OnDisconnectedAsync(exception);
             return;
         }
@@ -42,9 +44,12 @@ public class GameHub : Hub
         var player = room?.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
         if (player == null)
         {
+            Console.WriteLine($"[GameHub] OnDisconnectedAsync: {Context.ConnectionId} — player not found in room {roomCode} (possibly already reconnected with new connectionId).");
             await base.OnDisconnectedAsync(exception);
             return;
         }
+        
+        Console.WriteLine($"[GameHub] OnDisconnectedAsync: {player.Nickname} ({Context.ConnectionId}) in room {roomCode}, IsHost={player.IsHost}");
         
         // LOBBY DISCONNECTION: Schedule removal with grace period instead of immediate removal
         // This allows the player to reconnect after a page refresh
@@ -69,9 +74,9 @@ public class GameHub : Hub
                         // Notify remaining players about the player leaving
                         await Clients.Group(removal.RoomCode).SendAsync("OnPlayerLeft", removal.Nickname);
                         
-                        if (removal.NewHostId != null)
+                        if (removal.NewHostId != null && removal.NewHostNickname != null)
                         {
-                            await Clients.Group(removal.RoomCode).SendAsync("OnNewHost", removal.NewHostId);
+                            await Clients.Group(removal.RoomCode).SendAsync("OnNewHost", removal.NewHostNickname, removal.NewHostId);
                         }
                     }
                 }
@@ -80,14 +85,15 @@ public class GameHub : Hub
         else
         {
             // No session ID - immediate removal (legacy behavior)
+            Console.WriteLine($"[GameHub] OnDisconnectedAsync: {player.Nickname} has no sessionId, immediate removal.");
             var result = _roomService.LeaveRoom(Context.ConnectionId);
             if (result.Room != null && !result.RoomDeleted)
             {
                 await Clients.Group(result.Room.Code).SendAsync("OnPlayerLeft", Context.ConnectionId);
                 
-                if (result.NewHostId != null)
+                if (result.NewHostId != null && result.NewHostNickname != null)
                 {
-                    await Clients.Group(result.Room.Code).SendAsync("OnNewHost", result.NewHostId);
+                    await Clients.Group(result.Room.Code).SendAsync("OnNewHost", result.NewHostNickname, result.NewHostId);
                 }
             }
         }
@@ -293,9 +299,9 @@ public class GameHub : Hub
             {
                 await Clients.Group(roomCode).SendAsync("OnPlayerLeft", Context.ConnectionId);
                 
-                if (result.NewHostId != null)
+                if (result.NewHostId != null && result.NewHostNickname != null)
                 {
-                    await Clients.Group(roomCode).SendAsync("OnNewHost", result.NewHostId);
+                    await Clients.Group(roomCode).SendAsync("OnNewHost", result.NewHostNickname, result.NewHostId);
                 }
             }
         }
@@ -848,15 +854,15 @@ public class GameHub : Hub
     }
 
     /// <summary>
-    /// Wraca do lobby (zachowuje pokój, graczy i wyniki - reset przy następnej grze).
+    /// Wraca do lobby (tylko dla gracza który kliknął — każdy wraca niezależnie).
     /// </summary>
     public async Task ReturnToLobby(string roomCode)
     {
         var room = _roomService.GetRoom(roomCode);
         if (room == null) return;
 
-        // Just notify all players to return to lobby (reset happens on next StartGame)
-        await Clients.Group(roomCode).SendAsync("OnReturnToLobby", roomCode);
+        // Only send to the caller — each player returns to lobby independently
+        await Clients.Caller.SendAsync("OnReturnToLobby", roomCode);
     }
 
     #endregion

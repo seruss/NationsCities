@@ -122,22 +122,22 @@ public class RoomService
     /// <summary>
     /// Usuwa gracza z pokoju.
     /// </summary>
-    public (Room? Room, bool RoomDeleted, string? NewHostId) LeaveRoom(string connectionId)
+    public (Room? Room, bool RoomDeleted, string? NewHostId, string? NewHostNickname) LeaveRoom(string connectionId)
     {
         if (!_playerRooms.TryRemove(connectionId, out var roomCode))
         {
-            return (null, false, null);
+            return (null, false, null, null);
         }
 
         if (!_rooms.TryGetValue(roomCode, out var room))
         {
-            return (null, false, null);
+            return (null, false, null, null);
         }
 
         var player = room.Players.FirstOrDefault(p => p.ConnectionId == connectionId);
         if (player == null)
         {
-            return (null, false, null);
+            return (null, false, null, null);
         }
 
         room.Players.Remove(player);
@@ -146,20 +146,22 @@ public class RoomService
         if (room.Players.Count == 0)
         {
             _rooms.TryRemove(roomCode, out _);
-            return (room, true, null);
+            return (room, true, null, null);
         }
 
         // Jeśli host wyszedł - przydziel nowego
         string? newHostId = null;
+        string? newHostNickname = null;
         if (player.IsHost)
         {
             var newHost = room.Players.First();
             newHost.IsHost = true;
             room.HostConnectionId = newHost.ConnectionId;
             newHostId = newHost.ConnectionId;
+            newHostNickname = newHost.Nickname;
         }
 
-        return (room, false, newHostId);
+        return (room, false, newHostId, newHostNickname);
     }
 
     /// <summary>
@@ -424,9 +426,9 @@ public class RoomService
     /// Processes expired pending disconnections. Should be called periodically or after delay.
     /// Returns list of removed players for notification.
     /// </summary>
-    public List<(string RoomCode, string Nickname, string? NewHostId, bool RoomDeleted)> ProcessExpiredDisconnections()
+    public List<(string RoomCode, string Nickname, string? NewHostId, string? NewHostNickname, bool RoomDeleted)> ProcessExpiredDisconnections()
     {
-        var results = new List<(string RoomCode, string Nickname, string? NewHostId, bool RoomDeleted)>();
+        var results = new List<(string RoomCode, string Nickname, string? NewHostId, string? NewHostNickname, bool RoomDeleted)>();
         var now = DateTime.UtcNow;
 
         foreach (var kvp in _pendingDisconnections.ToList())
@@ -447,10 +449,19 @@ public class RoomService
                         
                         if (player != null)
                         {
+                            // GUARD: If the player has already reconnected (connectionId changed),
+                            // do NOT remove them — they're back in the game with a new connection.
+                            if (player.ConnectionId != pending.ConnectionId)
+                            {
+                                Console.WriteLine($"[RoomService] Skipping removal for {pending.Nickname} — player reconnected with new connectionId {player.ConnectionId} (pending had {pending.ConnectionId})");
+                                continue;
+                            }
+                            
                             room.Players.Remove(player);
                             _playerRooms.TryRemove(player.ConnectionId, out _);
                             
                             string? newHostId = null;
+                            string? newHostNickname = null;
                             bool roomDeleted = false;
                             
                             if (room.Players.Count == 0)
@@ -464,9 +475,10 @@ public class RoomService
                                 newHost.IsHost = true;
                                 room.HostConnectionId = newHost.ConnectionId;
                                 newHostId = newHost.ConnectionId;
+                                newHostNickname = newHost.Nickname;
                             }
                             
-                            results.Add((pending.RoomCode, pending.Nickname, newHostId, roomDeleted));
+                            results.Add((pending.RoomCode, pending.Nickname, newHostId, newHostNickname, roomDeleted));
                         }
                     }
                 }

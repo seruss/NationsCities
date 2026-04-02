@@ -163,7 +163,7 @@ else
                         @if (IsHost && !isMe)
                         {
                             <button @onclick="() => KickPlayer(player.ConnectionId)" 
-                                    class="ml-1 p-1.5 text-slate-400 hover:text-red-500 transition-colors rounded-full hover:bg-red-900/20">
+                                    class="ml-1 w-8 h-8 flex items-center justify-center shrink-0 text-slate-400 hover:text-red-500 transition-colors rounded-full hover:bg-red-100 dark:hover:bg-red-900/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50">
                                 <span class="material-symbols-outlined text-lg">block</span>
                             </button>
                         }
