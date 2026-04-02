@@ -8,8 +8,18 @@ var polishCulture = new CultureInfo("pl-PL");
 CultureInfo.DefaultThreadCurrentCulture = polishCulture;
 CultureInfo.DefaultThreadCurrentUICulture = polishCulture;
 
-builder.Services.AddRazorComponents().AddInteractiveServerComponents();
-builder.Services.AddSignalR();
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents()
+    .AddCircuitOptions(options =>
+    {
+        // Keep disconnected circuits alive longer for mobile resume scenarios
+        options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(3);
+    });
+builder.Services.AddSignalR(options =>
+{
+    options.ClientTimeoutInterval = TimeSpan.FromMinutes(2);
+    options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+});
 
 builder.Services.AddSingleton<NationsCities.Services.RoomService>();
 builder.Services.AddSingleton<NationsCities.Services.GameService>();

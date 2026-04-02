@@ -168,10 +168,13 @@ public class ClientGameStateService : IAsyncDisposable
             .WithUrl(_navigation.ToAbsoluteUri("/gamehub"))
             .WithAutomaticReconnect(new[] { 
                 TimeSpan.Zero, 
+                TimeSpan.FromMilliseconds(500), 
+                TimeSpan.FromSeconds(1), 
                 TimeSpan.FromSeconds(2), 
+                TimeSpan.FromSeconds(3), 
                 TimeSpan.FromSeconds(5), 
                 TimeSpan.FromSeconds(10),
-                TimeSpan.FromSeconds(30)
+                TimeSpan.FromSeconds(20)
             })
             .Build();
 
@@ -426,17 +429,14 @@ public class ClientGameStateService : IAsyncDisposable
                 CurrentRoom = snapshot.Room;
                 Nickname = snapshot.Nickname;
                 
-                // Resume anti-cheat if playing; register handler for all active phases
-                // so pending violations from the queue can still be flushed to the server
+                // ALWAYS re-register the Blazor handler after reconnect.
+                // This drains any pending violations from the JS queue that were
+                // detected while the hub connection was broken (e.g. mobile resume).
+                _ = RegisterAntiCheatHandlerOnlyAsync();
+                
                 if (snapshot.Phase == GamePhase.Playing)
                 {
                     _ = ResumeAntiCheatAsync(CurrentGame?.CurrentRound ?? 1);
-                }
-                else if (snapshot.Phase == GamePhase.Voting || snapshot.Phase == GamePhase.RoundResults)
-                {
-                    // Register handler so pending violations (detected while disconnected)
-                    // can be flushed to the server even though we're past Playing phase
-                    _ = RegisterAntiCheatHandlerOnlyAsync();
                 }
                 
                 SetPhase(snapshot.Phase);

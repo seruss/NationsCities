@@ -340,6 +340,9 @@ window.AntiCheatTracker = class {
             this._saveSession(session);
             this._startHeartbeat();
             console.log(`[AntiCheat] Tracking resumed, round ${session.roundNumber}, violations: ${session.violationCount}`);
+            
+            // Drain any pending violations queued while disconnected
+            this._processQueue();
         } else if (roomCode) {
             // No session to resume - start fresh (fallback)
             console.log('[AntiCheat] No session to resume, starting fresh');
