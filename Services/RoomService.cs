@@ -1,5 +1,6 @@
 using NationsCities.Models;
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 
 namespace NationsCities.Services;
 
@@ -10,6 +11,7 @@ namespace NationsCities.Services;
 /// </summary>
 public class RoomService
 {
+    private readonly ILogger<RoomService> _logger;
     private readonly ConcurrentDictionary<string, Room> _rooms = new();
     private readonly ConcurrentDictionary<string, string> _sessionRooms = new(); // SessionId -> RoomCode
     private readonly ConcurrentDictionary<string, string> _sessionConnections = new(); // SessionId -> ConnectionId (transport)
@@ -19,6 +21,11 @@ public class RoomService
     
     private const string RoomCodeChars = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // bez I, O
     private static readonly TimeSpan LobbyDisconnectGracePeriod = TimeSpan.FromSeconds(5);
+
+    public RoomService(ILogger<RoomService> logger)
+    {
+        _logger = logger;
+    }
 
     // ===== RESOLVER: ConnectionId <-> SessionId =====
 
@@ -424,7 +431,7 @@ public class RoomService
         };
         
         _pendingDisconnections[sessionId] = pending;
-        Console.WriteLine($"[RoomService] Scheduled removal for {nickname} (session {sessionId}) at {removalTime:HH:mm:ss}");
+        _logger.LogInformation("Scheduled removal for {Nickname} (session={SessionId}) at {RemovalTime:HH:mm:ss}", nickname, sessionId, removalTime);
         
         return removalTime;
     }
@@ -436,7 +443,7 @@ public class RoomService
     {
         if (_pendingDisconnections.TryRemove(sessionId, out var pending))
         {
-            Console.WriteLine($"[RoomService] Cancelled pending removal for {pending.Nickname} (session {sessionId})");
+            _logger.LogInformation("Cancelled pending removal for {Nickname} (session={SessionId})", pending.Nickname, sessionId);
             return true;
         }
         return false;
@@ -454,7 +461,7 @@ public class RoomService
             {
                 if (_pendingDisconnections.TryRemove(kvp.Key, out var pending))
                 {
-                    Console.WriteLine($"[RoomService] Cancelled pending removal for {pending.Nickname} by nickname");
+                    _logger.LogInformation("Cancelled pending removal for {Nickname} by nickname", pending.Nickname);
                     return true;
                 }
             }
@@ -476,7 +483,7 @@ public class RoomService
             {
                 if (_pendingDisconnections.TryRemove(kvp.Key, out var pending))
                 {
-                    Console.WriteLine($"[RoomService] Processing expired disconnection for {pending.Nickname}");
+                    _logger.LogDebug("Processing expired disconnection for {Nickname}", pending.Nickname);
                     
                     var room = GetRoom(pending.RoomCode);
                     if (room != null)
@@ -491,7 +498,7 @@ public class RoomService
                             // do NOT remove them.
                             if (player.ConnectionId != pending.ConnectionId)
                             {
-                                Console.WriteLine($"[RoomService] Skipping removal for {pending.Nickname} — player reconnected");
+                                _logger.LogInformation("Skipping removal for {Nickname} — player reconnected (conn changed)", pending.Nickname);
                                 continue;
                             }
                             

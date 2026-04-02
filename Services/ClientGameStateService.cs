@@ -14,6 +14,7 @@ public class ClientGameStateService : IAsyncDisposable
     private readonly NavigationManager _navigation;
     private readonly IJSRuntime _jsRuntime;
     private readonly RoomService _roomService;
+    private readonly ILogger<ClientGameStateService> _logger;
     
     private HubConnection? _hubConnection;
     private DotNetObjectReference<ClientGameStateService>? _dotNetRef;
@@ -96,11 +97,13 @@ public class ClientGameStateService : IAsyncDisposable
     public ClientGameStateService(
         NavigationManager navigation, 
         IJSRuntime jsRuntime,
-        RoomService roomService)
+        RoomService roomService,
+        ILogger<ClientGameStateService> logger)
     {
         _navigation = navigation;
         _jsRuntime = jsRuntime;
         _roomService = roomService;
+        _logger = logger;
     }
 
     // ===== LIFECYCLE =====
@@ -119,6 +122,8 @@ public class ClientGameStateService : IAsyncDisposable
             SessionId = await _jsRuntime.InvokeAsync<string?>("gameSession.getOrCreateSessionId");
             _tabId = await _jsRuntime.InvokeAsync<string>("gameSession.getTabId");
             
+            _logger.LogInformation("Initialized: SessionId={SessionId}, TabId={TabId}", SessionId, _tabId);
+            
             // Setup navigation guard for back button
             _dotNetRef = DotNetObjectReference.Create(this);
             await _jsRuntime.InvokeVoidAsync("gameSession.setupNavigationGuard", _dotNetRef);
@@ -127,7 +132,7 @@ public class ClientGameStateService : IAsyncDisposable
             var savedSession = await _jsRuntime.InvokeAsync<SavedGameSession?>("gameSession.load");
             if (savedSession != null && !string.IsNullOrEmpty(savedSession.RoomCode))
             {
-                // Attempt reconnection
+                _logger.LogInformation("Found saved session: room={RoomCode}, nickname={Nickname}", savedSession.RoomCode, savedSession.Nickname);
                 RoomCode = savedSession.RoomCode;
                 Nickname = savedSession.Nickname;
                 await ReconnectAsync();
@@ -135,7 +140,7 @@ public class ClientGameStateService : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ClientGameState] Init error: {ex.Message}");
+            _logger.LogError(ex, "Init error");
         }
     }
 
@@ -162,6 +167,7 @@ public class ClientGameStateService : IAsyncDisposable
     {
         if (_hubConnection?.State == HubConnectionState.Connected) return;
         
+        _logger.LogDebug("EnsureConnectedAsync: creating new hub connection");
         _hubConnection?.DisposeAsync().AsTask().Wait(500);
         
         _hubConnection = new HubConnectionBuilder()
@@ -180,17 +186,20 @@ public class ClientGameStateService : IAsyncDisposable
 
         _hubConnection.Reconnecting += error =>
         {
+            _logger.LogWarning(error, "Hub connection reconnecting");
             SetPhase(GamePhase.Disconnected);
             return Task.CompletedTask;
         };
 
         _hubConnection.Reconnected += async _ =>
         {
+            _logger.LogInformation("Hub connection reconnected, calling ReconnectAsync");
             await ReconnectAsync();
         };
 
         _hubConnection.Closed += error =>
         {
+            _logger.LogWarning(error, "Hub connection closed, currentPhase={Phase}", CurrentPhase);
             if (CurrentPhase != GamePhase.Home)
             {
                 SetPhase(GamePhase.Error);
@@ -429,13 +438,15 @@ public class ClientGameStateService : IAsyncDisposable
                 CurrentRoom = snapshot.Room;
                 Nickname = snapshot.Nickname;
                 
+                _logger.LogInformation("ReconnectAsync: success — phase={Phase}, nickname={Nickname}, room={RoomCode}", snapshot.Phase, snapshot.Nickname, RoomCode);
+                
                 // ALWAYS re-register the Blazor handler after reconnect.
-                // This drains any pending violations from the JS queue that were
-                // detected while the hub connection was broken (e.g. mobile resume).
+                _logger.LogDebug("ReconnectAsync: re-registering anti-cheat handler");
                 _ = RegisterAntiCheatHandlerOnlyAsync();
                 
                 if (snapshot.Phase == GamePhase.Playing)
                 {
+                    _logger.LogDebug("ReconnectAsync: resuming anti-cheat tracking for round {Round}", CurrentGame?.CurrentRound ?? 1);
                     _ = ResumeAntiCheatAsync(CurrentGame?.CurrentRound ?? 1);
                 }
                 
@@ -450,7 +461,7 @@ public class ClientGameStateService : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ClientGameState] Reconnect failed: {ex.Message}");
+            _logger.LogError(ex, "ReconnectAsync failed");
             SetPhase(GamePhase.Home);
         }
     }
@@ -622,17 +633,19 @@ public class ClientGameStateService : IAsyncDisposable
     {
         try
         {
-            // Register handler if not done
+            _logger.LogDebug("StartAntiCheatAsync: registering handler, dotNetRef null={IsNull}", _dotNetRef == null);
             if (_dotNetRef != null)
             {
                 await _jsRuntime.InvokeVoidAsync("registerAntiCheatHandler", _dotNetRef);
             }
+            _logger.LogDebug("StartAntiCheatAsync: calling startTracking, room={RoomCode}, round={Round}", RoomCode, CurrentGame?.CurrentRound ?? 1);
             await _jsRuntime.InvokeVoidAsync("antiCheatTracker.startTracking", 
                 RoomCode, CurrentGame?.CurrentRound ?? 1);
+            _logger.LogInformation("StartAntiCheatAsync: tracking started successfully");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ClientGameState] Anti-cheat start error: {ex.Message}");
+            _logger.LogError(ex, "Anti-cheat start error");
         }
     }
 
@@ -650,6 +663,7 @@ public class ClientGameStateService : IAsyncDisposable
     {
         try
         {
+            _logger.LogDebug("StartAntiCheatTrackingAsync: round={Round}, dotNetRef null={IsNull}", roundNumber, _dotNetRef == null);
             if (_dotNetRef != null)
             {
                 await _jsRuntime.InvokeVoidAsync("registerAntiCheatHandler", _dotNetRef);
@@ -657,16 +671,19 @@ public class ClientGameStateService : IAsyncDisposable
             
             if (roundNumber > 1)
             {
+                _logger.LogDebug("StartAntiCheatTrackingAsync: resumeTracking (round > 1)");
                 await _jsRuntime.InvokeVoidAsync("antiCheatTracker.resumeTracking", RoomCode, roundNumber);
             }
             else
             {
+                _logger.LogDebug("StartAntiCheatTrackingAsync: startTracking (round 1)");
                 await _jsRuntime.InvokeVoidAsync("antiCheatTracker.startTracking", RoomCode, roundNumber);
             }
+            _logger.LogInformation("StartAntiCheatTrackingAsync: tracking active for round {Round}", roundNumber);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ClientGameState] Anti-cheat tracking start error: {ex.Message}");
+            _logger.LogError(ex, "Anti-cheat tracking start error");
         }
     }
     
@@ -698,14 +715,20 @@ public class ClientGameStateService : IAsyncDisposable
     {
         try
         {
+            _logger.LogDebug("RegisterAntiCheatHandlerOnlyAsync: dotNetRef null={IsNull}", _dotNetRef == null);
             if (_dotNetRef != null)
             {
                 await _jsRuntime.InvokeVoidAsync("registerAntiCheatHandler", _dotNetRef);
+                _logger.LogDebug("RegisterAntiCheatHandlerOnlyAsync: handler registered OK");
+            }
+            else
+            {
+                _logger.LogWarning("RegisterAntiCheatHandlerOnlyAsync: dotNetRef is null, cannot register");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ClientGameState] Register anti-cheat handler error: {ex.Message}");
+            _logger.LogError(ex, "Register anti-cheat handler error");
         }
     }
 
@@ -722,18 +745,24 @@ public class ClientGameStateService : IAsyncDisposable
     [JSInvokable]
     public async Task<bool> ReportViolationFromJS(string violationType, double durationSeconds, int roundNumber)
     {
-        // Allow reporting during any active game phase — violations may be detected
-        // after returning from alt-tab when phase has already moved past Playing.
-        // The server-side ReportViolation has no phase restriction and handles it correctly.
+        _logger.LogInformation("ReportViolationFromJS: type={Type}, duration={Duration}s, round={Round}, phase={Phase}, hubState={HubState}",
+            violationType, durationSeconds, roundNumber, CurrentPhase, _hubConnection?.State);
+        
         if (_hubConnection == null || string.IsNullOrEmpty(RoomCode))
+        {
+            _logger.LogWarning("ReportViolationFromJS: BLOCKED — hub={HubNull}, room={RoomCode}", _hubConnection == null, RoomCode);
             return false;
+        }
 
-        // Only block reporting when there's no active game at all
         if (CurrentPhase == GamePhase.Home || CurrentPhase == GamePhase.Lobby || CurrentPhase == GamePhase.Error)
+        {
+            _logger.LogWarning("ReportViolationFromJS: BLOCKED — phase={Phase} not active game", CurrentPhase);
             return false;
+        }
         
         try
         {
+            _logger.LogDebug("ReportViolationFromJS: invoking hub ReportViolation...");
             var reported = await _hubConnection.InvokeAsync<bool>(
                 "ReportViolation",
                 RoomCode,
@@ -741,11 +770,12 @@ public class ClientGameStateService : IAsyncDisposable
                 durationSeconds,
                 roundNumber);
 
+            _logger.LogInformation("ReportViolationFromJS: hub returned {Reported}", reported);
             return reported;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ClientGameState] Report violation error: {ex.Message}");
+            _logger.LogError(ex, "ReportViolationFromJS: hub invocation failed");
             return false;
         }
     }
@@ -775,6 +805,7 @@ public class ClientGameStateService : IAsyncDisposable
     {
         if (CurrentPhase == newPhase) return;
         
+        _logger.LogInformation("Phase change: {OldPhase} → {NewPhase}", CurrentPhase, newPhase);
         CurrentPhase = newPhase;
         
         // Sync to JS for anti-cheat

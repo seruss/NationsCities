@@ -13,11 +13,13 @@ public class GameHub : Hub
 {
     private readonly RoomService _roomService;
     private readonly GameService _gameService;
+    private readonly ILogger<GameHub> _logger;
 
-    public GameHub(RoomService roomService, GameService gameService)
+    public GameHub(RoomService roomService, GameService gameService, ILogger<GameHub> logger)
     {
         _roomService = roomService;
         _gameService = gameService;
+        _logger = logger;
     }
 
     // ===== RESOLVER =====
@@ -43,7 +45,7 @@ public class GameHub : Hub
         
         if (roomCode == null || sessionId == null)
         {
-            Console.WriteLine($"[GameHub] OnDisconnectedAsync: {Context.ConnectionId} — no room mapping, skipping.");
+            _logger.LogDebug("OnDisconnectedAsync: conn={ConnectionId} — no room mapping, skipping", Context.ConnectionId);
             await base.OnDisconnectedAsync(exception);
             return;
         }
@@ -53,7 +55,7 @@ public class GameHub : Hub
         // DON'T remove players when a game is in progress
         if (room?.CurrentGame != null)
         {
-            Console.WriteLine($"[GameHub] OnDisconnectedAsync: {Context.ConnectionId} — game in progress in room {roomCode}, keeping player.");
+            _logger.LogDebug("OnDisconnectedAsync: conn={ConnectionId} — game in progress in room {RoomCode}, keeping player", Context.ConnectionId, roomCode);
             await base.OnDisconnectedAsync(exception);
             return;
         }
@@ -61,12 +63,12 @@ public class GameHub : Hub
         var player = room?.Players.FirstOrDefault(p => p.SessionId == sessionId);
         if (player == null)
         {
-            Console.WriteLine($"[GameHub] OnDisconnectedAsync: {Context.ConnectionId} — player not found in room {roomCode}.");
+            _logger.LogDebug("OnDisconnectedAsync: conn={ConnectionId} — player not found in room {RoomCode}", Context.ConnectionId, roomCode);
             await base.OnDisconnectedAsync(exception);
             return;
         }
         
-        Console.WriteLine($"[GameHub] OnDisconnectedAsync: {player.Nickname} ({Context.ConnectionId}) in room {roomCode}, IsHost={player.IsHost}");
+        _logger.LogInformation("OnDisconnectedAsync: {Nickname} (conn={ConnectionId}) in room {RoomCode}, IsHost={IsHost}", player.Nickname, Context.ConnectionId, roomCode, player.IsHost);
         
         // LOBBY DISCONNECTION: Schedule removal with grace period
         if (!string.IsNullOrEmpty(player.SessionId))
@@ -100,7 +102,7 @@ public class GameHub : Hub
         else
         {
             // No session ID - immediate removal (legacy)
-            Console.WriteLine($"[GameHub] OnDisconnectedAsync: {player.Nickname} has no sessionId, immediate removal.");
+            _logger.LogWarning("OnDisconnectedAsync: {Nickname} has no sessionId, immediate removal", player.Nickname);
             var result = _roomService.LeaveRoom(sessionId);
             if (result.Room != null && !result.RoomDeleted)
             {
@@ -126,6 +128,7 @@ public class GameHub : Hub
     public async Task CreateRoom(string nickname, string? sessionId = null)
     {
         var sid = sessionId ?? Guid.NewGuid().ToString("N");
+        _logger.LogInformation("CreateRoom: nickname={Nickname}, session={SessionId}, conn={ConnectionId}", nickname, sid, Context.ConnectionId);
         var room = _roomService.CreateRoom(Context.ConnectionId, nickname, sid);
         AddSystemMessageInternal(room, "Naciśnij 'Jestem gotowy' gdy chcesz grać!");
         await Groups.AddToGroupAsync(Context.ConnectionId, room.Code);
@@ -161,6 +164,7 @@ public class GameHub : Hub
     /// </summary>
     public async Task<GameStateSnapshot?> ReconnectSession(string roomCode, string sessionId, string? nickname)
     {
+        _logger.LogInformation("ReconnectSession: room={RoomCode}, session={SessionId}, nickname={Nickname}, conn={ConnectionId}", roomCode, sessionId, nickname, Context.ConnectionId);
         _roomService.CancelPendingRemoval(sessionId);
         if (!string.IsNullOrEmpty(nickname))
         {
@@ -194,6 +198,7 @@ public class GameHub : Hub
         await Groups.AddToGroupAsync(Context.ConnectionId, roomCode);
 
         var phase = DeterminePhase(room);
+        _logger.LogInformation("ReconnectSession: success — {Nickname} reconnected to {RoomCode}, phase={Phase}", player.Nickname, roomCode, phase);
 
         return new GameStateSnapshot
         {
@@ -510,7 +515,7 @@ public class GameHub : Hub
         var sessionId = ResolveSessionId();
         if (sessionId == null) return;
         
-        Console.WriteLine($"[TriggerStop] Called by session {sessionId} (conn {Context.ConnectionId})");
+        _logger.LogDebug("TriggerStop: session={SessionId}, conn={ConnectionId}, room={RoomCode}", sessionId, Context.ConnectionId, roomCode);
         
         var room = _roomService.GetRoom(roomCode);
         var countdownSeconds = room?.Settings.CountdownSeconds ?? 10;
@@ -822,12 +827,20 @@ public class GameHub : Hub
     public async Task<bool> ReportViolation(string roomCode, string violationType, double durationSeconds, int roundNumber)
     {
         var sessionId = ResolveSessionId();
-        Console.WriteLine($"[AntiCheat] ReportViolation: room={roomCode}, type={violationType}, duration={durationSeconds}s, round={roundNumber}, session={sessionId}");
+        _logger.LogInformation("ReportViolation: room={RoomCode}, type={ViolationType}, duration={Duration}s, round={Round}, session={SessionId}, conn={ConnectionId}",
+            roomCode, violationType, durationSeconds, roundNumber, sessionId, Context.ConnectionId);
         
-        if (sessionId == null) return false;
+        if (sessionId == null)
+        {
+            _logger.LogWarning("ReportViolation: REJECTED — could not resolve session for conn={ConnectionId}", Context.ConnectionId);
+            return false;
+        }
 
         var room = _roomService.GetRoom(roomCode);
         var player = room?.Players.FirstOrDefault(p => p.SessionId == sessionId);
+        
+        _logger.LogDebug("ReportViolation: room found={RoomFound}, player found={PlayerFound}, playerNickname={Nickname}",
+            room != null, player != null, player?.Nickname);
         
         if (player != null && Enum.TryParse<ViolationType>(violationType, out var type))
         {
@@ -845,7 +858,8 @@ public class GameHub : Hub
             player.TotalScore -= penalty;
             player.RoundScore -= penalty;
             
-            Console.WriteLine($"[AntiCheat] Violation added: {player.Nickname}, TotalScore={player.TotalScore}, Violations={player.Violations.Count}");
+            _logger.LogInformation("ReportViolation: ACCEPTED — {Nickname} violation #{Count}, penalty={Penalty}, totalScore={TotalScore}, roundScore={RoundScore}",
+                player.Nickname, player.Violations.Count, penalty, player.TotalScore, player.RoundScore);
 
             await Clients.Group(roomCode).SendAsync("OnAntiCheatViolation", 
                 sessionId, 
@@ -856,7 +870,8 @@ public class GameHub : Hub
             return true;
         }
         
-        Console.WriteLine($"[AntiCheat] Not processed - player null: {player == null}");
+        _logger.LogWarning("ReportViolation: NOT PROCESSED — player null={PlayerNull}, parsedType={ParsedOk}",
+            player == null, Enum.TryParse<ViolationType>(violationType, out _));
         return false;
     }
 

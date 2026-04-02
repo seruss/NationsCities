@@ -1,6 +1,51 @@
 // Państwa, Miasta - JavaScript Interop
 // ======================================
 
+// ======================================
+// Configurable Logger
+// ======================================
+// Control via localStorage: localStorage.setItem('debug_log_level', 'debug')
+// Levels: 'off' | 'error' | 'warn' | 'info' | 'debug' | 'trace'
+// Default: 'info' (shows info + warn + error)
+window.GameLog = (function () {
+    const LEVELS = { off: 0, error: 1, warn: 2, info: 3, debug: 4, trace: 5 };
+
+    function getLevel() {
+        try {
+            const stored = localStorage.getItem('debug_log_level');
+            if (stored && LEVELS[stored] !== undefined) return LEVELS[stored];
+        } catch (e) { /* localStorage unavailable */ }
+        return LEVELS.info; // default
+    }
+
+    function ts() {
+        const d = new Date();
+        return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}:${d.getSeconds().toString().padStart(2,'0')}.${d.getMilliseconds().toString().padStart(3,'0')}`;
+    }
+
+    function log(level, tag, msg, ...args) {
+        if (LEVELS[level] > getLevel()) return;
+        const prefix = `[${ts()}][${tag}]`;
+        switch (level) {
+            case 'error': console.error(prefix, msg, ...args); break;
+            case 'warn':  console.warn(prefix, msg, ...args); break;
+            case 'info':  console.info(prefix, msg, ...args); break;
+            case 'debug': console.log(prefix, msg, ...args); break;
+            case 'trace': console.log(prefix, `[TRACE]`, msg, ...args); break;
+        }
+    }
+
+    return {
+        error: (tag, msg, ...args) => log('error', tag, msg, ...args),
+        warn:  (tag, msg, ...args) => log('warn', tag, msg, ...args),
+        info:  (tag, msg, ...args) => log('info', tag, msg, ...args),
+        debug: (tag, msg, ...args) => log('debug', tag, msg, ...args),
+        trace: (tag, msg, ...args) => log('trace', tag, msg, ...args),
+        setLevel: (lvl) => { try { localStorage.setItem('debug_log_level', lvl); } catch(e){} },
+        getLevel: () => { try { return localStorage.getItem('debug_log_level') || 'info'; } catch(e) { return 'info'; } }
+    };
+})();
+
 // NOTE: ThemeManager is now defined inline in App.razor <head> 
 // so it's available immediately for onclick handlers.
 
@@ -77,7 +122,7 @@ window.gameSession = {
             savedAt: Date.now()
         };
         localStorage.setItem(this._SESSION_KEY, JSON.stringify(data));
-        console.log('[GameSession] Saved:', data);
+        GameLog.debug('Session', 'Saved:', data);
     },
 
     /**
@@ -91,14 +136,14 @@ window.gameSession = {
             const session = JSON.parse(data);
             // Check if session is stale (>30 min)
             if (Date.now() - session.savedAt > 30 * 60 * 1000) {
-                console.log('[GameSession] Session expired, clearing');
+                GameLog.info('Session', 'Session expired, clearing');
                 this.clear();
                 return null;
             }
-            console.log('[GameSession] Loaded:', session);
+            GameLog.debug('Session', 'Loaded:', session);
             return session;
         } catch (e) {
-            console.error('[GameSession] Error loading:', e);
+            GameLog.error('Session', 'Error loading:', e);
             return null;
         }
     },
@@ -109,7 +154,7 @@ window.gameSession = {
     clear: function () {
         localStorage.removeItem(this._SESSION_KEY);
         localStorage.removeItem(this._TAB_KEY);
-        console.log('[GameSession] Cleared');
+        GameLog.debug('Session', 'Cleared');
     },
 
     /**
@@ -141,14 +186,14 @@ window.gameSession = {
                 try {
                     await this._dotNetRef.invokeMethodAsync('OnBackButtonPressed');
                 } catch (err) {
-                    console.warn('[GameSession] Could not notify Blazor of back button:', err);
+                    GameLog.warn('Session', 'Could not notify Blazor of back button:', err);
                 }
             }
         });
 
         // Push initial state to enable popstate detection
         history.pushState(null, '', window.location.href);
-        console.log('[GameSession] Navigation guard setup complete');
+        GameLog.debug('Session', 'Navigation guard setup complete');
     },
 
     /**
@@ -164,7 +209,7 @@ window.gameSession = {
                         this._handleDuplicateTab();
                     }
                 } catch (err) {
-                    console.warn('[GameSession] Error checking tab:', err);
+                    GameLog.warn('Session', 'Error checking tab:', err);
                 }
             }
         });
@@ -189,7 +234,7 @@ window.gameSession = {
      * Handle duplicate tab detected
      */
     _handleDuplicateTab: function () {
-        console.warn('[GameSession] Duplicate tab detected!');
+        GameLog.warn('Session', 'Duplicate tab detected!');
 
         // Create blocking overlay
         const overlay = document.createElement('div');
@@ -211,7 +256,7 @@ window.gameSession = {
             try {
                 this._dotNetRef.invokeMethodAsync('OnDuplicateTabDetected');
             } catch (err) {
-                console.warn('[GameSession] Could not notify Blazor of duplicate tab:', err);
+                GameLog.warn('Session', 'Could not notify Blazor of duplicate tab:', err);
             }
         }
     }
@@ -222,7 +267,7 @@ window.gameSession = {
  */
 window.setGamePhase = function (phase) {
     window._gamePhase = phase;
-    console.log(`[GameFlow] Phase changed to: ${phase}`);
+    GameLog.info('Flow', `Phase changed to: ${phase}`);
 };
 
 /**
@@ -247,7 +292,7 @@ window.copyToClipboard = async function (text) {
             return successful;
         }
     } catch (err) {
-        console.error('Failed to copy text: ', err);
+        GameLog.error('Clipboard', 'Failed to copy text:', err);
         return false;
     }
 };
@@ -324,7 +369,7 @@ window.AntiCheatTracker = class {
         });
 
         this._startHeartbeat();
-        console.log(`[AntiCheat] Tracking started for room ${roomCode}, round ${roundNumber}, violations: ${existingViolationCount}`);
+        GameLog.info('AntiCheat', `Tracking started: room=${roomCode}, round=${roundNumber}, violations=${existingViolationCount}`);
     }
 
     // Resume tracking after pause (for round 2+)
@@ -339,16 +384,16 @@ window.AntiCheatTracker = class {
             }
             this._saveSession(session);
             this._startHeartbeat();
-            console.log(`[AntiCheat] Tracking resumed, round ${session.roundNumber}, violations: ${session.violationCount}`);
+            GameLog.info('AntiCheat', `Tracking resumed: round=${session.roundNumber}, violations=${session.violationCount}`);
             
             // Drain any pending violations queued while disconnected
             this._processQueue();
         } else if (roomCode) {
             // No session to resume - start fresh (fallback)
-            console.log('[AntiCheat] No session to resume, starting fresh');
+            GameLog.info('AntiCheat', 'No session to resume, starting fresh');
             this.startTracking(roomCode, roundNumber || 1);
         } else {
-            console.log('[AntiCheat] No session to resume and no roomCode provided');
+            GameLog.warn('AntiCheat', 'No session to resume and no roomCode provided');
         }
     }
 
@@ -356,7 +401,7 @@ window.AntiCheatTracker = class {
         this._stopHeartbeat();
         this._clearSession();
         this._hideBlockOverlay();
-        console.log('[AntiCheat] Tracking stopped');
+        GameLog.info('AntiCheat', 'Tracking stopped');
     }
 
     // Pause tracking - stops detecting new violations but keeps handler for reporting
@@ -368,7 +413,7 @@ window.AntiCheatTracker = class {
             this._saveSession(session);
         }
         this._hideBlockOverlay();
-        console.log('[AntiCheat] Tracking paused (answers submitted)');
+        GameLog.info('AntiCheat', 'Tracking paused (answers submitted)');
     }
 
     // Clear session completely - call when returning to lobby between games
@@ -378,7 +423,7 @@ window.AntiCheatTracker = class {
         this._clearSession();
         this._clearPendingQueue(); // Clear pending violations too
         this._hideBlockOverlay();
-        console.log('[AntiCheat] Session cleared (new game will start fresh)');
+        GameLog.info('AntiCheat', 'Session cleared (new game will start fresh)');
     }
 
     // Flush all pending violations NOW before navigating away
@@ -415,7 +460,7 @@ window.AntiCheatTracker = class {
         this._heartbeatInterval = setInterval(() => {
             this._updateHeartbeat();
         }, this.HEARTBEAT_MS);
-        console.log('[AntiCheat] Heartbeat started');
+        GameLog.trace('AntiCheat', 'Heartbeat started');
     }
 
     _stopHeartbeat() {
@@ -442,17 +487,17 @@ window.AntiCheatTracker = class {
 
         // Only process on game page
         if (!this._isOnGameRoundPage(session.roomCode)) {
-            console.log('[AntiCheat] Page load: Not on game page, clearing stale session');
+            GameLog.debug('AntiCheat', 'Page load: Not on game page, clearing stale session');
             this._clearSession();
             return;
         }
 
         const gap = Date.now() - session.lastActiveAt;
-        console.log(`[AntiCheat] Page load check: gap = ${(gap / 1000).toFixed(2)}s`);
+        GameLog.debug('AntiCheat', `Page load check: gap=${(gap / 1000).toFixed(2)}s`);
 
         // If gap is too large (>30 min), session is stale - clear it
         if (gap > 30 * 60 * 1000) {
-            console.log('[AntiCheat] Session is stale (>30 min), clearing');
+            GameLog.info('AntiCheat', 'Session is stale (>30 min), clearing');
             this._clearSession();
             return;
         }
@@ -473,27 +518,29 @@ window.AntiCheatTracker = class {
             if (session && session.isActive) {
                 session.hiddenAt = Date.now();
                 this._saveSession(session);
-                console.log('[AntiCheat] Page hidden, timestamp stored');
+                GameLog.debug('AntiCheat', `Page hidden: hiddenAt=${session.hiddenAt}, round=${session.roundNumber}`);
+            } else {
+                GameLog.debug('AntiCheat', `Page hidden but no active session (session=${!!session}, active=${session?.isActive})`);
             }
         } else {
             // Page became visible - check for violation
-            console.log('[AntiCheat] Page visible, checking for violations');
+            GameLog.info('AntiCheat', `Page VISIBLE: session=${!!session}, active=${session?.isActive}, dotNetRef=${!!window._antiCheatDotNetRef}, ready=${!!window._antiCheatReady}, phase=${window._gamePhase}`);
 
             if (!session || !session.isActive) {
-                console.log('[AntiCheat] No active session');
+                GameLog.debug('AntiCheat', 'No active session, nothing to check');
                 return;
             }
 
             // Only process violations on game round page
             if (!this._isOnGameRoundPage(session.roomCode)) {
-                console.log('[AntiCheat] Not on game round page, skipping');
+                GameLog.debug('AntiCheat', 'Not on game round page, skipping violation check');
                 return;
             }
 
             // Calculate gap from hiddenAt (preferred) or lastActiveAt (fallback for mobile)
             const hiddenAt = session.hiddenAt || session.lastActiveAt;
             const gap = Date.now() - hiddenAt;
-            console.log(`[AntiCheat] Absence duration: ${(gap / 1000).toFixed(2)}s`);
+            GameLog.info('AntiCheat', `Absence: gap=${(gap / 1000).toFixed(2)}s, hiddenAt=${session.hiddenAt ? new Date(session.hiddenAt).toISOString() : 'null'}, lastActiveAt=${new Date(session.lastActiveAt).toISOString()}`);
 
             // Clear hiddenAt
             session.hiddenAt = null;
@@ -508,7 +555,7 @@ window.AntiCheatTracker = class {
                 // the Blazor circuit was still reconnecting. Retry now.
                 const pendingQueue = this._getPendingQueue();
                 if (pendingQueue.length > 0) {
-                    console.log(`[AntiCheat] Page visible, retrying ${pendingQueue.length} pending violations`);
+                    GameLog.info('AntiCheat', `Page visible, retrying ${pendingQueue.length} pending violations`);
                     this._processQueue();
                     this._startQueueRetry();
                 }
@@ -528,7 +575,7 @@ window.AntiCheatTracker = class {
         const isGamePageByPhase = window._gamePhase === 'Playing';
 
         const isGamePage = isGamePageByUrl || isGamePageByPhase;
-        console.log(`[AntiCheat] Game page check: url=${isGamePageByUrl}, phase=${isGamePageByPhase}, result=${isGamePage}`);
+        GameLog.trace('AntiCheat', `Game page check: url=${isGamePageByUrl}, phase=${isGamePageByPhase}, result=${isGamePage}`);
         return isGamePage;
     }
 
@@ -541,7 +588,7 @@ window.AntiCheatTracker = class {
         // Capture round number at the time of violation!
         const roundNumber = session.roundNumber || 1;
 
-        console.log(`[AntiCheat] Violation #${session.violationCount} detected in round ${roundNumber}: ${durationSeconds.toFixed(2)}s`);
+        GameLog.warn('AntiCheat', `VIOLATION #${session.violationCount} detected: round=${roundNumber}, duration=${durationSeconds.toFixed(2)}s`);
 
         // Show block overlay IMMEDIATELY (don't wait for Blazor)
         this._showBlockOverlay(session.violationCount, durationSeconds);
@@ -557,7 +604,7 @@ window.AntiCheatTracker = class {
     // === BLOCK OVERLAY (shown directly in JS) ===
 
     _showBlockOverlay(violationNumber, durationSeconds) {
-        console.log(`[AntiCheat] _showBlockOverlay called: violation=${violationNumber}, duration=${durationSeconds}s`);
+        GameLog.debug('AntiCheat', `showBlockOverlay: violation=${violationNumber}, duration=${durationSeconds}s`);
 
         // Calculate block duration based on violation number
         const blockSeconds = this._getBlockDuration(violationNumber);
@@ -573,7 +620,7 @@ window.AntiCheatTracker = class {
             this._blockOverlay = document.createElement('div');
             this._blockOverlay.id = 'anticheat-block-overlay';
             document.body.appendChild(this._blockOverlay);
-            console.log('[AntiCheat] Block overlay created');
+            GameLog.debug('AntiCheat', 'Block overlay created');
         }
 
         const bgClass = isWarning ? 'bg-warning' : 'bg-block';
@@ -680,7 +727,7 @@ window.AntiCheatTracker = class {
     _tryReportToBlazor(roomCode, violationType, durationSeconds, roundNumber) {
         const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         this._addToPendingQueue({ id, roomCode, violationType, durationSeconds, roundNumber, timestamp: Date.now() });
-        console.log(`[AntiCheat] Violation queued (id=${id}): ${violationType}, round ${roundNumber}, ${durationSeconds.toFixed(2)}s`);
+        GameLog.info('AntiCheat', `Violation QUEUED: id=${id}, type=${violationType}, round=${roundNumber}, duration=${durationSeconds.toFixed(2)}s`);
 
         // Try to drain the queue immediately, and schedule retries
         // in case the Blazor circuit is still reconnecting after mobile resume
@@ -701,11 +748,11 @@ window.AntiCheatTracker = class {
                 clearInterval(this._queueRetryInterval);
                 this._queueRetryInterval = null;
                 if (queue.length > 0) {
-                    console.warn('[AntiCheat] Queue retry timed out, items remain');
+                    GameLog.warn('AntiCheat', 'Queue retry timed out, items remain in queue');
                 }
                 return;
             }
-            console.log(`[AntiCheat] Retry: draining queue (${queue.length} pending)`);
+            GameLog.debug('AntiCheat', `Retry: draining queue (${queue.length} pending)`);
             this._processQueue();
         }, 2000);
     }
@@ -719,10 +766,17 @@ window.AntiCheatTracker = class {
 
     // Single processing loop — guarded against concurrent execution
     async _processQueue() {
-        if (this._processingQueue) return; // already running
-        if (!window._antiCheatDotNetRef || !window._antiCheatReady) return; // Blazor not connected
+        if (this._processingQueue) {
+            GameLog.trace('AntiCheat', '_processQueue: already running, skipping');
+            return;
+        }
+        if (!window._antiCheatDotNetRef || !window._antiCheatReady) {
+            GameLog.debug('AntiCheat', `_processQueue: Blazor not ready (dotNetRef=${!!window._antiCheatDotNetRef}, ready=${!!window._antiCheatReady})`);
+            return;
+        }
 
         this._processingQueue = true;
+        GameLog.debug('AntiCheat', '_processQueue: START');
         try {
             const session = this._getSession();
             const currentRoom = session?.roomCode;
@@ -734,7 +788,7 @@ window.AntiCheatTracker = class {
 
                 // Drop stale violations from other rooms
                 if (currentRoom && violation.roomCode !== currentRoom) {
-                    console.log(`[AntiCheat] Dropping stale violation from room ${violation.roomCode}`);
+                    GameLog.info('AntiCheat', `Dropping stale violation from room ${violation.roomCode}`);
                     this._removeById(violation.id);
                     queue = this._getPendingQueue();
                     continue;
@@ -742,13 +796,14 @@ window.AntiCheatTracker = class {
 
                 // Drop very old violations (>5 min)
                 if (Date.now() - violation.timestamp > 5 * 60 * 1000) {
-                    console.log(`[AntiCheat] Dropping old violation (${((Date.now() - violation.timestamp) / 1000).toFixed(0)}s ago)`);
+                    GameLog.info('AntiCheat', `Dropping old violation (${((Date.now() - violation.timestamp) / 1000).toFixed(0)}s ago)`);
                     this._removeById(violation.id);
                     queue = this._getPendingQueue();
                     continue;
                 }
 
                 try {
+                    GameLog.debug('AntiCheat', `_processQueue: invoking ReportViolationFromJS for id=${violation.id}, type=${violation.violationType}, round=${violation.roundNumber}`);
                     const reported = await window._antiCheatDotNetRef.invokeMethodAsync(
                         'ReportViolationFromJS',
                         violation.violationType,
@@ -756,21 +811,22 @@ window.AntiCheatTracker = class {
                         violation.roundNumber || 1);
 
                     if (reported) {
-                        console.log(`[AntiCheat] Violation ${violation.id} (round ${violation.roundNumber}) reported to server`);
+                        GameLog.info('AntiCheat', `Violation REPORTED to server: id=${violation.id}, round=${violation.roundNumber}`);
                         this._removeById(violation.id);
                     } else {
-                        console.warn(`[AntiCheat] Violation ${violation.id} rejected by Blazor — keeping in queue`);
-                        break; // Don't spin on a rejection; wait for next trigger
+                        GameLog.warn('AntiCheat', `Violation REJECTED by Blazor: id=${violation.id} — keeping in queue`);
+                        break;
                     }
                 } catch (err) {
-                    console.warn(`[AntiCheat] Report failed (${err.message}) — will retry later`);
-                    break; // Circuit probably reconnecting; stop processing
+                    GameLog.warn('AntiCheat', `Report FAILED: id=${violation.id}, error=${err.message}, name=${err.name} — will retry later`);
+                    break;
                 }
 
                 queue = this._getPendingQueue();
             }
         } finally {
             this._processingQueue = false;
+            GameLog.debug('AntiCheat', `_processQueue: END, remaining=${this._getPendingQueue().length}`);
         }
     }
 
@@ -781,7 +837,7 @@ window.AntiCheatTracker = class {
             const data = localStorage.getItem('anticheat_pending');
             return data ? JSON.parse(data) : [];
         } catch (e) {
-            console.error('[AntiCheat] Error reading pending queue:', e);
+            GameLog.error('AntiCheat', 'Error reading pending queue:', e);
             return [];
         }
     }
@@ -790,7 +846,7 @@ window.AntiCheatTracker = class {
         try {
             localStorage.setItem('anticheat_pending', JSON.stringify(queue));
         } catch (e) {
-            console.error('[AntiCheat] Error saving pending queue:', e);
+            GameLog.error('AntiCheat', 'Error saving pending queue:', e);
         }
     }
 
@@ -798,7 +854,7 @@ window.AntiCheatTracker = class {
         const queue = this._getPendingQueue();
         queue.push(violation);
         this._savePendingQueue(queue);
-        console.log(`[AntiCheat] Queue size: ${queue.length}`);
+        GameLog.trace('AntiCheat', `Queue size: ${queue.length}`);
     }
 
     _removeById(id) {
@@ -810,7 +866,7 @@ window.AntiCheatTracker = class {
         try {
             localStorage.removeItem('anticheat_pending');
         } catch (e) {
-            console.error('[AntiCheat] Error clearing pending queue:', e);
+            GameLog.error('AntiCheat', 'Error clearing pending queue:', e);
         }
     }
 
@@ -821,7 +877,7 @@ window.AntiCheatTracker = class {
             const data = localStorage.getItem(this._sessionKey);
             return data ? JSON.parse(data) : null;
         } catch (e) {
-            console.error('[AntiCheat] Error reading session:', e);
+            GameLog.error('AntiCheat', 'Error reading session:', e);
             return null;
         }
     }
@@ -830,7 +886,7 @@ window.AntiCheatTracker = class {
         try {
             localStorage.setItem(this._sessionKey, JSON.stringify(session));
         } catch (e) {
-            console.error('[AntiCheat] Error saving session:', e);
+            GameLog.error('AntiCheat', 'Error saving session:', e);
         }
     }
 
@@ -838,7 +894,7 @@ window.AntiCheatTracker = class {
         try {
             localStorage.removeItem(this._sessionKey);
         } catch (e) {
-            console.error('[AntiCheat] Error clearing session:', e);
+            GameLog.error('AntiCheat', 'Error clearing session:', e);
         }
     }
 };
@@ -848,15 +904,17 @@ window.antiCheatTracker = new window.AntiCheatTracker();
 
 // Handler registration for Blazor communication
 window.registerAntiCheatHandler = function (dotNetHelper) {
+    const hadPrevious = !!window._antiCheatDotNetRef;
     window._antiCheatDotNetRef = dotNetHelper;
     window._antiCheatReady = true;
-    console.log('[AntiCheat] Blazor handler registered — draining queue');
+    const pending = window.antiCheatTracker._getPendingQueue();
+    GameLog.info('AntiCheat', `Blazor handler registered: hadPrevious=${hadPrevious}, pendingViolations=${pending.length}, phase=${window._gamePhase}`);
 
     // Drain any violations that were queued while Blazor was disconnected
     window.antiCheatTracker._processQueue();
     // Also start retry loop in case _processQueue partially fails
-    const pending = window.antiCheatTracker._getPendingQueue();
     if (pending.length > 0) {
+        GameLog.info('AntiCheat', `Starting queue retry for ${pending.length} pending violations`);
         window.antiCheatTracker._startQueueRetry();
     }
 };
@@ -864,5 +922,5 @@ window.registerAntiCheatHandler = function (dotNetHelper) {
 window.unregisterAntiCheatHandler = function () {
     window._antiCheatDotNetRef = null;
     window._antiCheatReady = false;
-    console.log('[AntiCheat] Blazor handler unregistered');
+    GameLog.info('AntiCheat', 'Blazor handler unregistered');
 };
