@@ -494,6 +494,13 @@ public class GameHub : Hub
 
         room.Settings.MaxPlayers = maxPlayers;
         await Clients.Group(roomCode).SendAsync("OnMaxPlayersUpdated", maxPlayers);
+
+        // Update public lobby if room is public
+        if (room.IsPublic)
+        {
+            var updatedRooms = _roomService.GetPublicRooms();
+            await Clients.Group("public-lobby").SendAsync("OnPublicRoomsUpdated", updatedRooms);
+        }
     }
 
     #endregion
