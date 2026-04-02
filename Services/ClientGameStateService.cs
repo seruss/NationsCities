@@ -325,6 +325,12 @@ public class ClientGameStateService : IAsyncDisposable
             NotifyStateChanged();
         });
 
+        _hubConnection.On<int>("OnMaxPlayersUpdated", maxPlayers =>
+        {
+            CurrentRoom = _roomService.GetRoom(RoomCode ?? "");
+            NotifyStateChanged();
+        });
+
         _hubConnection.On<DateTime>("OnTimeAdded", endTime =>
         {
             CurrentRoom = _roomService.GetRoom(RoomCode ?? "");
@@ -344,8 +350,14 @@ public class ClientGameStateService : IAsyncDisposable
         {
             CurrentRoom = _roomService.GetRoom(RoomCode ?? "");
             OnVotingEnded?.Invoke();
-            var isLastRound = (CurrentGame?.CurrentRound ?? 1) >= (CurrentGame?.TotalRounds ?? 1);
-            SetPhase(isLastRound ? GamePhase.FinalResults : GamePhase.RoundResults);
+            SetPhase(GamePhase.RoundResults);
+        });
+
+        _hubConnection.On("OnGameFinished", () =>
+        {
+            CurrentRoom = _roomService.GetRoom(RoomCode ?? "");
+            OnVotingEnded?.Invoke();
+            SetPhase(GamePhase.FinalResults);
         });
 
         _hubConnection.On<string>("OnReturnToLobby", roomCode =>
@@ -611,6 +623,13 @@ public class ClientGameStateService : IAsyncDisposable
     {
         if (_hubConnection == null || string.IsNullOrEmpty(RoomCode)) return;
         await _hubConnection.InvokeAsync("UpdateGameSettings", RoomCode, categories, roundCount);
+    }
+
+    /// <summary>Update max players (host only).</summary>
+    public async Task UpdateMaxPlayersAsync(int maxPlayers)
+    {
+        if (_hubConnection == null || string.IsNullOrEmpty(RoomCode)) return;
+        await _hubConnection.InvokeAsync("UpdateMaxPlayers", RoomCode, maxPlayers);
     }
 
     /// <summary>Set room visibility (host only).</summary>

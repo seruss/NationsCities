@@ -220,9 +220,8 @@ public class GameHub : Hub
             RoundPhase.Answering => GamePhase.Playing,
             RoundPhase.Countdown => GamePhase.Playing,
             RoundPhase.Voting => GamePhase.Voting,
-            RoundPhase.Results => room.CurrentGame.CurrentRound >= room.CurrentGame.TotalRounds 
-                ? GamePhase.FinalResults 
-                : GamePhase.RoundResults,
+            RoundPhase.Results => GamePhase.RoundResults,
+            RoundPhase.FinalResults => GamePhase.FinalResults,
             _ => GamePhase.Lobby
         };
     }
@@ -442,7 +441,7 @@ public class GameHub : Hub
             return;
         }
 
-        var minLetters = room.Settings.RoundCount;
+        var minLetters = 5;
         if (letters == null || letters.Count < minLetters)
         {
             await Clients.Caller.SendAsync("OnError", $"Wybierz co najmniej {minLetters} liter (tyle ile rund).");
@@ -462,12 +461,39 @@ public class GameHub : Hub
 
         room.Settings.AvailableLetters = validLetters;
 
-        if (room.Settings.RoundCount > validLetters.Count)
+        await Clients.Group(roomCode).SendAsync("OnLetterSettingsUpdated", validLetters.Count);
+    }
+
+    public async Task UpdateMaxPlayers(string roomCode, int maxPlayers)
+    {
+        var sessionId = ResolveSessionId();
+        if (sessionId == null) return;
+        
+        var room = _roomService.GetRoom(roomCode);
+        if (room == null)
         {
-            room.Settings.RoundCount = validLetters.Count;
+            await Clients.Caller.SendAsync("OnError", "Pokój nie istnieje.");
+            return;
         }
 
-        await Clients.Group(roomCode).SendAsync("OnLetterSettingsUpdated", validLetters.Count);
+        if (room.HostSessionId != sessionId)
+        {
+            await Clients.Caller.SendAsync("OnError", "Tylko host może zmieniać ustawienia.");
+            return;
+        }
+
+        // Cannot set below current player count
+        if (maxPlayers < room.Players.Count)
+        {
+            maxPlayers = room.Players.Count;
+        }
+
+        // Clamp to valid range
+        if (maxPlayers < 2) maxPlayers = 2;
+        if (maxPlayers > 50) maxPlayers = 50;
+
+        room.Settings.MaxPlayers = maxPlayers;
+        await Clients.Group(roomCode).SendAsync("OnMaxPlayersUpdated", maxPlayers);
     }
 
     #endregion
@@ -717,15 +743,6 @@ public class GameHub : Hub
     {
         _gameService.FinalizeVotingAndCalculateScores(roomCode);
         
-        var room = _roomService.GetRoom(roomCode);
-        if (room?.CurrentGame != null && room.CurrentGame.CurrentRound >= room.CurrentGame.TotalRounds)
-        {
-            foreach (var player in room.Players)
-            {
-                player.IsReady = player.IsHost;
-            }
-        }
-        
         await Clients.Group(roomCode).SendAsync("OnVotingEnded");
     }
 
@@ -745,8 +762,7 @@ public class GameHub : Hub
 
         if (room.CurrentGame != null)
         {
-            room.CurrentGame.CurrentRound = room.CurrentGame.TotalRounds;
-            room.CurrentGame.Phase = RoundPhase.Results;
+            room.CurrentGame.Phase = RoundPhase.FinalResults;
             
             foreach (var player in room.Players)
             {
@@ -754,7 +770,7 @@ public class GameHub : Hub
             }
         }
 
-        await Clients.Group(roomCode).SendAsync("OnVotingEnded");
+        await Clients.Group(roomCode).SendAsync("OnGameFinished");
     }
 
     public async Task ReturnToLobby(string roomCode)

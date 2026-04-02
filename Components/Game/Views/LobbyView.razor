@@ -72,20 +72,20 @@ else
                         </button>
                     </div>
 
-                    <!-- Row 2: Round count with inline +/- -->
+                    <!-- Row 2: Max players with inline +/- -->
                     <div class="flex items-center justify-between p-3 rounded-xl bg-slate-100 dark:bg-surface-darker border border-slate-200 dark:border-slate-700 mb-3">
                         <div class="flex items-center gap-2">
-                            <span class="material-symbols-outlined text-cyan-500 dark:text-cyan-400">repeat</span>
+                            <span class="material-symbols-outlined text-cyan-500 dark:text-cyan-400">group</span>
                             <div class="flex flex-col">
-                                <span class="text-sm font-bold text-slate-900 dark:text-white">Liczba rund</span>
-                                <span class="text-xs text-slate-500 dark:text-slate-400">@room.Settings.RoundCount @GetRoundWord(room.Settings.RoundCount)</span>
+                                <span class="text-sm font-bold text-slate-900 dark:text-white">Max graczy</span>
+                                <span class="text-xs text-slate-500 dark:text-slate-400">@room.Settings.MaxPlayers @GetPlayerWord(room.Settings.MaxPlayers)</span>
                             </div>
                         </div>
                         <div class="flex items-center gap-2">
-                            <button @onclick="DecrementRoundsInline" disabled="@(room.Settings.RoundCount <= 1)" class="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                            <button @onclick="DecrementMaxPlayersInline" disabled="@(room.Settings.MaxPlayers <= MinMaxPlayers)" class="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                                 <span class="material-symbols-outlined text-slate-600 dark:text-slate-300 text-lg">remove</span>
                             </button>
-                            <button @onclick="IncrementRoundsInline" disabled="@(room.Settings.RoundCount >= MaxRoundCount)" class="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                            <button @onclick="IncrementMaxPlayersInline" disabled="@(room.Settings.MaxPlayers >= 50)" class="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                                 <span class="material-symbols-outlined text-slate-600 dark:text-slate-300 text-lg">add</span>
                             </button>
                         </div>
@@ -356,8 +356,8 @@ else
     private record CategoryWithColor(Category Category, string BgClass, string TextClass);
     private List<CategoryWithColor> _categoriesWithColors = new();
 
-    private int MinLetterCount => GameState.CurrentRoom?.Settings.RoundCount ?? 5;
-    private int MaxRoundCount => GameState.CurrentRoom?.Settings.AvailableLetters.Count ?? GameSettings.DefaultPolishLetters.Length;
+    private int MinLetterCount => 5;
+    private int MinMaxPlayers => Math.Max(2, GameState.CurrentRoom?.Players.Count ?? 2);
 
     private bool IsHost => GameState.CurrentRoom?.Players.FirstOrDefault(p => p.Nickname == GameState.Nickname)?.IsHost ?? false;
     private bool AmIReady => GameState.CurrentRoom?.Players.FirstOrDefault(p => p.Nickname == GameState.Nickname)?.IsReady ?? false;
@@ -556,23 +556,21 @@ else
         // No longer needed
     }
 
-    private async Task IncrementRoundsInline()
+    private async Task IncrementMaxPlayersInline()
     {
-        if (GameState.CurrentRoom != null && GameState.CurrentRoom.Settings.RoundCount < MaxRoundCount)
+        if (GameState.CurrentRoom != null && GameState.CurrentRoom.Settings.MaxPlayers < 50)
         {
-            var newCount = GameState.CurrentRoom.Settings.RoundCount + 1;
-            var categoryNames = GameState.CurrentRoom.Settings.SelectedCategories.Select(c => c.Name).ToList();
-            await GameState.UpdateGameSettingsAsync(categoryNames, newCount);
+            var newCount = GameState.CurrentRoom.Settings.MaxPlayers + 1;
+            await GameState.UpdateMaxPlayersAsync(newCount);
         }
     }
 
-    private async Task DecrementRoundsInline()
+    private async Task DecrementMaxPlayersInline()
     {
-        if (GameState.CurrentRoom != null && GameState.CurrentRoom.Settings.RoundCount > 1)
+        if (GameState.CurrentRoom != null && GameState.CurrentRoom.Settings.MaxPlayers > MinMaxPlayers)
         {
-            var newCount = GameState.CurrentRoom.Settings.RoundCount - 1;
-            var categoryNames = GameState.CurrentRoom.Settings.SelectedCategories.Select(c => c.Name).ToList();
-            await GameState.UpdateGameSettingsAsync(categoryNames, newCount);
+            var newCount = GameState.CurrentRoom.Settings.MaxPlayers - 1;
+            await GameState.UpdateMaxPlayersAsync(newCount);
         }
     }
 

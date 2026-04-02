@@ -26,9 +26,9 @@ public class GameSettings
     public List<Category> SelectedCategories { get; set; } = Category.StandardCategories.Take(5).ToList();
 
     /// <summary>
-    /// Maksymalna liczba graczy.
+    /// Maksymalna liczba graczy (domyślnie 10, max 50).
     /// </summary>
-    public int MaxPlayers { get; set; } = 20;
+    public int MaxPlayers { get; set; } = 10;
 
     /// <summary>
     /// Litery dostępne do losowania (konfigurowalne przez hosta).

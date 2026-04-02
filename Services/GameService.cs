@@ -90,11 +90,6 @@ public class GameService
 
         var game = room.CurrentGame;
         
-        if (game.CurrentRound > game.TotalRounds)
-        {
-            return (false, default, "Gra zakończona.");
-        }
-
         var letter = SelectRandomLetter(room);
         game.CurrentLetter = letter;
         game.UsedLetters.Add(letter);
@@ -386,16 +381,8 @@ public class GameService
 
         var game = room.CurrentGame;
         game.CurrentRound++;
-
-        if (game.CurrentRound > game.TotalRounds)
-        {
-            // Koniec gry
-            game.Phase = RoundPhase.Waiting;
-            return false; // false = koniec gry
-        }
-
         game.Phase = RoundPhase.Waiting;
-        return true; // true = jest następna runda
+        return true;
     }
 
     /// <summary>

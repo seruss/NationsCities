@@ -80,5 +80,8 @@ public enum RoundPhase
     Voting,
     
     /// <summary>Wyświetlanie wyników rundy.</summary>
-    Results
+    Results,
+    
+    /// <summary>Gra zakończona - wyniki finalne.</summary>
+    FinalResults
 }

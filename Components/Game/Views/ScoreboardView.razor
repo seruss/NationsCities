@@ -21,7 +21,6 @@
 else
 {
     var currentRound = GameState.CurrentGame.CurrentRound;
-    var totalRounds = GameState.CurrentGame.TotalRounds;
     var letter = GameState.CurrentGame.CurrentLetter;
     var sortedPlayers = GameState.CurrentRoom.Players.OrderByDescending(p => p.TotalScore).ToList();
     var leader = sortedPlayers.FirstOrDefault();
@@ -31,7 +30,7 @@ else
         <!-- Header -->
         <header class="flex items-center justify-between px-4 py-4 sticky top-0 z-20 bg-bg-light/95 dark:bg-bg-dark/95 backdrop-blur-sm border-b border-slate-200 dark:border-slate-800">
             <div class="w-8"></div>
-            <h1 class="text-xl font-bold text-slate-900 dark:text-white">Wyniki rundy @currentRound</h1>
+            <h1 class="text-xl font-bold text-slate-900 dark:text-white">Wyniki rundy</h1>
             <div class="w-8"></div>
         </header>
 
@@ -44,7 +43,7 @@ else
                         <span class="material-symbols-outlined text-lg">flag</span>
                         <span class="text-sm font-medium uppercase tracking-wide opacity-80">Runda</span>
                     </div>
-                    <p class="text-3xl font-black text-slate-900 dark:text-white">@currentRound/@totalRounds</p>
+                    <p class="text-3xl font-black text-slate-900 dark:text-white">@currentRound</p>
                 </div>
                 <div class="flex flex-1 flex-col items-center justify-center gap-1 rounded-xl bg-surface-light dark:bg-surface-dark p-4 shadow-sm border border-slate-200 dark:border-slate-800">
                     <div class="flex items-center gap-2 text-primary">
@@ -177,41 +176,29 @@ else
         <!-- Footer Actions -->
         <footer class="sticky bottom-0 p-4 bg-surface-light dark:bg-surface-dark border-t border-slate-200 dark:border-slate-800 z-20 w-full safe-area-bottom">
             <div class="flex flex-col gap-3 max-w-md mx-auto">
-            @if (currentRound < totalRounds)
+            @if (GameState.IsHost)
             {
-                @if (GameState.IsHost)
-                {
-                    <button @onclick="NextRound"
-                            disabled="@_isStartingRound"
-                            class="flex w-full items-center justify-center gap-2 rounded-xl @(_isStartingRound ? "bg-slate-700" : "bg-primary hover:bg-primary-dark") px-6 py-4 text-base font-bold text-white shadow-lg shadow-primary/20 transition-transform btn-press">
-                        @if (_isStartingRound)
-                        {
-                            <span class="material-symbols-outlined animate-spin">progress_activity</span>
-                            <span>Rozpoczynam...</span>
-                        }
-                        else
-                        {
-                            <span>Następna runda (@(currentRound + 1))</span>
-                            <span class="material-symbols-outlined">arrow_forward</span>
-                        }
-                    </button>
-                }
-                else
-                {
-                    <div class="text-center py-4">
-                        <p class="text-lg font-bold text-slate-400 flex items-center justify-center gap-2">
-                            <span class="material-symbols-outlined animate-spin">progress_activity</span>
-                            Czekam na hosta...
-                        </p>
-                    </div>
-                }
+                <button @onclick="NextRound"
+                        disabled="@_isStartingRound"
+                        class="flex w-full items-center justify-center gap-2 rounded-xl @(_isStartingRound ? "bg-slate-700" : "bg-primary hover:bg-primary-dark") px-6 py-4 text-base font-bold text-white shadow-lg shadow-primary/20 transition-transform btn-press">
+                    @if (_isStartingRound)
+                    {
+                        <span class="material-symbols-outlined animate-spin">progress_activity</span>
+                        <span>Rozpoczynam...</span>
+                    }
+                    else
+                    {
+                        <span>Następna runda (@(currentRound + 1))</span>
+                        <span class="material-symbols-outlined">arrow_forward</span>
+                    }
+                </button>
             }
             else
             {
                 <div class="text-center py-4">
-                    <p class="text-lg font-bold text-green-400 flex items-center justify-center gap-2">
-                        <span class="material-symbols-outlined">emoji_events</span>
-                        Gra zakończona!
+                    <p class="text-lg font-bold text-slate-400 flex items-center justify-center gap-2">
+                        <span class="material-symbols-outlined animate-spin">progress_activity</span>
+                        Czekam na hosta...
                     </p>
                 </div>
             }
