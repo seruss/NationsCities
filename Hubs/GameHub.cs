@@ -6,6 +6,8 @@ namespace NationsCities.Hubs;
 
 /// <summary>
 /// Hub SignalR do komunikacji w czasie rzeczywistym między graczami.
+/// Wszystkie operacje domenowe używają SessionId jako klucza gracza.
+/// ConnectionId jest używany wyłącznie do transportu SignalR (Groups, Clients.Client).
 /// </summary>
 public class GameHub : Hub
 {
@@ -18,12 +20,28 @@ public class GameHub : Hub
         _gameService = gameService;
     }
 
+    // ===== RESOLVER =====
+
+    /// <summary>
+    /// Tłumaczy bieżące połączenie na stabilny SessionId.
+    /// </summary>
+    private string? ResolveSessionId()
+        => _roomService.GetSessionByConnection(Context.ConnectionId);
+
+    /// <summary>
+    /// Tłumaczy SessionId na bieżący ConnectionId (do wysyłki SignalR).
+    /// </summary>
+    private string? ResolveConnectionId(string sessionId)
+        => _roomService.GetConnectionId(sessionId);
+
     #region Połączenia
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        var roomCode = _roomService.GetRoomCode(Context.ConnectionId);
-        if (roomCode == null)
+        var sessionId = ResolveSessionId();
+        var roomCode = sessionId != null ? _roomService.GetRoomCodeBySession(sessionId) : null;
+        
+        if (roomCode == null || sessionId == null)
         {
             Console.WriteLine($"[GameHub] OnDisconnectedAsync: {Context.ConnectionId} — no room mapping, skipping.");
             await base.OnDisconnectedAsync(exception);
@@ -33,7 +51,6 @@ public class GameHub : Hub
         var room = _roomService.GetRoom(roomCode);
         
         // DON'T remove players when a game is in progress
-        // They're just navigating between pages (lobby -> game -> scoreboard -> etc)
         if (room?.CurrentGame != null)
         {
             Console.WriteLine($"[GameHub] OnDisconnectedAsync: {Context.ConnectionId} — game in progress in room {roomCode}, keeping player.");
@@ -41,42 +58,40 @@ public class GameHub : Hub
             return;
         }
         
-        var player = room?.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+        var player = room?.Players.FirstOrDefault(p => p.SessionId == sessionId);
         if (player == null)
         {
-            Console.WriteLine($"[GameHub] OnDisconnectedAsync: {Context.ConnectionId} — player not found in room {roomCode} (possibly already reconnected with new connectionId).");
+            Console.WriteLine($"[GameHub] OnDisconnectedAsync: {Context.ConnectionId} — player not found in room {roomCode}.");
             await base.OnDisconnectedAsync(exception);
             return;
         }
         
         Console.WriteLine($"[GameHub] OnDisconnectedAsync: {player.Nickname} ({Context.ConnectionId}) in room {roomCode}, IsHost={player.IsHost}");
         
-        // LOBBY DISCONNECTION: Schedule removal with grace period instead of immediate removal
-        // This allows the player to reconnect after a page refresh
+        // LOBBY DISCONNECTION: Schedule removal with grace period
         if (!string.IsNullOrEmpty(player.SessionId))
         {
-            var removalTime = _roomService.SchedulePlayerRemoval(
+            _roomService.SchedulePlayerRemoval(
                 player.SessionId, 
                 player.ConnectionId, 
                 roomCode, 
                 player.Nickname);
             
-            // Schedule the actual removal processing after the grace period
             _ = Task.Run(async () =>
             {
-                await Task.Delay(TimeSpan.FromSeconds(6)); // Slightly longer than grace period
+                await Task.Delay(TimeSpan.FromSeconds(6));
                 var removals = _roomService.ProcessExpiredDisconnections();
                 
                 foreach (var removal in removals)
                 {
                     if (!removal.RoomDeleted)
                     {
-                        // Notify remaining players about the player leaving
                         await Clients.Group(removal.RoomCode).SendAsync("OnPlayerLeft", removal.Nickname);
                         
-                        if (removal.NewHostId != null && removal.NewHostNickname != null)
+                        if (removal.NewHostSessionId != null && removal.NewHostNickname != null)
                         {
-                            await Clients.Group(removal.RoomCode).SendAsync("OnNewHost", removal.NewHostNickname, removal.NewHostId);
+                            var newHostConnId = _roomService.GetConnectionId(removal.NewHostSessionId);
+                            await Clients.Group(removal.RoomCode).SendAsync("OnNewHost", removal.NewHostNickname, removal.NewHostSessionId);
                         }
                     }
                 }
@@ -84,16 +99,16 @@ public class GameHub : Hub
         }
         else
         {
-            // No session ID - immediate removal (legacy behavior)
+            // No session ID - immediate removal (legacy)
             Console.WriteLine($"[GameHub] OnDisconnectedAsync: {player.Nickname} has no sessionId, immediate removal.");
-            var result = _roomService.LeaveRoom(Context.ConnectionId);
+            var result = _roomService.LeaveRoom(sessionId);
             if (result.Room != null && !result.RoomDeleted)
             {
-                await Clients.Group(result.Room.Code).SendAsync("OnPlayerLeft", Context.ConnectionId);
+                await Clients.Group(result.Room.Code).SendAsync("OnPlayerLeft", player.Nickname);
                 
-                if (result.NewHostId != null && result.NewHostNickname != null)
+                if (result.NewHostSessionId != null && result.NewHostNickname != null)
                 {
-                    await Clients.Group(result.Room.Code).SendAsync("OnNewHost", result.NewHostNickname, result.NewHostId);
+                    await Clients.Group(result.Room.Code).SendAsync("OnNewHost", result.NewHostNickname, result.NewHostSessionId);
                 }
             }
         }
@@ -110,7 +125,8 @@ public class GameHub : Hub
     /// </summary>
     public async Task CreateRoom(string nickname, string? sessionId = null)
     {
-        var room = _roomService.CreateRoom(Context.ConnectionId, nickname, sessionId);
+        var sid = sessionId ?? Guid.NewGuid().ToString("N");
+        var room = _roomService.CreateRoom(Context.ConnectionId, nickname, sid);
         AddSystemMessageInternal(room, "Naciśnij 'Jestem gotowy' gdy chcesz grać!");
         await Groups.AddToGroupAsync(Context.ConnectionId, room.Code);
         await Clients.Caller.SendAsync("OnRoomCreated", room.Code);
@@ -121,7 +137,8 @@ public class GameHub : Hub
     /// </summary>
     public async Task JoinRoom(string roomCode, string nickname, string? sessionId = null)
     {
-        var result = _roomService.JoinRoom(roomCode, Context.ConnectionId, nickname, sessionId);
+        var sid = sessionId ?? Guid.NewGuid().ToString("N");
+        var result = _roomService.JoinRoom(roomCode, Context.ConnectionId, nickname, sid);
         
         if (!result.Success)
         {
@@ -134,9 +151,8 @@ public class GameHub : Hub
         AddSystemMessageInternal(room, $"{nickname} dołączył do pokoju.");
         
         await Groups.AddToGroupAsync(Context.ConnectionId, rCode);
-        await Clients.Caller.SendAsync("OnRoomCreated", rCode); // Reuse for join
-        await Clients.OthersInGroup(rCode).SendAsync("OnPlayerJoined", nickname, Context.ConnectionId);
-        // Broadcast system message to everyone (caller will get room state via OnRoomCreated)
+        await Clients.Caller.SendAsync("OnRoomCreated", rCode);
+        await Clients.OthersInGroup(rCode).SendAsync("OnPlayerJoined", nickname, sid);
         await Clients.OthersInGroup(rCode).SendAsync("OnChatMessage", "System", $"{nickname} dołączył do pokoju.", true);
     }
 
@@ -145,7 +161,6 @@ public class GameHub : Hub
     /// </summary>
     public async Task<GameStateSnapshot?> ReconnectSession(string roomCode, string sessionId, string? nickname)
     {
-        // Cancel any pending disconnection for this session (lobby refresh scenario)
         _roomService.CancelPendingRemoval(sessionId);
         if (!string.IsNullOrEmpty(nickname))
         {
@@ -155,10 +170,8 @@ public class GameHub : Hub
         var room = _roomService.GetRoom(roomCode);
         if (room == null) return null;
 
-        // Find player by session ID first
         var player = room.Players.FirstOrDefault(p => p.SessionId == sessionId);
         
-        // Fallback to nickname if session not found
         if (player == null && !string.IsNullOrEmpty(nickname))
         {
             player = room.Players.FirstOrDefault(p => 
@@ -167,32 +180,19 @@ public class GameHub : Hub
         
         if (player == null) return null;
 
-        // Update connection ID
-        var oldConnectionId = player.ConnectionId;
+        // Update transport ConnectionId
         player.ConnectionId = Context.ConnectionId;
         
-        // Update session ID if not set
         if (string.IsNullOrEmpty(player.SessionId))
         {
             player.SessionId = sessionId;
         }
 
-        // Update host connection if this is the host
-        if (player.IsHost)
-        {
-            room.HostConnectionId = Context.ConnectionId;
-        }
+        // Update transport mapping
+        _roomService.UpdatePlayerConnection(player.SessionId, Context.ConnectionId);
 
-        // Update player-room mapping
-        if (oldConnectionId != Context.ConnectionId)
-        {
-            _roomService.UpdatePlayerConnection(roomCode, oldConnectionId, Context.ConnectionId);
-        }
-
-        // Add to SignalR group
         await Groups.AddToGroupAsync(Context.ConnectionId, roomCode);
 
-        // Determine current phase
         var phase = DeterminePhase(room);
 
         return new GameStateSnapshot
@@ -234,35 +234,26 @@ public class GameHub : Hub
         return Math.Max(0, (int)remaining);
     }
 
-    /// <summary>
-    /// Pobiera listę dostępnych pokoi publicznych.
-    /// </summary>
     public List<PublicRoomInfo> GetPublicRooms()
     {
         return _roomService.GetPublicRooms();
     }
 
-    /// <summary>
-    /// Subskrybuje aktualizacje listy pub. pokoi (ekran dołączania).
-    /// </summary>
     public async Task SubscribePublicRooms()
     {
         await Groups.AddToGroupAsync(Context.ConnectionId, "public-lobby");
     }
 
-    /// <summary>
-    /// Odsubskrybowuje aktualizacje listy pub. pokoi.
-    /// </summary>
     public async Task UnsubscribePublicRooms()
     {
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, "public-lobby");
     }
 
-    /// <summary>
-    /// Ustawia pokój jako publiczny lub prywatny (tylko host).
-    /// </summary>
     public async Task SetRoomPublic(string roomCode, bool isPublic)
     {
+        var sessionId = ResolveSessionId();
+        if (sessionId == null) return;
+        
         var room = _roomService.GetRoom(roomCode);
         if (room == null)
         {
@@ -270,8 +261,7 @@ public class GameHub : Hub
             return;
         }
 
-        var caller = room.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
-        if (caller?.IsHost != true)
+        if (room.HostSessionId != sessionId)
         {
             await Clients.Caller.SendAsync("OnError", "Tylko host może zmienić widoczność pokoju.");
             return;
@@ -280,39 +270,42 @@ public class GameHub : Hub
         _roomService.SetRoomPublic(roomCode, isPublic);
         await Clients.Group(roomCode).SendAsync("OnRoomVisibilityChanged", isPublic);
 
-        // Notify public rooms browsers about the updated list
         var updatedRooms = _roomService.GetPublicRooms();
         await Clients.Group("public-lobby").SendAsync("OnPublicRoomsUpdated", updatedRooms);
     }
 
-    /// <summary>
-    /// Opuszcza pokój.
-    /// </summary>
     public async Task LeaveRoom(string roomCode)
     {
-        var result = _roomService.LeaveRoom(Context.ConnectionId);
+        var sessionId = ResolveSessionId();
+        if (sessionId == null) return;
+        
+        // Capture nickname before removal
+        var room = _roomService.GetRoom(roomCode);
+        var leavingNickname = room?.Players.FirstOrDefault(p => p.SessionId == sessionId)?.Nickname;
+        
+        var result = _roomService.LeaveRoom(sessionId);
         if (result.Room != null)
         {
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, roomCode);
             
             if (!result.RoomDeleted)
             {
-                await Clients.Group(roomCode).SendAsync("OnPlayerLeft", Context.ConnectionId);
+                await Clients.Group(roomCode).SendAsync("OnPlayerLeft", leavingNickname ?? sessionId);
                 
-                if (result.NewHostId != null && result.NewHostNickname != null)
+                if (result.NewHostSessionId != null && result.NewHostNickname != null)
                 {
-                    await Clients.Group(roomCode).SendAsync("OnNewHost", result.NewHostNickname, result.NewHostId);
+                    await Clients.Group(roomCode).SendAsync("OnNewHost", result.NewHostNickname, result.NewHostSessionId);
                 }
             }
         }
     }
 
-    /// <summary>
-    /// Wyrzuca gracza (tylko host).
-    /// </summary>
-    public async Task KickPlayer(string roomCode, string playerId)
+    public async Task KickPlayer(string roomCode, string playerSessionId)
     {
-        var result = _roomService.KickPlayer(Context.ConnectionId, playerId);
+        var sessionId = ResolveSessionId();
+        if (sessionId == null) return;
+        
+        var result = _roomService.KickPlayer(sessionId, playerSessionId);
         
         if (!result.Success)
         {
@@ -320,9 +313,14 @@ public class GameHub : Hub
             return;
         }
 
-        await Clients.Client(playerId).SendAsync("OnKicked");
-        await Groups.RemoveFromGroupAsync(playerId, roomCode);
-        await Clients.Group(roomCode).SendAsync("OnPlayerKicked", playerId);
+        // Send kick notification to the kicked player's current connection
+        var kickedConnId = _roomService.GetConnectionId(playerSessionId);
+        if (kickedConnId != null)
+        {
+            await Clients.Client(kickedConnId).SendAsync("OnKicked");
+            await Groups.RemoveFromGroupAsync(kickedConnId, roomCode);
+        }
+        await Clients.Group(roomCode).SendAsync("OnPlayerKicked", playerSessionId);
     }
 
     /// <summary>
@@ -331,51 +329,31 @@ public class GameHub : Hub
     public async Task<bool> JoinGame(string roomCode, string nickname)
     {
         var room = _roomService.GetRoom(roomCode);
-        if (room == null)
-        {
-            return false;
-        }
+        if (room == null) return false;
 
-        // Find player by nickname and update their connection ID
         var player = room.Players.FirstOrDefault(p => p.Nickname.Equals(nickname, StringComparison.OrdinalIgnoreCase));
-        if (player != null)
-        {
-            // Update connection ID if reconnecting
-            var oldConnectionId = player.ConnectionId;
-            player.ConnectionId = Context.ConnectionId;
-            
-            // If this player is the host, update room's HostConnectionId too
-            if (player.IsHost)
-            {
-                room.HostConnectionId = Context.ConnectionId;
-            }
-            
-            // Update the _playerRooms mapping only if connectionId actually changed
-            if (oldConnectionId != Context.ConnectionId)
-            {
-                _roomService.UpdatePlayerConnection(roomCode, oldConnectionId, Context.ConnectionId);
-            }
-            
-            // Add to SignalR group
-            await Groups.AddToGroupAsync(Context.ConnectionId, roomCode);
-            return true;
-        }
+        if (player == null) return false;
 
-        return false;
+        // Update transport ConnectionId
+        player.ConnectionId = Context.ConnectionId;
+        _roomService.UpdatePlayerConnection(player.SessionId, Context.ConnectionId);
+        
+        await Groups.AddToGroupAsync(Context.ConnectionId, roomCode);
+        return true;
     }
 
     #endregion
 
     #region Stan gotowości
 
-    /// <summary>
-    /// Ustawia gotowość gracza.
-    /// </summary>
     public async Task SetReady(string roomCode, bool isReady)
     {
-        if (_roomService.SetPlayerReady(Context.ConnectionId, isReady))
+        var sessionId = ResolveSessionId();
+        if (sessionId == null) return;
+        
+        if (_roomService.SetPlayerReady(sessionId, isReady))
         {
-            await Clients.Group(roomCode).SendAsync("OnPlayerReadyChanged", Context.ConnectionId, isReady);
+            await Clients.Group(roomCode).SendAsync("OnPlayerReadyChanged", sessionId, isReady);
         }
     }
 
@@ -383,11 +361,11 @@ public class GameHub : Hub
 
     #region Ustawienia
 
-    /// <summary>
-    /// Aktualizuje ustawienia gry (tylko host).
-    /// </summary>
     public async Task UpdateGameSettings(string roomCode, List<string> categoryNames, int roundCount)
     {
+        var sessionId = ResolveSessionId();
+        if (sessionId == null) return;
+        
         var room = _roomService.GetRoom(roomCode);
         if (room == null)
         {
@@ -395,15 +373,12 @@ public class GameHub : Hub
             return;
         }
 
-        // Check if caller is host
-        var caller = room.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
-        if (caller?.IsHost != true)
+        if (room.HostSessionId != sessionId)
         {
             await Clients.Caller.SendAsync("OnError", "Tylko host może zmieniać ustawienia.");
             return;
         }
 
-        // Validate input
         if (categoryNames == null || categoryNames.Count == 0)
         {
             await Clients.Caller.SendAsync("OnError", "Wybierz co najmniej jedną kategorię.");
@@ -416,14 +391,12 @@ public class GameHub : Hub
             return;
         }
 
-        // Cap round count at available letter count
         var maxRounds = room.Settings.AvailableLetters.Count;
         if (roundCount > maxRounds)
         {
             roundCount = maxRounds;
         }
 
-        // Update settings - include both standard and custom categories
         var selectedCategories = new List<Category>();
         foreach (var name in categoryNames)
         {
@@ -434,7 +407,6 @@ public class GameHub : Hub
             }
             else
             {
-                // Custom category
                 selectedCategories.Add(new Category { Name = name, Icon = "star", IsCustom = true });
             }
         }
@@ -442,17 +414,16 @@ public class GameHub : Hub
         room.Settings.SelectedCategories = selectedCategories;
         room.Settings.RoundCount = roundCount;
 
-        // Notify all players in the room
         await Clients.Group(roomCode).SendAsync("OnSettingsUpdated", 
             selectedCategories.Select(c => c.Name).ToList(), 
             roundCount);
     }
 
-    /// <summary>
-    /// Aktualizuje dostępne litery (tylko host, w lobby).
-    /// </summary>
     public async Task UpdateLetterSettings(string roomCode, List<char> letters)
     {
+        var sessionId = ResolveSessionId();
+        if (sessionId == null) return;
+        
         var room = _roomService.GetRoom(roomCode);
         if (room == null)
         {
@@ -460,8 +431,7 @@ public class GameHub : Hub
             return;
         }
 
-        var caller = room.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
-        if (caller?.IsHost != true)
+        if (room.HostSessionId != sessionId)
         {
             await Clients.Caller.SendAsync("OnError", "Tylko host może zmieniać ustawienia.");
             return;
@@ -474,7 +444,6 @@ public class GameHub : Hub
             return;
         }
 
-        // Filtruj tylko litery z dozwolonego alfabetu
         var validLetters = letters
             .Where(l => GameSettings.FullAlphabet.Contains(l))
             .Distinct()
@@ -488,7 +457,6 @@ public class GameHub : Hub
 
         room.Settings.AvailableLetters = validLetters;
 
-        // Auto-reduce round count if it exceeds new letter count
         if (room.Settings.RoundCount > validLetters.Count)
         {
             room.Settings.RoundCount = validLetters.Count;
@@ -501,18 +469,17 @@ public class GameHub : Hub
 
     #region Gra
 
-    /// <summary>
-    /// Rozpoczyna grę (tylko host).
-    /// </summary>
     public async Task StartGame(string roomCode)
     {
+        var sessionId = ResolveSessionId();
+        if (sessionId == null) return;
+        
         var room = _roomService.GetRoom(roomCode);
         if (room == null) return;
 
-        // Reset scores and violations when starting a new game
         _gameService.ResetGameForLobby(roomCode);
 
-        var result = _gameService.StartGame(Context.ConnectionId);
+        var result = _gameService.StartGame(sessionId);
         
         if (!result.Success)
         {
@@ -520,11 +487,9 @@ public class GameHub : Hub
             return;
         }
 
-        // Refresh room reference after StartGame may have modified it
         room = _roomService.GetRoom(roomCode);
         if (room?.CurrentGame != null)
         {
-            // Start first round
             var roundResult = _gameService.StartRound(roomCode);
             
             await Clients.Group(roomCode).SendAsync("OnGameStarted", 
@@ -540,101 +505,64 @@ public class GameHub : Hub
         }
     }
 
-    /// <summary>
-    /// Gracz wciska STOP.
-    /// </summary>
     public async Task TriggerStop(string roomCode, Dictionary<string, string> answers)
     {
-        Console.WriteLine($"[TriggerStop] Called by {Context.ConnectionId}");
+        var sessionId = ResolveSessionId();
+        if (sessionId == null) return;
+        
+        Console.WriteLine($"[TriggerStop] Called by session {sessionId} (conn {Context.ConnectionId})");
         
         var room = _roomService.GetRoom(roomCode);
         var countdownSeconds = room?.Settings.CountdownSeconds ?? 10;
         
-        Console.WriteLine($"[TriggerStop] Room has {room?.Players.Count ?? 0} players");
-        
-        var result = _gameService.TriggerStop(roomCode, Context.ConnectionId, countdownSeconds);
-        
-        Console.WriteLine($"[TriggerStop] GameService.TriggerStop result: Success={result.Success}");
+        var result = _gameService.TriggerStop(roomCode, sessionId, countdownSeconds);
         
         if (result.Success)
         {
-            // Auto-submit answers for the player who triggered STOP
-            _gameService.SubmitAnswers(roomCode, Context.ConnectionId, answers);
+            _gameService.SubmitAnswers(roomCode, sessionId, answers);
             await Clients.Caller.SendAsync("OnAnswersSubmitted");
             
-            // Notify all players about STOP
-            await Clients.Group(roomCode).SendAsync("OnStopTriggered", Context.ConnectionId, result.EndTime);
-            await Clients.Group(roomCode).SendAsync("OnPlayerSubmitted", Context.ConnectionId);
+            await Clients.Group(roomCode).SendAsync("OnStopTriggered", sessionId, result.EndTime);
+            await Clients.Group(roomCode).SendAsync("OnPlayerSubmitted", sessionId);
             
-            // Check if all players already submitted (could happen in 2-player game)
             if (room?.CurrentGame != null)
             {
-                var submittedCount = room.CurrentGame.RoundAnswers.Count;
-                var playerCount = room.Players.Count;
-                Console.WriteLine($"[TriggerStop] SUCCESS branch: Submitted={submittedCount}, Players={playerCount}");
-                
                 var allSubmitted = room.Players.All(p => 
-                    room.CurrentGame.RoundAnswers.ContainsKey(p.ConnectionId));
+                    room.CurrentGame.RoundAnswers.ContainsKey(p.SessionId));
                 
                 if (allSubmitted)
                 {
-                    Console.WriteLine($"[TriggerStop] All submitted in SUCCESS branch - calling EndRound");
                     await EndRound(roomCode);
                 }
             }
         }
         else
         {
-            Console.WriteLine($"[TriggerStop] ELSE branch - TriggerStop failed, submitting answers anyway");
-            
-            // TriggerStop failed (another player already triggered) - but still submit this player's answers
-            // This prevents deadlock when both players click STOP simultaneously
-            if (_gameService.SubmitAnswers(roomCode, Context.ConnectionId, answers))
+            if (_gameService.SubmitAnswers(roomCode, sessionId, answers))
             {
-                Console.WriteLine($"[TriggerStop] ELSE branch - SubmitAnswers succeeded");
-                
                 await Clients.Caller.SendAsync("OnAnswersSubmitted");
-                await Clients.Group(roomCode).SendAsync("OnPlayerSubmitted", Context.ConnectionId);
+                await Clients.Group(roomCode).SendAsync("OnPlayerSubmitted", sessionId);
                 
-                // Check if all players submitted
                 if (room?.CurrentGame != null)
                 {
-                    var submittedCount = room.CurrentGame.RoundAnswers.Count;
-                    var playerCount = room.Players.Count;
-                    Console.WriteLine($"[TriggerStop] ELSE branch: Submitted={submittedCount}, Players={playerCount}");
-                    
                     var allSubmitted = room.Players.All(p => 
-                        room.CurrentGame.RoundAnswers.ContainsKey(p.ConnectionId));
+                        room.CurrentGame.RoundAnswers.ContainsKey(p.SessionId));
                     
                     if (allSubmitted)
                     {
-                        Console.WriteLine($"[TriggerStop] All submitted in ELSE branch - calling EndRound");
                         await EndRound(roomCode);
                     }
-                    else
-                    {
-                        Console.WriteLine($"[TriggerStop] NOT all submitted yet in ELSE branch");
-                        foreach (var p in room.Players)
-                        {
-                            var hasAnswers = room.CurrentGame.RoundAnswers.ContainsKey(p.ConnectionId);
-                            Console.WriteLine($"[TriggerStop]   Player {p.Nickname} ({p.ConnectionId}): HasAnswers={hasAnswers}");
-                        }
-                    }
                 }
-            }
-            else
-            {
-                Console.WriteLine($"[TriggerStop] ELSE branch - SubmitAnswers FAILED!");
             }
         }
     }
 
-    /// <summary>
-    /// Dodaje czas (tylko gracz który wcisnął STOP).
-    /// </summary>
     public async Task AddTime(string roomCode, int additionalSeconds)
     {
-        var result = _gameService.AddTime(roomCode, Context.ConnectionId, additionalSeconds);
+        var sessionId = ResolveSessionId();
+        if (sessionId == null) return;
+        
+        var result = _gameService.AddTime(roomCode, sessionId, additionalSeconds);
         
         if (result.Success)
         {
@@ -642,22 +570,21 @@ public class GameHub : Hub
         }
     }
 
-    /// <summary>
-    /// Wysyła odpowiedzi.
-    /// </summary>
     public async Task SubmitAnswers(string roomCode, Dictionary<string, string> answers)
     {
-        if (_gameService.SubmitAnswers(roomCode, Context.ConnectionId, answers))
+        var sessionId = ResolveSessionId();
+        if (sessionId == null) return;
+        
+        if (_gameService.SubmitAnswers(roomCode, sessionId, answers))
         {
             await Clients.Caller.SendAsync("OnAnswersSubmitted");
-            await Clients.Group(roomCode).SendAsync("OnPlayerSubmitted", Context.ConnectionId);
+            await Clients.Group(roomCode).SendAsync("OnPlayerSubmitted", sessionId);
             
-            // Check if all players submitted
             var room = _roomService.GetRoom(roomCode);
             if (room?.CurrentGame != null)
             {
                 var allSubmitted = room.Players.All(p => 
-                    room.CurrentGame.RoundAnswers.ContainsKey(p.ConnectionId));
+                    room.CurrentGame.RoundAnswers.ContainsKey(p.SessionId));
                 
                 if (allSubmitted)
                 {
@@ -667,34 +594,27 @@ public class GameHub : Hub
         }
     }
 
-    /// <summary>
-    /// Kończy rundę i przechodzi do głosowania.
-    /// </summary>
     public async Task EndRound(string roomCode)
     {
         var answersForVoting = _gameService.EndRoundAndPrepareVoting(roomCode);
-        
-        // Notify all players to go to voting
         await Clients.Group(roomCode).SendAsync("OnRoundEnded", answersForVoting.Count);
     }
 
-    /// <summary>
-    /// Rozpoczyna następną rundę (tylko host).
-    /// </summary>
     public async Task StartNextRound(string roomCode)
     {
+        var sessionId = ResolveSessionId();
+        if (sessionId == null) return;
+        
         var room = _roomService.GetRoom(roomCode);
         if (room == null) return;
         
-        // Find player by connection ID and check IsHost
-        var caller = room.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+        var caller = room.Players.FirstOrDefault(p => p.SessionId == sessionId);
         if (caller?.IsHost != true)
         {
             await Clients.Caller.SendAsync("OnError", "Tylko host może rozpocząć następną rundę.");
             return;
         }
 
-        // Increment round number
         if (room.CurrentGame != null)
         {
             room.CurrentGame.CurrentRound++;
@@ -714,12 +634,12 @@ public class GameHub : Hub
         }
     }
 
-    /// <summary>
-    /// Losuje nową literę w trakcie rundy (tylko host).
-    /// </summary>
     public async Task RerollLetter(string roomCode)
     {
-        var result = _gameService.RerollLetter(roomCode, Context.ConnectionId);
+        var sessionId = ResolveSessionId();
+        if (sessionId == null) return;
+        
+        var result = _gameService.RerollLetter(roomCode, sessionId);
 
         if (result.Success)
         {
@@ -735,32 +655,30 @@ public class GameHub : Hub
 
     #region Głosowanie
 
-    /// <summary>
-    /// Głosuje na odpowiedź.
-    /// </summary>
     public async Task VoteAnswer(string roomCode, string answerId, string voteType)
     {
+        var sessionId = ResolveSessionId();
+        if (sessionId == null) return;
+        
         var room = _roomService.GetRoom(roomCode);
         var answer = room?.CurrentGame?.AnswersForVoting.FirstOrDefault(a => a.Id == answerId);
         
         if (answer != null)
         {
-            // Usuń poprzedni głos ze wszystkich list
-            answer.VotesValid.Remove(Context.ConnectionId);
-            answer.VotesInvalid.Remove(Context.ConnectionId);
-            answer.VotesDuplicate.Remove(Context.ConnectionId);
+            answer.VotesValid.Remove(sessionId);
+            answer.VotesInvalid.Remove(sessionId);
+            answer.VotesDuplicate.Remove(sessionId);
             
-            // Dodaj nowy głos
             switch (voteType.ToLowerInvariant())
             {
                 case "valid":
-                    answer.VotesValid.Add(Context.ConnectionId);
+                    answer.VotesValid.Add(sessionId);
                     break;
                 case "invalid":
-                    answer.VotesInvalid.Add(Context.ConnectionId);
+                    answer.VotesInvalid.Add(sessionId);
                     break;
                 case "duplicate":
-                    answer.VotesDuplicate.Add(Context.ConnectionId);
+                    answer.VotesDuplicate.Add(sessionId);
                     break;
             }
 
@@ -769,99 +687,76 @@ public class GameHub : Hub
         }
     }
 
-    /// <summary>
-    /// Gracz przesyła swoje głosy.
-    /// </summary>
     public async Task SubmitVotes(string roomCode)
     {
+        var sessionId = ResolveSessionId();
+        if (sessionId == null) return;
+        
         var room = _roomService.GetRoom(roomCode);
         if (room?.CurrentGame == null) return;
 
-        // Find player by current connection
-        var player = room.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
-        if (player == null) return;
-
-        // Mark votes as submitted
-        room.CurrentGame.VotesSubmittedBy.Add(Context.ConnectionId);
+        room.CurrentGame.VotesSubmittedBy.Add(sessionId);
 
         var submittedCount = room.CurrentGame.VotesSubmittedBy.Count;
         var totalPlayers = room.Players.Count;
 
-        // Notify all players of progress
         await Clients.Group(roomCode).SendAsync("OnVotesSubmitted", submittedCount);
 
-        // Auto-end if all players have submitted
         if (submittedCount >= totalPlayers)
         {
             await FinalizeVoting(roomCode);
         }
     }
 
-    /// <summary>
-    /// Kończy głosowanie i przechodzi do tabeli wyników.
-    /// </summary>
     public async Task FinalizeVoting(string roomCode)
     {
         _gameService.FinalizeVotingAndCalculateScores(roomCode);
         
-        // Check if this was the last round - reset ready states for new game
         var room = _roomService.GetRoom(roomCode);
         if (room?.CurrentGame != null && room.CurrentGame.CurrentRound >= room.CurrentGame.TotalRounds)
         {
             foreach (var player in room.Players)
             {
-                player.IsReady = player.IsHost; // Only host stays ready
+                player.IsReady = player.IsHost;
             }
         }
         
-        // Notify all players to go to scoreboard
         await Clients.Group(roomCode).SendAsync("OnVotingEnded");
     }
 
-    /// <summary>
-    /// Kończy grę wcześniej i przechodzi do wyników końcowych (tylko host).
-    /// </summary>
     public async Task EndGame(string roomCode)
     {
-        var room = _roomService.GetRoom(roomCode);
+        var sessionId = ResolveSessionId();
+        if (sessionId == null) return;
         
-        // Only host can end game
+        var room = _roomService.GetRoom(roomCode);
         if (room == null) return;
         
-        var caller = room.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
-        
-        if (caller?.IsHost != true)
+        if (room.HostSessionId != sessionId)
         {
             await Clients.Caller.SendAsync("OnError", "Tylko host może zakończyć grę.");
             return;
         }
 
-        // Force the game to final results by setting current round = total rounds
         if (room.CurrentGame != null)
         {
             room.CurrentGame.CurrentRound = room.CurrentGame.TotalRounds;
             room.CurrentGame.Phase = RoundPhase.Results;
             
-            // Reset ready states for potential return to lobby
             foreach (var player in room.Players)
             {
                 player.IsReady = player.IsHost;
             }
         }
 
-        // Notify all players - client will see isLastRound=true and go to FinalResults
         await Clients.Group(roomCode).SendAsync("OnVotingEnded");
     }
 
-    /// <summary>
-    /// Wraca do lobby (tylko dla gracza który kliknął — każdy wraca niezależnie).
-    /// </summary>
     public async Task ReturnToLobby(string roomCode)
     {
         var room = _roomService.GetRoom(roomCode);
         if (room == null) return;
 
-        // Only send to the caller — each player returns to lobby independently
         await Clients.Caller.SendAsync("OnReturnToLobby", roomCode);
     }
 
@@ -869,22 +764,20 @@ public class GameHub : Hub
 
     #region Chat
 
-    /// <summary>
-    /// Wysyła wiadomość na czacie.
-    /// </summary>
     public async Task SendChatMessage(string roomCode, string message)
     {
         if (string.IsNullOrWhiteSpace(message)) return;
         
-        // Limit długości
         if (message.Length > 200)
         {
             message = message[..200];
         }
 
-        // Persist message in room
+        var sessionId = ResolveSessionId();
+        if (sessionId == null) return;
+
         var room = _roomService.GetRoom(roomCode);
-        var player = room?.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
+        var player = room?.Players.FirstOrDefault(p => p.SessionId == sessionId);
         if (room != null && player != null)
         {
             room.ChatMessages.Add(new ChatMessage
@@ -894,20 +787,15 @@ public class GameHub : Hub
                 IsSystem = false
             });
             
-            // Keep only last 50 messages
             if (room.ChatMessages.Count > 50)
             {
                 room.ChatMessages.RemoveAt(0);
             }
 
-            // Broadcast with nickname + isSystem flag so clients match the listener signature
             await Clients.Group(roomCode).SendAsync("OnChatMessage", player.Nickname, message, false);
         }
     }
 
-    /// <summary>
-    /// Dodaje system message do czatu (używane przez serwer).
-    /// </summary>
     public void AddSystemMessage(string roomCode, string text)
     {
         var room = _roomService.GetRoom(roomCode);
@@ -931,50 +819,45 @@ public class GameHub : Hub
 
     #region Anty-cheat
 
-    /// <summary>
-    /// Raportuje naruszenie.
-    /// </summary>
-    public async Task ReportViolation(string roomCode, string violationType, double durationSeconds, int roundNumber)
+    public async Task<bool> ReportViolation(string roomCode, string violationType, double durationSeconds, int roundNumber)
     {
-        Console.WriteLine($"[AntiCheat] ReportViolation called: room={roomCode}, type={violationType}, duration={durationSeconds}s, round={roundNumber}, connectionId={Context.ConnectionId}");
+        var sessionId = ResolveSessionId();
+        Console.WriteLine($"[AntiCheat] ReportViolation: room={roomCode}, type={violationType}, duration={durationSeconds}s, round={roundNumber}, session={sessionId}");
         
+        if (sessionId == null) return false;
+
         var room = _roomService.GetRoom(roomCode);
-        var player = room?.Players.FirstOrDefault(p => p.ConnectionId == Context.ConnectionId);
-        
-        Console.WriteLine($"[AntiCheat] Player found: {player?.Nickname ?? "NULL"}, Room found: {room != null}");
+        var player = room?.Players.FirstOrDefault(p => p.SessionId == sessionId);
         
         if (player != null && Enum.TryParse<ViolationType>(violationType, out var type))
         {
             var penalty = Violation.CalculatePenalty(player.Violations, type, durationSeconds);
-            
-            Console.WriteLine($"[AntiCheat] Penalty calculated: {penalty} points (previous violations: {player.Violations.Count})");
             
             var violation = new Violation
             {
                 Type = type,
                 DurationSeconds = durationSeconds,
                 Penalty = penalty,
-                RoundNumber = roundNumber  // Use round number from client (captured at detection time!)
+                RoundNumber = roundNumber
             };
             
             player.Violations.Add(violation);
             player.TotalScore -= penalty;
-            player.RoundScore -= penalty; // Dolicz karę do wyniku bieżącej rundy
+            player.RoundScore -= penalty;
             
-            Console.WriteLine($"[AntiCheat] Violation added. Player {player.Nickname} now has TotalScore={player.TotalScore}, RoundScore={player.RoundScore}, Violations={player.Violations.Count}, Round={roundNumber}");
+            Console.WriteLine($"[AntiCheat] Violation added: {player.Nickname}, TotalScore={player.TotalScore}, Violations={player.Violations.Count}");
 
             await Clients.Group(roomCode).SendAsync("OnAntiCheatViolation", 
-                Context.ConnectionId, 
+                sessionId, 
                 violationType, 
                 durationSeconds, 
                 penalty);
                 
-            Console.WriteLine($"[AntiCheat] OnAntiCheatViolation broadcast sent");
+            return true;
         }
-        else
-        {
-            Console.WriteLine($"[AntiCheat] Violation not processed - player null: {player == null}, parse failed: {!Enum.TryParse<ViolationType>(violationType, out _)}");
-        }
+        
+        Console.WriteLine($"[AntiCheat] Not processed - player null: {player == null}");
+        return false;
     }
 
     #endregion

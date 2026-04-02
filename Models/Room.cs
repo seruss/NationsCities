@@ -11,9 +11,9 @@ public class Room
     public string Code { get; set; } = string.Empty;
 
     /// <summary>
-    /// ConnectionId hosta (twórcy pokoju).
+    /// SessionId hosta (twórcy pokoju). Stabilny identyfikator przeżywający reconnect.
     /// </summary>
-    public string HostConnectionId { get; set; } = string.Empty;
+    public string HostSessionId { get; set; } = string.Empty;
 
     /// <summary>
     /// Lista graczy w pokoju.

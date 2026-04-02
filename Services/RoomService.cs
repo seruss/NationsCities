@@ -5,11 +5,14 @@ namespace NationsCities.Services;
 
 /// <summary>
 /// Serwis zarządzania pokojami gry.
+/// Klucz domenowy gracza: SessionId (stabilny, przeżywa reconnect).
+/// ConnectionId jest używany wyłącznie jako adres transportowy SignalR.
 /// </summary>
 public class RoomService
 {
     private readonly ConcurrentDictionary<string, Room> _rooms = new();
-    private readonly ConcurrentDictionary<string, string> _playerRooms = new(); // ConnectionId -> RoomCode
+    private readonly ConcurrentDictionary<string, string> _sessionRooms = new(); // SessionId -> RoomCode
+    private readonly ConcurrentDictionary<string, string> _sessionConnections = new(); // SessionId -> ConnectionId (transport)
     
     // Pending disconnections for lobby grace period (SessionId -> PendingDisconnection)
     private readonly ConcurrentDictionary<string, PendingDisconnection> _pendingDisconnections = new();
@@ -17,17 +20,53 @@ public class RoomService
     private const string RoomCodeChars = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // bez I, O
     private static readonly TimeSpan LobbyDisconnectGracePeriod = TimeSpan.FromSeconds(5);
 
+    // ===== RESOLVER: ConnectionId <-> SessionId =====
+
+    /// <summary>
+    /// Zwraca SessionId gracza na podstawie bieżącego ConnectionId.
+    /// Używane w hubie do tłumaczenia Context.ConnectionId → stabilny klucz.
+    /// </summary>
+    public string? GetSessionByConnection(string connectionId)
+    {
+        foreach (var kvp in _sessionConnections)
+        {
+            if (kvp.Value == connectionId)
+                return kvp.Key;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Zwraca bieżący ConnectionId gracza na podstawie SessionId.
+    /// Używane do wysyłki wiadomości SignalR.
+    /// </summary>
+    public string? GetConnectionId(string sessionId)
+    {
+        _sessionConnections.TryGetValue(sessionId, out var connectionId);
+        return connectionId;
+    }
+
+    /// <summary>
+    /// Aktualizuje ConnectionId gracza po ponownym połączeniu (rejoin/reconnect).
+    /// </summary>
+    public void UpdatePlayerConnection(string sessionId, string newConnectionId)
+    {
+        _sessionConnections[sessionId] = newConnectionId;
+    }
+
+    // ===== POKOJE =====
+
     /// <summary>
     /// Tworzy nowy pokój.
     /// </summary>
-    public Room CreateRoom(string hostConnectionId, string hostNickname, string? sessionId = null)
+    public Room CreateRoom(string connectionId, string nickname, string sessionId)
     {
         var roomCode = GenerateUniqueRoomCode();
         var host = new Player
         {
-            SessionId = sessionId ?? string.Empty,
-            ConnectionId = hostConnectionId,
-            Nickname = hostNickname,
+            SessionId = sessionId,
+            ConnectionId = connectionId,
+            Nickname = nickname,
             AvatarColor = Player.GenerateAvatarColor(),
             IsHost = true,
             IsReady = true
@@ -36,12 +75,13 @@ public class RoomService
         var room = new Room
         {
             Code = roomCode,
-            HostConnectionId = hostConnectionId,
+            HostSessionId = sessionId,
             Players = [host]
         };
 
         _rooms[roomCode] = room;
-        _playerRooms[hostConnectionId] = roomCode;
+        _sessionRooms[sessionId] = roomCode;
+        _sessionConnections[sessionId] = connectionId;
 
         return room;
     }
@@ -81,7 +121,7 @@ public class RoomService
     /// <summary>
     /// Dołącza gracza do pokoju.
     /// </summary>
-    public (bool Success, string? Error, Room? Room) JoinRoom(string roomCode, string connectionId, string nickname, string? sessionId = null)
+    public (bool Success, string? Error, Room? Room) JoinRoom(string roomCode, string connectionId, string nickname, string sessionId)
     {
         roomCode = roomCode.ToUpperInvariant();
 
@@ -107,34 +147,37 @@ public class RoomService
 
         var player = new Player
         {
-            SessionId = sessionId ?? string.Empty,
+            SessionId = sessionId,
             ConnectionId = connectionId,
             Nickname = nickname,
             AvatarColor = Player.GenerateAvatarColor()
         };
 
         room.Players.Add(player);
-        _playerRooms[connectionId] = roomCode;
+        _sessionRooms[sessionId] = roomCode;
+        _sessionConnections[sessionId] = connectionId;
 
         return (true, null, room);
     }
 
     /// <summary>
-    /// Usuwa gracza z pokoju.
+    /// Usuwa gracza z pokoju po SessionId.
     /// </summary>
-    public (Room? Room, bool RoomDeleted, string? NewHostId, string? NewHostNickname) LeaveRoom(string connectionId)
+    public (Room? Room, bool RoomDeleted, string? NewHostSessionId, string? NewHostNickname) LeaveRoom(string sessionId)
     {
-        if (!_playerRooms.TryRemove(connectionId, out var roomCode))
+        if (!_sessionRooms.TryRemove(sessionId, out var roomCode))
         {
             return (null, false, null, null);
         }
+
+        _sessionConnections.TryRemove(sessionId, out _);
 
         if (!_rooms.TryGetValue(roomCode, out var room))
         {
             return (null, false, null, null);
         }
 
-        var player = room.Players.FirstOrDefault(p => p.ConnectionId == connectionId);
+        var player = room.Players.FirstOrDefault(p => p.SessionId == sessionId);
         if (player == null)
         {
             return (null, false, null, null);
@@ -150,49 +193,50 @@ public class RoomService
         }
 
         // Jeśli host wyszedł - przydziel nowego
-        string? newHostId = null;
+        string? newHostSessionId = null;
         string? newHostNickname = null;
         if (player.IsHost)
         {
             var newHost = room.Players.First();
             newHost.IsHost = true;
-            room.HostConnectionId = newHost.ConnectionId;
-            newHostId = newHost.ConnectionId;
+            room.HostSessionId = newHost.SessionId;
+            newHostSessionId = newHost.SessionId;
             newHostNickname = newHost.Nickname;
         }
 
-        return (room, false, newHostId, newHostNickname);
+        return (room, false, newHostSessionId, newHostNickname);
     }
 
     /// <summary>
-    /// Wyrzuca gracza z pokoju (tylko host).
+    /// Wyrzuca gracza z pokoju (tylko host). Parametry = SessionId.
     /// </summary>
-    public (bool Success, string? Error) KickPlayer(string hostConnectionId, string playerConnectionId)
+    public (bool Success, string? Error) KickPlayer(string hostSessionId, string playerSessionId)
     {
-        var room = GetRoomByPlayer(hostConnectionId);
+        var room = GetRoomBySession(hostSessionId);
         if (room == null)
         {
             return (false, "Nie jesteś w pokoju.");
         }
 
-        if (room.HostConnectionId != hostConnectionId)
+        if (room.HostSessionId != hostSessionId)
         {
             return (false, "Tylko host może wyrzucać graczy.");
         }
 
-        if (hostConnectionId == playerConnectionId)
+        if (hostSessionId == playerSessionId)
         {
             return (false, "Nie możesz wyrzucić siebie.");
         }
 
-        var player = room.Players.FirstOrDefault(p => p.ConnectionId == playerConnectionId);
+        var player = room.Players.FirstOrDefault(p => p.SessionId == playerSessionId);
         if (player == null)
         {
             return (false, "Gracz nie istnieje.");
         }
 
         room.Players.Remove(player);
-        _playerRooms.TryRemove(playerConnectionId, out _);
+        _sessionRooms.TryRemove(playerSessionId, out _);
+        _sessionConnections.TryRemove(playerSessionId, out _);
 
         return (true, null);
     }
@@ -207,11 +251,11 @@ public class RoomService
     }
 
     /// <summary>
-    /// Pobiera pokój gracza.
+    /// Pobiera pokój gracza po SessionId.
     /// </summary>
-    public Room? GetRoomByPlayer(string connectionId)
+    public Room? GetRoomBySession(string sessionId)
     {
-        if (!_playerRooms.TryGetValue(connectionId, out var roomCode))
+        if (!_sessionRooms.TryGetValue(sessionId, out var roomCode))
         {
             return null;
         }
@@ -219,37 +263,35 @@ public class RoomService
     }
 
     /// <summary>
-    /// Pobiera kod pokoju gracza.
+    /// Pobiera kod pokoju gracza po SessionId.
+    /// </summary>
+    public string? GetRoomCodeBySession(string sessionId)
+    {
+        _sessionRooms.TryGetValue(sessionId, out var roomCode);
+        return roomCode;
+    }
+
+    /// <summary>
+    /// Pobiera kod pokoju po ConnectionId (potrzebne w OnDisconnectedAsync).
     /// </summary>
     public string? GetRoomCode(string connectionId)
     {
-        _playerRooms.TryGetValue(connectionId, out var roomCode);
-        return roomCode;
+        var sessionId = GetSessionByConnection(connectionId);
+        if (sessionId == null) return null;
+        return GetRoomCodeBySession(sessionId);
     }
 
     /// <summary>
     /// Ustawia stan gotowości gracza.
     /// </summary>
-    public bool SetPlayerReady(string connectionId, bool isReady)
+    public bool SetPlayerReady(string sessionId, bool isReady)
     {
-        var room = GetRoomByPlayer(connectionId);
-        var player = room?.Players.FirstOrDefault(p => p.ConnectionId == connectionId);
+        var room = GetRoomBySession(sessionId);
+        var player = room?.Players.FirstOrDefault(p => p.SessionId == sessionId);
         if (player == null) return false;
 
         player.IsReady = isReady;
         return true;
-    }
-
-    /// <summary>
-    /// Aktualizuje ConnectionId gracza po ponownym połączeniu (rejoin).
-    /// </summary>
-    public void UpdatePlayerConnection(string roomCode, string oldConnectionId, string newConnectionId)
-    {
-        // Remove old mapping
-        _playerRooms.TryRemove(oldConnectionId, out _);
-        
-        // Add new mapping
-        _playerRooms[newConnectionId] = roomCode;
     }
 
     /// <summary>
@@ -276,7 +318,8 @@ public class RoomService
         // Remove all player mappings
         foreach (var player in room.Players)
         {
-            _playerRooms.TryRemove(player.ConnectionId, out _);
+            _sessionRooms.TryRemove(player.SessionId, out _);
+            _sessionConnections.TryRemove(player.SessionId, out _);
         }
 
         return true;
@@ -331,7 +374,6 @@ public class RoomService
         {
             var inactiveTime = now - room.LastActivityAt;
             
-            // Usuń puste pokoje (brak graczy) po krótszym czasie
             if (room.Players.Count == 0 && inactiveTime > emptyRoomThreshold)
             {
                 if (_rooms.TryRemove(room.Code, out _))
@@ -339,13 +381,12 @@ public class RoomService
                     removedCount++;
                 }
             }
-            // Usuń pokoje z graczami po dłuższym czasie nieaktywności
             else if (inactiveTime > staleRoomThreshold)
             {
-                // Wyczyść mapowania graczy
                 foreach (var player in room.Players)
                 {
-                    _playerRooms.TryRemove(player.ConnectionId, out _);
+                    _sessionRooms.TryRemove(player.SessionId, out _);
+                    _sessionConnections.TryRemove(player.SessionId, out _);
                 }
                 
                 if (_rooms.TryRemove(room.Code, out _))
@@ -390,7 +431,6 @@ public class RoomService
 
     /// <summary>
     /// Cancels a pending disconnection if player reconnects.
-    /// Returns true if a pending disconnection was cancelled.
     /// </summary>
     public bool CancelPendingRemoval(string sessionId)
     {
@@ -423,12 +463,11 @@ public class RoomService
     }
 
     /// <summary>
-    /// Processes expired pending disconnections. Should be called periodically or after delay.
-    /// Returns list of removed players for notification.
+    /// Processes expired pending disconnections.
     /// </summary>
-    public List<(string RoomCode, string Nickname, string? NewHostId, string? NewHostNickname, bool RoomDeleted)> ProcessExpiredDisconnections()
+    public List<(string RoomCode, string Nickname, string? NewHostSessionId, string? NewHostNickname, bool RoomDeleted)> ProcessExpiredDisconnections()
     {
-        var results = new List<(string RoomCode, string Nickname, string? NewHostId, string? NewHostNickname, bool RoomDeleted)>();
+        var results = new List<(string RoomCode, string Nickname, string? NewHostSessionId, string? NewHostNickname, bool RoomDeleted)>();
         var now = DateTime.UtcNow;
 
         foreach (var kvp in _pendingDisconnections.ToList())
@@ -439,7 +478,6 @@ public class RoomService
                 {
                     Console.WriteLine($"[RoomService] Processing expired disconnection for {pending.Nickname}");
                     
-                    // Actually remove the player now
                     var room = GetRoom(pending.RoomCode);
                     if (room != null)
                     {
@@ -450,17 +488,18 @@ public class RoomService
                         if (player != null)
                         {
                             // GUARD: If the player has already reconnected (connectionId changed),
-                            // do NOT remove them — they're back in the game with a new connection.
+                            // do NOT remove them.
                             if (player.ConnectionId != pending.ConnectionId)
                             {
-                                Console.WriteLine($"[RoomService] Skipping removal for {pending.Nickname} — player reconnected with new connectionId {player.ConnectionId} (pending had {pending.ConnectionId})");
+                                Console.WriteLine($"[RoomService] Skipping removal for {pending.Nickname} — player reconnected");
                                 continue;
                             }
                             
                             room.Players.Remove(player);
-                            _playerRooms.TryRemove(player.ConnectionId, out _);
+                            _sessionRooms.TryRemove(player.SessionId, out _);
+                            _sessionConnections.TryRemove(player.SessionId, out _);
                             
-                            string? newHostId = null;
+                            string? newHostSessionId = null;
                             string? newHostNickname = null;
                             bool roomDeleted = false;
                             
@@ -473,12 +512,12 @@ public class RoomService
                             {
                                 var newHost = room.Players.First();
                                 newHost.IsHost = true;
-                                room.HostConnectionId = newHost.ConnectionId;
-                                newHostId = newHost.ConnectionId;
+                                room.HostSessionId = newHost.SessionId;
+                                newHostSessionId = newHost.SessionId;
                                 newHostNickname = newHost.Nickname;
                             }
                             
-                            results.Add((pending.RoomCode, pending.Nickname, newHostId, newHostNickname, roomDeleted));
+                            results.Add((pending.RoomCode, pending.Nickname, newHostSessionId, newHostNickname, roomDeleted));
                         }
                     }
                 }
