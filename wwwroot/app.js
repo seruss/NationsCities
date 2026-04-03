@@ -971,3 +971,44 @@ window.unregisterAntiCheatHandler = function () {
     window._antiCheatReady = false;
     GameLog.info('AntiCheat', 'Blazor handler unregistered');
 };
+
+// ======================================
+// Countdown Vignette Pulse (Gaussian bell)
+// ======================================
+
+/**
+ * Fires a single Gaussian-bell pulse on the #countdown-vignette element.
+ * Call once per timer tick while the countdown is active.
+ */
+window.beatVignette = function () {
+    const maxAlpha  = 0.22;
+    const maxSize   = 40;
+    const maxSpread = 10;
+    const dur       = 820;   // ms — must be < 1000 (one tick)
+    const sigma     = 0.22;
+
+    const el = document.getElementById('countdown-vignette');
+    if (!el) return;
+
+    const start = performance.now();
+
+    function frame(now) {
+        const x = (now - start) / dur; // 0 → 1
+        if (x >= 1) { el.style.boxShadow = 'none'; return; }
+        const g  = Math.exp(-Math.pow(x - 0.5, 2) / (2 * sigma * sigma));
+        const a  = (g * maxAlpha).toFixed(3);
+        const sz = Math.round(g * maxSize);
+        const sp = Math.round(g * maxSpread);
+        el.style.boxShadow = `inset 0 0 ${sz}px ${sp}px rgba(220,38,38,${a})`;
+        requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+};
+
+/**
+ * Clears the vignette effect immediately.
+ */
+window.clearVignette = function () {
+    const el = document.getElementById('countdown-vignette');
+    if (el) el.style.boxShadow = 'none';
+};

@@ -559,6 +559,13 @@ public class ClientGameStateService : IAsyncDisposable
         await _hubConnection.InvokeAsync("AddTime", RoomCode, seconds);
     }
 
+    /// <summary>Request more time from the stop triggerer.</summary>
+    public async Task RequestMoreTimeAsync()
+    {
+        if (_hubConnection == null || string.IsNullOrEmpty(RoomCode)) return;
+        await _hubConnection.InvokeAsync("RequestMoreTime", RoomCode);
+    }
+
     /// <summary>Vote on an answer.</summary>
     public async Task VoteAnswerAsync(string answerId, string voteType)
     {

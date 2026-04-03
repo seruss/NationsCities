@@ -23,71 +23,52 @@ else
 {
     <div class="flex flex-col min-h-screen bg-bg-light dark:bg-bg-dark">
         <!-- Header -->
-        <header class="sticky top-0 flex items-center justify-between px-4 py-3 bg-bg-light dark:bg-bg-dark shrink-0 z-20">
-            <div class="w-10"></div>
+        <header class="sticky top-0 flex items-center justify-center px-4 py-3 bg-bg-light/95 dark:bg-bg-dark/95 backdrop-blur-md shrink-0 z-20 border-b border-slate-200/60 dark:border-slate-800/60">
             <h2 class="text-base font-bold tracking-tight uppercase text-slate-500 dark:text-slate-400">Runda @_currentRound</h2>
-            <div class="w-10"></div>
         </header>
 
-        <!-- Letter & Timer Section -->
-        <div class="px-5 pb-6 pt-2 bg-bg-light dark:bg-bg-dark shrink-0 z-10 border-b border-slate-200 dark:border-slate-800 shadow-sm">
-            <div class="flex items-end justify-between gap-6">
-                <!-- Current Letter -->
-                <div class="flex flex-col">
-                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Litera</span>
-                    <div class="flex items-center gap-3">
-                        <h1 class="text-6xl font-black text-primary leading-none tracking-tighter drop-shadow-lg">@GameState.CurrentGame.CurrentLetter</h1>
-                        @if (GameState.IsHost && !_isCountdownActive && !_hasSubmitted)
-                        {
-                            <button @onclick="ShowRerollConfirmation"
-                                    class="flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-primary/10 border border-slate-200 dark:border-slate-700 transition-all"
-                                    title="Losuj nową literę">
-                                <span class="material-symbols-outlined text-xl text-slate-500 dark:text-slate-400 hover:text-primary">refresh</span>
-                            </button>
-                        }
-                    </div>
+        <!-- Countdown Toast -->
+        @if (_isCountdownActive)
+        {
+            <div class="countdown-toast @(_toastVisible ? "visible" : "")" id="countdown-toast">
+                <!-- Left column: who stopped -->
+                <div class="ct-who">
+                    <span class="ct-label">Kto zatrzymał?</span>
+                    <span class="ct-name">@(_stopTriggeredByMe ? "Ty" : _stopTriggerName)</span>
                 </div>
-                
-                <!-- Timer / Status -->
-                <div class="flex flex-col flex-1 items-end justify-end pb-1">
-                    <div class="flex flex-col items-end w-full">
-                        @if (_isCountdownActive)
-                        {
-                            <!-- Countdown active -->
-                            <div class="flex items-center gap-2 mb-2 @(_secondsRemaining <= 5 ? "bg-red-100 dark:bg-red-900/20 border-red-200 dark:border-red-900/30" : "bg-yellow-100 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-900/30") px-3 py-1 rounded-lg border animate-pulse">
-                                <span class="material-symbols-outlined @(_secondsRemaining <= 5 ? "text-red-500" : "text-yellow-500") text-2xl">hourglass_top</span>
-                                <span class="text-4xl font-black font-mono tabular-nums leading-none @(_secondsRemaining <= 5 ? "text-red-500" : "text-yellow-500") tracking-tight">@_secondsRemaining</span>
-                            </div>
-                            
-                            <!-- Progress Bar -->
-                            <div class="w-full h-3 bg-slate-200 dark:bg-surface-dark rounded-full overflow-hidden mb-2">
-                                <div class="h-full @(_secondsRemaining <= 5 ? "bg-red-500" : "bg-yellow-500") rounded-full transition-all duration-1000" 
-                                     style="width: @(Math.Min(100, (_secondsRemaining / 10.0) * 100))%"></div>
-                            </div>
 
-                            <!-- Add Time Button (only for STOP triggerer) -->
-                            @if (_stopTriggeredByMe)
-                            {
-                                <button @onclick="AddOneSecond" 
-                                        class="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-blue-400 active:scale-95 transition-transform bg-primary/10 px-3 py-1.5 rounded-full border border-primary/20">
-                                    <span class="material-symbols-outlined text-base">add_circle</span>
-                                    <span>+1 sekunda</span>
-                                </button>
-                            }
-                        }
-                        else
-                        {
-                            <!-- No timer - waiting for STOP -->
-                            <div class="flex items-center gap-2 mb-2 bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-700 px-3 py-1 rounded-lg border">
-                                <span class="material-symbols-outlined text-primary text-2xl">all_inclusive</span>
-                                <span class="text-2xl font-black text-primary leading-none tracking-tight">Bez limitu</span>
-                            </div>
-                            <p class="text-xs text-slate-500 dark:text-slate-400 text-right">Wciśnij STOP gdy skończysz</p>
-                        }
+                <!-- Center: counter -->
+                <div class="ct-center">
+                    <div class="ct-num" style="color: @CounterColor">@_secondsRemaining</div>
+                    <div class="ct-bar-wrap">
+                        <div class="ct-bar" style="width: @(Math.Min(100, (_secondsRemaining / 10.0) * 100))%; background: @CounterColor"></div>
                     </div>
+                    <div class="ct-sublabel">pozostało</div>
+                </div>
+
+                <!-- Right column: action button -->
+                <div class="ct-btn-wrap">
+                    @if (_stopTriggeredByMe)
+                    {
+                        <button class="ct-btn ct-btn-add" @onclick="AddOneSecond">
+                            +1 sekunda
+                        </button>
+                    }
+                    else if (_timeBegSent)
+                    {
+                        <button class="ct-btn ct-btn-sent" disabled>
+                            Wysłano
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="ct-btn ct-btn-beg" @onclick="RequestMoreTime">
+                            Więcej czasu!
+                        </button>
+                    }
                 </div>
             </div>
-        </div>
+        }
 
         <!-- Answer Inputs -->
         <main class="flex-1 overflow-y-auto no-scrollbar" data-scrollable="true">
@@ -183,12 +164,20 @@ else
     private bool _isCountdownActive = false;
     private bool _hasSubmitted = false;
     private bool _stopTriggeredByMe = false;
+    private bool _timeBegSent = false;
+    private string _stopTriggerName = "";
+    private bool _toastVisible = false;
     private System.Timers.Timer? _timer;
     private bool _hasInitialized = false;
     private bool _showRerollConfirmation = false;
 
     // Can only click STOP if all answers are filled
     private bool CanStop => GameState.CurrentGame?.Categories.All(c => !string.IsNullOrWhiteSpace(GetAnswer(c.Name))) ?? false;
+
+    // Color of countdown number and bar
+    private string CounterColor => _secondsRemaining <= 3 ? "#f87171"
+                                 : _secondsRemaining <= 6 ? "#fb923c"
+                                 : "var(--color-primary)";
 
     protected override void OnInitialized()
     {
@@ -224,6 +213,10 @@ else
             var remaining = (GameState.CurrentGame.CountdownEndTime.Value - DateTime.UtcNow).TotalSeconds;
             _secondsRemaining = Math.Max(1, (int)Math.Ceiling(remaining));
             _stopTriggeredByMe = GameState.CurrentGame.StopTriggeredBy == GameState.MyPlayer?.SessionId;
+            // Resolve trigger name on rejoin
+            var triggerPlayer = GameState.CurrentRoom?.Players.FirstOrDefault(p => p.SessionId == GameState.CurrentGame.StopTriggeredBy);
+            _stopTriggerName = triggerPlayer?.Nickname ?? "Gracz";
+            _timeBegSent = false;
             StartTimer();
         }
     }
@@ -251,12 +244,27 @@ else
     {
         _isCountdownActive = true;
         _stopTriggeredByMe = playerId == GameState.MyPlayer?.SessionId;
-        
+        _timeBegSent = false;
+
+        // Resolve trigger player's nickname
+        var triggerPlayer = GameState.CurrentRoom?.Players.FirstOrDefault(p => p.SessionId == playerId);
+        _stopTriggerName = triggerPlayer?.Nickname ?? "Gracz";
+
         var remaining = (endTime - DateTime.UtcNow).TotalSeconds;
         _secondsRemaining = Math.Max(1, (int)Math.Ceiling(remaining));
-        
+
         StartTimer();
-        InvokeAsync(StateHasChanged);
+
+        // Show toast with small delay for enter animation
+        _ = InvokeAsync(async () =>
+        {
+            StateHasChanged();
+            await Task.Delay(50);
+            _toastVisible = true;
+            StateHasChanged();
+            // Initial vignette pulse
+            await JS.InvokeVoidAsync("beatVignette");
+        });
     }
 
     private void HandleTimeAdded(DateTime endTime)
@@ -266,13 +274,20 @@ else
         InvokeAsync(StateHasChanged);
     }
 
+    private async Task RequestMoreTime()
+    {
+        if (_timeBegSent) return;
+        _timeBegSent = true;
+        await GameState.RequestMoreTimeAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
     private async void HandleRoundEnded(int answerCount)
     {
         _timer?.Stop();
-        
-        // Pause anti-cheat tracking
-        await GameState.PauseAntiCheatTrackingAsync();
-        
+        _toastVisible = false;
+        await JS.InvokeVoidAsync("clearVignette");
+        // Anti-cheat is paused by ClientGameStateService.OnRoundEnded hub handler — no need to pause here again.
         // Phase transition handled by GameState hub callbacks
     }
 
@@ -286,10 +301,14 @@ else
             {
                 _secondsRemaining--;
                 await InvokeAsync(StateHasChanged);
+                // Vignette pulse on each tick
+                try { await JS.InvokeVoidAsync("beatVignette"); } catch { /* disposed */ }
             }
             else
             {
                 _timer?.Stop();
+                _toastVisible = false;
+                try { await JS.InvokeVoidAsync("clearVignette"); } catch { /* disposed */ }
                 if (!_hasSubmitted)
                 {
                     await SubmitAnswers();

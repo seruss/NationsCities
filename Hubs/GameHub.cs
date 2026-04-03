@@ -608,6 +608,21 @@ public class GameHub : Hub
         }
     }
 
+    public async Task RequestMoreTime(string roomCode)
+    {
+        var sessionId = ResolveSessionId();
+        if (sessionId == null) return;
+
+        var room = _roomService.GetRoom(roomCode);
+        if (room?.CurrentGame == null) return;
+
+        var player = room.Players.FirstOrDefault(p => p.SessionId == sessionId);
+        var nickname = player?.Nickname ?? "Gracz";
+
+        // Notify the stop triggerer (and room) about the request
+        await Clients.Group(roomCode).SendAsync("OnTimeRequested", sessionId, nickname);
+    }
+
     public async Task SubmitAnswers(string roomCode, Dictionary<string, string> answers)
     {
         var sessionId = ResolveSessionId();
