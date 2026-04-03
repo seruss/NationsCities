@@ -1012,3 +1012,55 @@ window.clearVignette = function () {
     const el = document.getElementById('countdown-vignette');
     if (el) el.style.boxShadow = 'none';
 };
+
+// ======================================
+// Countdown Toast Portal + Viewport Pin
+// ======================================
+// On mobile browsers, position:fixed breaks when the element sits inside
+// a parent with transform, backdrop-filter, or will-change. The solution
+// is to teleport the toast to a portal div at the body root, and use the
+// Visual Viewport API to keep it pinned when the keyboard opens.
+
+(function () {
+    let _viewportHandler = null;
+
+    /**
+     * Moves #countdown-toast into #countdown-toast-portal (body root).
+     * Call once after Blazor renders the toast element.
+     */
+    window.mountCountdownToast = function () {
+        const toast = document.getElementById('countdown-toast');
+        const portal = document.getElementById('countdown-toast-portal');
+        if (!toast || !portal) return;
+
+        // Only move if not already inside portal
+        if (toast.parentElement !== portal) {
+            portal.appendChild(toast);
+        }
+
+        // Set up Visual Viewport listener for keyboard handling
+        if (window.visualViewport && !_viewportHandler) {
+            _viewportHandler = function () {
+                const vv = window.visualViewport;
+                // offsetTop = how far the visual viewport is scrolled from layout viewport top
+                toast.style.top = (vv.offsetTop + 56) + 'px';
+            };
+            window.visualViewport.addEventListener('resize', _viewportHandler);
+            window.visualViewport.addEventListener('scroll', _viewportHandler);
+        }
+    };
+
+    /**
+     * Removes viewport listeners. Call when countdown ends.
+     */
+    window.unmountCountdownToast = function () {
+        if (_viewportHandler && window.visualViewport) {
+            window.visualViewport.removeEventListener('resize', _viewportHandler);
+            window.visualViewport.removeEventListener('scroll', _viewportHandler);
+            _viewportHandler = null;
+        }
+        // Reset inline top
+        const toast = document.getElementById('countdown-toast');
+        if (toast) toast.style.top = '';
+    };
+})();

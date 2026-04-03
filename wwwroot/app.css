@@ -635,6 +635,9 @@
   .touch-manipulation {
     touch-action: manipulation;
   }
+  .resize {
+    resize: both;
+  }
   .grid-cols-2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -3123,20 +3126,16 @@ html.dark .countdown-letter-label {
   align-items: center;
   gap: 8px;
   opacity: 0;
-  transform: translateY(-10px);
-  transition: opacity 0.35s cubic-bezier(0.22, 1, 0.36, 1), transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
-  -webkit-transform: translateZ(0);
-  will-change: transform, opacity;
 }
 html.dark .countdown-toast {
-  background: rgba(26, 38, 51, 0.88);
+  background: rgba(26, 38, 51, 0.92);
   border-color: rgba(255, 255, 255, 0.06);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 .countdown-toast.visible {
   opacity: 1;
-  transform: translateY(0);
 }
 .ct-who {
   display: flex;

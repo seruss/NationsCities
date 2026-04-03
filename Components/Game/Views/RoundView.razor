@@ -222,6 +222,14 @@ else
         {
             // Start anti-cheat tracking via the state service
             await GameState.StartAntiCheatTrackingAsync(_currentRound);
+
+            // If countdown was already active on mount (rejoin), teleport toast to portal
+            if (_isCountdownActive)
+            {
+                try { await JS.InvokeVoidAsync("mountCountdownToast"); } catch { }
+                _toastVisible = true;
+                StateHasChanged();
+            }
         }
     }
 
@@ -255,6 +263,8 @@ else
         {
             StateHasChanged();
             await Task.Delay(50);
+            // Teleport toast to body-root portal so position:fixed works on mobile
+            try { await JS.InvokeVoidAsync("mountCountdownToast"); } catch { }
             _toastVisible = true;
             StateHasChanged();
             // Initial vignette pulse
@@ -281,6 +291,7 @@ else
     {
         _timer?.Stop();
         _toastVisible = false;
+        try { await JS.InvokeVoidAsync("unmountCountdownToast"); } catch { }
         try { await JS.InvokeVoidAsync("clearVignette"); } catch { /* JS not available or disposed */ }
         // Anti-cheat is paused by ClientGameStateService.OnRoundEnded hub handler — no need to pause here again.
         // Phase transition handled by GameState hub callbacks
@@ -303,6 +314,7 @@ else
             {
                 _timer?.Stop();
                 _toastVisible = false;
+                try { await JS.InvokeVoidAsync("unmountCountdownToast"); } catch { }
                 try { await JS.InvokeVoidAsync("clearVignette"); } catch { /* disposed */ }
                 if (!_hasSubmitted)
                 {
