@@ -116,7 +116,6 @@ window.gameSession = {
      */
     save: function (sessionId, roomCode, nickname) {
         const data = {
-            sessionId: sessionId,
             roomCode: roomCode,
             nickname: nickname,
             savedAt: Date.now()
@@ -155,6 +154,22 @@ window.gameSession = {
         localStorage.removeItem(this._SESSION_KEY);
         localStorage.removeItem(this._TAB_KEY);
         GameLog.debug('Session', 'Cleared');
+    },
+
+    /**
+     * Save last used nickname (persists even after session is cleared)
+     */
+    saveLastNickname: function (nickname) {
+        if (nickname) {
+            localStorage.setItem('game_last_nickname', nickname);
+        }
+    },
+
+    /**
+     * Get last used nickname (for pre-filling the input)
+     */
+    getLastNickname: function () {
+        return localStorage.getItem('game_last_nickname') || '';
     },
 
     /**

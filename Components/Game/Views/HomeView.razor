@@ -61,6 +61,20 @@
             @if (!_showJoinInput)
             {
                 <!-- ---- SCREEN 1: dwa przyciski ---- -->
+
+                @if (!string.IsNullOrEmpty(_kickedMessage))
+                {
+                    <div class="flex items-center gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/30 animate-fade-in">
+                        <span class="material-symbols-outlined text-red-500 text-2xl shrink-0">block</span>
+                        <div class="flex-1">
+                            <p class="text-sm font-semibold text-red-500">@_kickedMessage</p>
+                        </div>
+                        <button @onclick="DismissKickedMessage" class="shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+                            <span class="material-symbols-outlined text-lg">close</span>
+                        </button>
+                    </div>
+                }
+
                 <button @onclick="ShowNicknameForCreate"
                         class="flex w-full items-center justify-center rounded-full h-14 px-5 bg-primary hover:bg-primary-dark transition-all text-white shadow-lg shadow-primary/25 btn-press">
                     <span class="material-symbols-outlined mr-2 text-2xl">add_circle</span>
@@ -73,17 +87,7 @@
                     <span class="text-lg font-bold">Dołącz do pokoju</span>
                 </button>
 
-                @if (!string.IsNullOrEmpty(_pendingRoomCode))
-                {
-                    <div class="p-4 rounded-xl bg-primary/10 border border-primary/30">
-                        <p class="text-center text-sm text-slate-600 dark:text-slate-400 mb-1">Dołączasz do pokoju:</p>
-                        <p class="text-center text-2xl font-bold text-primary tracking-widest">@_pendingRoomCode</p>
-                        <button @onclick="JoinPendingRoom"
-                                class="w-full mt-3 h-12 rounded-full bg-primary text-white font-semibold hover:bg-primary-dark transition-colors">
-                            Wpisz nick i dołącz
-                        </button>
-                    </div>
-                }
+
 
                 <div class="flex justify-center">
                     <button @onclick="GoToHowToPlay" class="flex items-center gap-1.5 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-primary transition-colors py-2 px-4 rounded-full hover:bg-slate-200/50 dark:hover:bg-slate-800/50">
@@ -195,11 +199,21 @@
                     }
 
                     <!-- Kod: h-14 rounded-full jak przyciski ekranu 1 -->
-                    <input @bind="_roomCode"
-                           @bind:event="oninput"
-                           placeholder="ABCD"
-                           maxlength="4"
-                           class="w-full h-14 px-6 rounded-full bg-surface-light dark:bg-surface-dark border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-center text-xl font-black uppercase tracking-[0.35em] placeholder:text-slate-300 dark:placeholder:text-slate-600 placeholder:font-normal placeholder:tracking-normal placeholder:text-base focus:border-primary transition-all" />
+                    @if (!string.IsNullOrEmpty(_pendingRoomCode))
+                    {
+                        <!-- Read-only pre-filled code from URL -->
+                        <div class="w-full h-14 px-6 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center">
+                            <span class="text-xl font-black text-primary tracking-[0.35em]">@_roomCode</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <input @bind="_roomCode"
+                               @bind:event="oninput"
+                               placeholder="ABCD"
+                               maxlength="4"
+                               class="w-full h-14 px-6 rounded-full bg-surface-light dark:bg-surface-dark border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white text-center text-xl font-black uppercase tracking-[0.35em] placeholder:text-slate-300 dark:placeholder:text-slate-600 placeholder:font-normal placeholder:tracking-normal placeholder:text-base focus:border-primary transition-all" />
+                    }
 
                     @{
                         var codeReady = _roomCode.Length == 4 && !string.IsNullOrWhiteSpace(_nickname) && !_isLoading;
@@ -241,10 +255,11 @@
     private string _nickname = "";
     private string? _error;
     private string? _pendingRoomCode;
+    private string? _kickedMessage;
     private List<PublicRoomInfo> _publicRooms = new();
 
     private bool CanSubmit => !string.IsNullOrWhiteSpace(_nickname) &&
-                              (_isCreating || _roomCode.Length == 4 || !string.IsNullOrEmpty(_pendingRoomCode));
+                              (_isCreating || _roomCode.Length == 4);
 
     protected override void OnInitialized()
     {
@@ -254,6 +269,34 @@
         if (!string.IsNullOrEmpty(GameState.RoomCode) && string.IsNullOrEmpty(GameState.Nickname))
         {
             _pendingRoomCode = GameState.RoomCode;
+        }
+
+        // Show kicked/error message if redirected here after being kicked
+        if (!string.IsNullOrEmpty(GameState.LastError))
+        {
+            _kickedMessage = GameState.LastError;
+            GameState.LastError = null;
+        }
+
+        // Auto-show join form when coming from URL deep link
+        if (!string.IsNullOrEmpty(_pendingRoomCode))
+        {
+            _roomCode = _pendingRoomCode;
+            _showJoinInput = true;
+            _isCreating = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && string.IsNullOrEmpty(_nickname))
+        {
+            var lastNickname = await GameState.GetLastNicknameAsync();
+            if (!string.IsNullOrEmpty(lastNickname))
+            {
+                _nickname = lastNickname;
+                StateHasChanged();
+            }
         }
     }
 
@@ -309,16 +352,7 @@
         catch { _error = "Nie udało się dołączyć."; _isLoading = false; }
     }
 
-    private void JoinPendingRoom()
-    {
-        if (!string.IsNullOrEmpty(_pendingRoomCode))
-        {
-            _roomCode = _pendingRoomCode;
-            _pendingRoomCode = null;
-            _showJoinInput = true;
-            _isCreating = false;
-        }
-    }
+
 
     private void CancelForm()
     {
@@ -363,6 +397,11 @@
     }
 
     private void GoToHowToPlay() => Navigation.NavigateTo("/how-to-play");
+
+    private void DismissKickedMessage()
+    {
+        _kickedMessage = null;
+    }
 
     public void Dispose()
     {

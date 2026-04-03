@@ -39,7 +39,7 @@ public class ClientGameStateService : IAsyncDisposable
     public Room? CurrentRoom { get; private set; }
     
     /// <summary>Last error message.</summary>
-    public string? LastError { get; private set; }
+    public string? LastError { get; set; }
 
     // ===== COMPUTED =====
     
@@ -158,9 +158,9 @@ public class ClientGameStateService : IAsyncDisposable
         }
         
         // If we don't have a session for this room, show home to join
-        if (RoomCode != roomCode)
+        if (!string.Equals(RoomCode, roomCode, StringComparison.OrdinalIgnoreCase))
         {
-            RoomCode = roomCode;
+            RoomCode = roomCode.ToUpperInvariant();
             // Will need nickname - show join modal in HomeView
             SetPhase(GamePhase.Home);
         }
@@ -295,28 +295,21 @@ public class ClientGameStateService : IAsyncDisposable
 
         _hubConnection.On<char, int>("OnRoundStarted", (letter, roundNumber) =>
         {
-            var previousPhase = CurrentPhase;
             CurrentRoom = _roomService.GetRoom(RoomCode ?? "");
             
-            if (previousPhase == GamePhase.Lobby || previousPhase == GamePhase.Home)
-            {
-                // First round after game start — show countdown overlay
-                CountdownLetter = letter;
-                SetPhase(GamePhase.Countdown);
-            }
-            else
-            {
-                _ = StartAntiCheatAsync();
-                SetPhase(GamePhase.Playing);
-            }
+            // Always show countdown overlay (3-2-1-letter) for every round
+            CountdownLetter = letter;
+            SetPhase(GamePhase.Countdown);
         });
 
         _hubConnection.On<char>("OnNewRound", letter =>
         {
             CurrentRoom = _roomService.GetRoom(RoomCode ?? "");
-            _ = ResumeAntiCheatAsync(CurrentGame?.CurrentRound ?? 1);
             OnNewRound?.Invoke(letter);
-            SetPhase(GamePhase.Playing);
+            
+            // Show countdown overlay for new round as well
+            CountdownLetter = letter;
+            SetPhase(GamePhase.Countdown);
         });
 
         _hubConnection.On<string, DateTime>("OnStopTriggered", (triggeredBy, endTime) =>
@@ -432,6 +425,7 @@ public class ClientGameStateService : IAsyncDisposable
         await EnsureConnectedAsync();
         
         if (_hubConnection == null) return;
+        try { await _jsRuntime.InvokeVoidAsync("gameSession.saveLastNickname", nickname); } catch { }
         await _hubConnection.InvokeAsync("CreateRoom", nickname, SessionId);
     }
 
@@ -443,6 +437,7 @@ public class ClientGameStateService : IAsyncDisposable
         await EnsureConnectedAsync();
         
         if (_hubConnection == null) return;
+        try { await _jsRuntime.InvokeVoidAsync("gameSession.saveLastNickname", nickname); } catch { }
         await _hubConnection.InvokeAsync("JoinRoom", RoomCode, nickname, SessionId);
     }
 
@@ -534,7 +529,15 @@ public class ClientGameStateService : IAsyncDisposable
     public void FinishCountdown()
     {
         if (CurrentPhase != GamePhase.Countdown) return;
-        _ = StartAntiCheatAsync();
+        var round = CurrentGame?.CurrentRound ?? 1;
+        if (round <= 1)
+        {
+            _ = StartAntiCheatAsync();
+        }
+        else
+        {
+            _ = ResumeAntiCheatAsync(round);
+        }
         SetPhase(GamePhase.Playing);
     }
 
@@ -953,4 +956,17 @@ public class ClientGameStateService : IAsyncDisposable
 
     // Helper class for saved session
     private record SavedGameSession(string? SessionId, string? RoomCode, string? Nickname);
+
+    /// <summary>Get the last used nickname from localStorage (for pre-filling forms).</summary>
+    public async Task<string> GetLastNicknameAsync()
+    {
+        try
+        {
+            return await _jsRuntime.InvokeAsync<string>("gameSession.getLastNickname") ?? "";
+        }
+        catch
+        {
+            return "";
+        }
+    }
 }

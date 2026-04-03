@@ -23,7 +23,11 @@ else if (!_categoriesWithAnswers.Any())
     <div class="flex flex-col min-h-screen bg-bg-light dark:bg-bg-dark items-center justify-center">
         <span class="material-symbols-outlined text-6xl text-green-500 mb-4">check_circle</span>
         <h1 class="text-xl font-bold text-slate-900 dark:text-white mb-2">Brak odpowiedzi do głosowania</h1>
-        <p class="text-slate-500 dark:text-slate-400">Wszystkie odpowiedzi zostały automatycznie zatwierdzone.</p>
+        <p class="text-slate-500 dark:text-slate-400">Czekam na innych graczy...</p>
+        <p class="text-sm text-slate-400 mt-2 flex items-center gap-2">
+            <span class="material-symbols-outlined animate-spin text-base">progress_activity</span>
+            @_votesSubmittedCount/@_totalPlayers
+        </p>
     </div>
 }
 else
@@ -200,9 +204,17 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && !_hasSubmittedVotes && _categoriesWithAnswers.Any())
+        if (firstRender && !_hasSubmittedVotes)
         {
-            await CheckAndAutoAdvance();
+            if (!_categoriesWithAnswers.Any())
+            {
+                // No answers to vote on — auto-submit immediately so voting doesn't stall
+                await SubmitVotes();
+            }
+            else
+            {
+                await CheckAndAutoAdvance();
+            }
         }
     }
 
