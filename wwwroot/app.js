@@ -981,11 +981,11 @@ window.unregisterAntiCheatHandler = function () {
  * Call once per timer tick while the countdown is active.
  */
 window.beatVignette = function () {
-    const maxAlpha  = 0.22;
-    const maxSize   = 40;
-    const maxSpread = 10;
+    const maxAlpha  = 0.45;
+    const maxSize   = 60;
+    const maxSpread = 18;
     const dur       = 820;   // ms — must be < 1000 (one tick)
-    const sigma     = 0.22;
+    const sigma     = 0.25;
 
     const el = document.getElementById('countdown-vignette');
     if (!el) return;

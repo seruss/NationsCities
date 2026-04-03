@@ -27,49 +27,6 @@ else
             <h2 class="text-base font-bold tracking-tight uppercase text-slate-500 dark:text-slate-400">Runda @_currentRound</h2>
         </header>
 
-        <!-- Countdown Toast -->
-        @if (_isCountdownActive)
-        {
-            <div class="countdown-toast @(_toastVisible ? "visible" : "")" id="countdown-toast">
-                <!-- Left column: who stopped -->
-                <div class="ct-who">
-                    <span class="ct-label">Kto zatrzymał?</span>
-                    <span class="ct-name">@(_stopTriggeredByMe ? "Ty" : _stopTriggerName)</span>
-                </div>
-
-                <!-- Center: counter -->
-                <div class="ct-center">
-                    <div class="ct-num" style="color: @CounterColor">@_secondsRemaining</div>
-                    <div class="ct-bar-wrap">
-                        <div class="ct-bar" style="width: @(Math.Min(100, (_secondsRemaining / 10.0) * 100))%; background: @CounterColor"></div>
-                    </div>
-                    <div class="ct-sublabel">pozostało</div>
-                </div>
-
-                <!-- Right column: action button -->
-                <div class="ct-btn-wrap">
-                    @if (_stopTriggeredByMe)
-                    {
-                        <button class="ct-btn ct-btn-add" @onclick="AddOneSecond">
-                            +1 sekunda
-                        </button>
-                    }
-                    else if (_timeBegSent)
-                    {
-                        <button class="ct-btn ct-btn-sent" disabled>
-                            Wysłano
-                        </button>
-                    }
-                    else
-                    {
-                        <button class="ct-btn ct-btn-beg" @onclick="RequestMoreTime">
-                            Więcej czasu!
-                        </button>
-                    }
-                </div>
-            </div>
-        }
-
         <!-- Answer Inputs -->
         <main class="flex-1 overflow-y-auto no-scrollbar" data-scrollable="true">
             <div class="px-5 py-6 flex flex-col gap-6 pb-32">
@@ -144,6 +101,44 @@ else
             }
         </footer>
     </div>
+
+    <!-- Countdown Toast — rendered outside layout div for bulletproof fixed positioning on mobile -->
+    @if (_isCountdownActive)
+    {
+        <div class="countdown-toast @(_toastVisible ? "visible" : "")" id="countdown-toast">
+            <div class="ct-who">
+                <span class="ct-label">Kto zatrzymał?</span>
+                <span class="ct-name">@(_stopTriggeredByMe ? "Ty" : _stopTriggerName)</span>
+            </div>
+            <div class="ct-center">
+                <div class="ct-num" style="color: @CounterColor">@_secondsRemaining</div>
+                <div class="ct-bar-wrap">
+                    <div class="ct-bar" style="width: @(Math.Min(100, (_secondsRemaining / 10.0) * 100))%; background: @CounterColor"></div>
+                </div>
+                <div class="ct-sublabel">pozostało</div>
+            </div>
+            <div class="ct-btn-wrap">
+                @if (_stopTriggeredByMe)
+                {
+                    <button class="ct-btn ct-btn-add" @onclick="AddOneSecond">
+                        +1 sekunda
+                    </button>
+                }
+                else if (_timeBegSent)
+                {
+                    <button class="ct-btn ct-btn-sent" disabled>
+                        Wysłano
+                    </button>
+                }
+                else
+                {
+                    <button class="ct-btn ct-btn-beg" @onclick="RequestMoreTime">
+                        Więcej czasu!
+                    </button>
+                }
+            </div>
+        </div>
+    }
 
     @if (_showRerollConfirmation)
     {

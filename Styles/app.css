@@ -875,14 +875,14 @@ html.dark .countdown-letter-label {
    ═══════════════════════════════════════ */
 .countdown-toast {
     position: fixed;
-    /* sticky header is ~48px tall */
     top: 56px;
     left: 12px;
     right: 12px;
-    z-index: 45;
+    z-index: 9990;
 
-    background: rgba(255, 255, 255, 0.88);
-    backdrop-filter: blur(14px);
+    background: rgba(255, 255, 255, 0.92);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
     border: 1px solid rgba(0, 0, 0, 0.08);
     border-radius: var(--radius-2xl);
     padding: 10px 14px;
@@ -896,7 +896,11 @@ html.dark .countdown-letter-label {
     transform: translateY(-10px);
     transition: opacity 0.35s cubic-bezier(0.22, 1, 0.36, 1),
                 transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+
+    /* Ensure fixed positioning works on iOS with virtual keyboard */
+    -webkit-transform: translateZ(0);
+    will-change: transform, opacity;
 }
 
 html.dark .countdown-toast {
