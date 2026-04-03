@@ -467,13 +467,18 @@ public class ClientGameStateService : IAsyncDisposable
                 _logger.LogInformation("ReconnectAsync: success — phase={Phase}, nickname={Nickname}, room={RoomCode}", snapshot.Phase, snapshot.Nickname, RoomCode);
                 
                 // ALWAYS re-register the Blazor handler after reconnect.
-                _logger.LogDebug("ReconnectAsync: re-registering anti-cheat handler");
-                _ = RegisterAntiCheatHandlerOnlyAsync();
-                
+                // For Playing phase, register and resume are done SEQUENTIALLY in one task to
+                // prevent a race where both independently reset _processingQueue and cause
+                // duplicate violation reports.
                 if (snapshot.Phase == GamePhase.Playing)
                 {
-                    _logger.LogDebug("ReconnectAsync: resuming anti-cheat tracking for round {Round}", CurrentGame?.CurrentRound ?? 1);
-                    _ = ResumeAntiCheatAsync(CurrentGame?.CurrentRound ?? 1);
+                    _logger.LogDebug("ReconnectAsync: registering handler and resuming anti-cheat for round {Round}", CurrentGame?.CurrentRound ?? 1);
+                    _ = RegisterAndResumeAntiCheatAsync(CurrentGame?.CurrentRound ?? 1);
+                }
+                else
+                {
+                    _logger.LogDebug("ReconnectAsync: re-registering anti-cheat handler");
+                    _ = RegisterAntiCheatHandlerOnlyAsync();
                 }
                 
                 SetPhase(snapshot.Phase);
@@ -746,6 +751,30 @@ public class ClientGameStateService : IAsyncDisposable
                 RoomCode, roundNumber);
         }
         catch { }
+    }
+
+    /// <summary>
+    /// Registers the Blazor anti-cheat handler and then resumes tracking, sequentially.
+    /// Used when reconnecting in Playing phase to avoid a race condition where both
+    /// operations independently reset _processingQueue and trigger duplicate violation reports.
+    /// </summary>
+    private async Task RegisterAndResumeAntiCheatAsync(int roundNumber)
+    {
+        try
+        {
+            _logger.LogDebug("RegisterAndResumeAntiCheatAsync: registering handler, round={Round}, dotNetRef null={IsNull}", roundNumber, _dotNetRef == null);
+            if (_dotNetRef != null)
+            {
+                await _jsRuntime.InvokeVoidAsync("registerAntiCheatHandler", _dotNetRef);
+                _logger.LogDebug("RegisterAndResumeAntiCheatAsync: handler registered, now resuming tracking");
+            }
+            await _jsRuntime.InvokeVoidAsync("antiCheatTracker.resumeTracking", RoomCode, roundNumber);
+            _logger.LogInformation("RegisterAndResumeAntiCheatAsync: done for round {Round}", roundNumber);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "RegisterAndResumeAntiCheatAsync error");
+        }
     }
 
     /// <summary>

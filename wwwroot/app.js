@@ -386,8 +386,10 @@ window.AntiCheatTracker = class {
             this._startHeartbeat();
             GameLog.info('AntiCheat', `Tracking resumed: round=${session.roundNumber}, violations=${session.violationCount}`);
             
-            // Reset & drain any pending violations queued while disconnected
-            this._processingQueue = false;
+            // Drain any pending violations queued while disconnected.
+            // NOTE: do NOT reset _processingQueue here — if registerAntiCheatHandler was just
+            // called (reconnect scenario), it already reset the flag and started _processQueue.
+            // Resetting it again here would break that guard and cause duplicate reports.
             this._processQueue();
         } else if (roomCode) {
             // No session to resume - start fresh (fallback)
