@@ -71,22 +71,12 @@ else
 
                 <!-- Action area (inline, scrolls with content) -->
                 <div class="pt-4 pb-8">
-                    @if (_hasSubmitted)
-                    {
-                        <div class="text-center py-4">
-                            <p class="text-lg font-bold text-green-500 dark:text-green-400 flex items-center justify-center gap-2">
-                                <span class="material-symbols-outlined">check_circle</span>
-                                Odpowiedzi wysłane!
-                            </p>
-                            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Czekam na innych graczy...</p>
-                        </div>
-                    }
-                    else if (_isCountdownActive && _stopTriggeredByMe)
+                    @if (_isCountdownActive && _stopTriggeredByMe)
                     {
                         <!-- Triggerer: progress bar button + add time -->
                         <div class="flex flex-col gap-3">
-                            <div class="relative w-full h-14 rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-700">
-                                <div class="absolute inset-0 rounded-xl transition-all duration-1000 linear"
+                            <div class="relative w-full h-14 rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-700 shadow-lg">
+                                <div class="absolute inset-y-0 left-0 rounded-xl transition-all duration-1000 linear"
                                      style="width: @(Math.Min(100, (_secondsRemaining / 10.0) * 100))%; background: @CounterColor">
                                 </div>
                                 <div class="absolute inset-0 flex items-center justify-center">
@@ -98,6 +88,16 @@ else
                                 <span class="material-symbols-outlined text-base">add_circle</span>
                                 <span>+1 sekunda</span>
                             </button>
+                        </div>
+                    }
+                    else if (_hasSubmitted)
+                    {
+                        <div class="text-center py-4">
+                            <p class="text-lg font-bold text-green-500 dark:text-green-400 flex items-center justify-center gap-2">
+                                <span class="material-symbols-outlined">check_circle</span>
+                                Odpowiedzi wysłane!
+                            </p>
+                            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Czekam na innych graczy...</p>
                         </div>
                     }
                     else if (_isCountdownActive)

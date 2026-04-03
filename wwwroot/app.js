@@ -982,10 +982,10 @@ window.unregisterAntiCheatHandler = function () {
  */
 window.beatVignette = function () {
     const maxAlpha  = 0.55;
-    const maxSize   = 35;
-    const maxSpread = 25;
-    const dur       = 820;   // ms — must be < 1000 (one tick)
-    const sigma     = 0.18;  // sharper peak = tighter edge glow
+    const maxSize   = 40;
+    const maxSpread = 15;
+    const dur       = 720;   // ms — must be < 1000 (one tick)
+    const sigma     = 0.22;  // sharper peak = tighter edge glow
 
     const el = document.getElementById('countdown-vignette');
     if (!el) return;
