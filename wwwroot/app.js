@@ -532,9 +532,11 @@ window.AntiCheatTracker = class {
                 return;
             }
 
-            // Only process violations on game round page
-            if (!this._isOnGameRoundPage(session.roomCode)) {
-                GameLog.debug('AntiCheat', 'Not on game round page, skipping violation check');
+            // Only process violations when actively playing a round in the same room
+            // Use strict mode: require Playing phase to prevent false positives
+            // (e.g. tab left overnight, then new room created next day)
+            if (!this._isOnGameRoundPage(session.roomCode, { requirePlayingPhase: true })) {
+                GameLog.debug('AntiCheat', 'Not actively playing a round, skipping violation check');
                 return;
             }
 
@@ -542,6 +544,16 @@ window.AntiCheatTracker = class {
             const hiddenAt = session.hiddenAt || session.lastActiveAt;
             const gap = Date.now() - hiddenAt;
             GameLog.info('AntiCheat', `Absence: gap=${(gap / 1000).toFixed(2)}s, hiddenAt=${session.hiddenAt ? new Date(session.hiddenAt).toISOString() : 'null'}, lastActiveAt=${new Date(session.lastActiveAt).toISOString()}`);
+
+            // Staleness guard: if absent > 30 min, session is stale (e.g. tab left overnight)
+            // Clear instead of reporting — the game has certainly ended by now.
+            if (gap > 30 * 60 * 1000) {
+                GameLog.info('AntiCheat', `Session is stale on visibility change (gap=${(gap / 1000).toFixed(0)}s > 30 min), clearing`);
+                this._clearSession();
+                this._clearPendingQueue();
+                this._hideBlockOverlay();
+                return;
+            }
 
             // Clear hiddenAt
             session.hiddenAt = null;
@@ -569,16 +581,29 @@ window.AntiCheatTracker = class {
         }
     }
 
-    _isOnGameRoundPage(roomCode) {
-        // Check URL first (for initial page load / deep links)
+    _isOnGameRoundPage(roomCode, { requirePlayingPhase = false } = {}) {
+        // Check SPA state — only trigger violations when actively playing a round
+        const isPlayingPhase = window._gamePhase === 'Playing';
+
+        // Check URL (for page load / deep links when Blazor hasn't set phase yet)
         const path = window.location.pathname.toLowerCase();
         const isGamePageByUrl = path.startsWith('/game/');
 
-        // Check SPA state (for in-app phase changes)
-        const isGamePageByPhase = window._gamePhase === 'Playing';
+        // Verify the room code in the URL matches the session's room code
+        // (prevents cross-room false positives after server restart / new room)
+        const urlRoomCode = isGamePageByUrl ? path.split('/game/')[1]?.split('/')[0]?.toUpperCase() : null;
+        const roomMatch = !roomCode || !urlRoomCode || urlRoomCode === roomCode.toUpperCase();
 
-        const isGamePage = isGamePageByUrl || isGamePageByPhase;
-        GameLog.trace('AntiCheat', `Game page check: url=${isGamePageByUrl}, phase=${isGamePageByPhase}, result=${isGamePage}`);
+        let isGamePage;
+        if (requirePlayingPhase) {
+            // Strict mode: require Playing phase AND matching room (for visibility changes)
+            isGamePage = isPlayingPhase && roomMatch;
+        } else {
+            // Relaxed mode: URL or phase check (for page load, before Blazor sets phase)
+            isGamePage = (isGamePageByUrl || isPlayingPhase) && roomMatch;
+        }
+
+        GameLog.trace('AntiCheat', `Game page check: phase=${isPlayingPhase}, url=${isGamePageByUrl}, roomMatch=${roomMatch} (url=${urlRoomCode}, session=${roomCode}), strict=${requirePlayingPhase}, result=${isGamePage}`);
         return isGamePage;
     }
 
