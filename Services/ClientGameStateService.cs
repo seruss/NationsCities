@@ -947,6 +947,10 @@ public class ClientGameStateService : IAsyncDisposable
         CurrentRoom = null;
         LastError = null;
         
+        // Always sync URL back to "/" when session is cleared,
+        // because SetPhase(Home) may be skipped if phase is already Home.
+        SyncUrlToPhase();
+        
         try
         {
             await _jsRuntime.InvokeVoidAsync("gameSession.clear");
