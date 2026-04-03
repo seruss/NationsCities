@@ -949,9 +949,11 @@ window.registerAntiCheatHandler = function (dotNetHelper) {
     const hadPrevious = !!window._antiCheatDotNetRef;
     window._antiCheatDotNetRef = dotNetHelper;
     window._antiCheatReady = true;
-    // Force-reset processing flag — a previous invokeMethodAsync may have hung
-    // (e.g., mobile WebSocket frozen after background), leaving this flag stuck true
-    window.antiCheatTracker._processingQueue = false;
+    // NOTE: do NOT reset _processingQueue here. _processQueue uses try/finally and
+    // _withTimeout(5s) to guarantee the flag is always cleared — resetting it here
+    // breaks the guard if registerAntiCheatHandler is called while _processQueue is
+    // already running (e.g. ReconnectAsync + RoundView.OnAfterRenderAsync racing),
+    // which causes duplicate violation reports.
     const pending = window.antiCheatTracker._getPendingQueue();
     GameLog.info('AntiCheat', `Blazor handler registered: hadPrevious=${hadPrevious}, pendingViolations=${pending.length}, phase=${window._gamePhase}`);
 
