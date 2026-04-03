@@ -1014,53 +1014,144 @@ window.clearVignette = function () {
 };
 
 // ======================================
-// Countdown Toast Portal + Viewport Pin
+// Countdown Toast (pure JS, body-level)
 // ======================================
-// On mobile browsers, position:fixed breaks when the element sits inside
-// a parent with transform, backdrop-filter, or will-change. The solution
-// is to teleport the toast to a portal div at the body root, and use the
-// Visual Viewport API to keep it pinned when the keyboard opens.
+// Created directly on document.body — no Blazor render tree, no portals.
+// position:fixed works perfectly because the element has no ancestor with
+// transform / backdrop-filter / will-change.
 
-(function () {
-    let _viewportHandler = null;
+window.CountdownToast = (function () {
+    let _el = null;
+    let _numEl = null;
+    let _barEl = null;
+    let _nameEl = null;
+    let _btnEl = null;
+    let _dotNetRef = null;
+    let _maxSeconds = 10;
 
-    /**
-     * Moves #countdown-toast into #countdown-toast-portal (body root).
-     * Call once after Blazor renders the toast element.
-     */
-    window.mountCountdownToast = function () {
-        const toast = document.getElementById('countdown-toast');
-        const portal = document.getElementById('countdown-toast-portal');
-        if (!toast || !portal) return;
+    function _counterColor(s) {
+        if (s <= 3) return '#f87171';
+        if (s <= 6) return '#fb923c';
+        return 'var(--color-primary, #258cf4)';
+    }
 
-        // Only move if not already inside portal
-        if (toast.parentElement !== portal) {
-            portal.appendChild(toast);
-        }
+    function _createEl() {
+        if (_el && document.body.contains(_el)) return;
+        if (_el) _el.remove();
 
-        // Set up Visual Viewport listener for keyboard handling
-        if (window.visualViewport && !_viewportHandler) {
-            _viewportHandler = function () {
-                const vv = window.visualViewport;
-                // offsetTop = how far the visual viewport is scrolled from layout viewport top
-                toast.style.top = (vv.offsetTop + 56) + 'px';
+        _el = document.createElement('div');
+        _el.id = 'countdown-toast';
+        _el.className = 'countdown-toast';
+        _el.innerHTML = `
+            <div class="ct-who">
+                <span class="ct-label">Kto zatrzymał?</span>
+                <span class="ct-name" id="ct-name"></span>
+            </div>
+            <div class="ct-center">
+                <div class="ct-num" id="ct-num"></div>
+                <div class="ct-bar-wrap"><div class="ct-bar" id="ct-bar"></div></div>
+                <div class="ct-sublabel">pozostało</div>
+            </div>
+            <div class="ct-btn-wrap">
+                <button class="ct-btn" id="ct-btn"></button>
+            </div>
+        `;
+        document.body.appendChild(_el);
+
+        _numEl  = _el.querySelector('#ct-num');
+        _barEl  = _el.querySelector('#ct-bar');
+        _nameEl = _el.querySelector('#ct-name');
+        _btnEl  = _el.querySelector('#ct-btn');
+    }
+
+    function _setBtn(state) {
+        if (!_btnEl) return;
+        _btnEl.onclick = null;
+        _btnEl.disabled = false;
+        _btnEl.className = 'ct-btn';
+
+        if (state === 'add') {
+            _btnEl.className = 'ct-btn ct-btn-add';
+            _btnEl.textContent = '+1 sekunda';
+            _btnEl.onclick = function () {
+                if (_dotNetRef) _dotNetRef.invokeMethodAsync('OnToastAddTime');
             };
-            window.visualViewport.addEventListener('resize', _viewportHandler);
-            window.visualViewport.addEventListener('scroll', _viewportHandler);
+        } else if (state === 'sent') {
+            _btnEl.className = 'ct-btn ct-btn-sent';
+            _btnEl.textContent = 'Wysłano';
+            _btnEl.disabled = true;
+        } else {
+            // 'beg'
+            _btnEl.className = 'ct-btn ct-btn-beg';
+            _btnEl.textContent = 'Więcej czasu!';
+            _btnEl.onclick = function () {
+                if (_dotNetRef) _dotNetRef.invokeMethodAsync('OnToastRequestTime');
+                _setBtn('sent');
+            };
         }
-    };
+    }
 
-    /**
-     * Removes viewport listeners. Call when countdown ends.
-     */
-    window.unmountCountdownToast = function () {
-        if (_viewportHandler && window.visualViewport) {
-            window.visualViewport.removeEventListener('resize', _viewportHandler);
-            window.visualViewport.removeEventListener('scroll', _viewportHandler);
-            _viewportHandler = null;
+    return {
+        /**
+         * Show the countdown toast. Creates element on document.body.
+         * @param {object} dotNetRef - DotNetObjectReference for callbacks
+         * @param {string} triggerName - nickname of who pressed STOP
+         * @param {boolean} isTriggerer - is the current player the one who stopped
+         * @param {number} seconds - remaining seconds
+         * @param {number} maxSeconds - total countdown seconds (for bar width)
+         */
+        show: function (dotNetRef, triggerName, isTriggerer, seconds, maxSeconds) {
+            _dotNetRef = dotNetRef;
+            _maxSeconds = maxSeconds || 10;
+            _createEl();
+
+            _nameEl.textContent = isTriggerer ? 'Ty' : triggerName;
+
+            var color = _counterColor(seconds);
+            _numEl.textContent = seconds;
+            _numEl.style.color = color;
+            _barEl.style.width = (seconds / _maxSeconds * 100) + '%';
+            _barEl.style.background = color;
+
+            _setBtn(isTriggerer ? 'add' : 'beg');
+
+            // Fade in
+            requestAnimationFrame(function () {
+                _el.classList.add('visible');
+            });
+        },
+
+        /**
+         * Update countdown state. Call on each timer tick.
+         * @param {number} seconds - remaining seconds
+         * @param {string} btnState - 'add' | 'beg' | 'sent'
+         */
+        update: function (seconds, btnState) {
+            if (!_el) return;
+            var color = _counterColor(seconds);
+            _numEl.textContent = seconds;
+            _numEl.style.color = color;
+            _barEl.style.width = (seconds / _maxSeconds * 100) + '%';
+            _barEl.style.background = color;
+            _setBtn(btnState);
+        },
+
+        /**
+         * Hide and remove the toast from the DOM. Safe to call multiple times.
+         */
+        hide: function () {
+            _dotNetRef = null;
+            if (_el) {
+                _el.classList.remove('visible');
+                // Remove from DOM after fade
+                var el = _el;
+                setTimeout(function () { el.remove(); }, 400);
+                _el = null;
+                _numEl = null;
+                _barEl = null;
+                _nameEl = null;
+                _btnEl = null;
+            }
         }
-        // Reset inline top
-        const toast = document.getElementById('countdown-toast');
-        if (toast) toast.style.top = '';
     };
 })();

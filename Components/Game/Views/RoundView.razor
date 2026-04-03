@@ -102,44 +102,6 @@ else
         </footer>
     </div>
 
-    <!-- Countdown Toast — rendered outside layout div for bulletproof fixed positioning on mobile -->
-    @if (_isCountdownActive)
-    {
-        <div class="countdown-toast @(_toastVisible ? "visible" : "")" id="countdown-toast">
-            <div class="ct-who">
-                <span class="ct-label">Kto zatrzymał?</span>
-                <span class="ct-name">@(_stopTriggeredByMe ? "Ty" : _stopTriggerName)</span>
-            </div>
-            <div class="ct-center">
-                <div class="ct-num" style="color: @CounterColor">@_secondsRemaining</div>
-                <div class="ct-bar-wrap">
-                    <div class="ct-bar" style="width: @(Math.Min(100, (_secondsRemaining / 10.0) * 100))%; background: @CounterColor"></div>
-                </div>
-                <div class="ct-sublabel">pozostało</div>
-            </div>
-            <div class="ct-btn-wrap">
-                @if (_stopTriggeredByMe)
-                {
-                    <button class="ct-btn ct-btn-add" @onclick="AddOneSecond">
-                        +1 sekunda
-                    </button>
-                }
-                else if (_timeBegSent)
-                {
-                    <button class="ct-btn ct-btn-sent" disabled>
-                        Wysłano
-                    </button>
-                }
-                else
-                {
-                    <button class="ct-btn ct-btn-beg" @onclick="RequestMoreTime">
-                        Więcej czasu!
-                    </button>
-                }
-            </div>
-        </div>
-    }
-
     @if (_showRerollConfirmation)
     {
         <NationsCities.Components.Game.Shared.ConfirmationModal
@@ -161,7 +123,6 @@ else
     private bool _stopTriggeredByMe = false;
     private bool _timeBegSent = false;
     private string _stopTriggerName = "";
-    private bool _toastVisible = false;
     private System.Timers.Timer? _timer;
     private bool _hasInitialized = false;
     private bool _showRerollConfirmation = false;
@@ -223,12 +184,10 @@ else
             // Start anti-cheat tracking via the state service
             await GameState.StartAntiCheatTrackingAsync(_currentRound);
 
-            // If countdown was already active on mount (rejoin), teleport toast to portal
+            // If countdown was already active on mount (rejoin), show JS toast
             if (_isCountdownActive)
             {
-                try { await JS.InvokeVoidAsync("mountCountdownToast"); } catch { }
-                _toastVisible = true;
-                StateHasChanged();
+                try { await JS.InvokeVoidAsync("CountdownToast.show", null, _stopTriggerName, _stopTriggeredByMe, _secondsRemaining, 10); } catch { }
             }
         }
     }
@@ -258,17 +217,12 @@ else
 
         StartTimer();
 
-        // Show toast with small delay for enter animation
+        // Show toast via pure JS (appended to document.body)
         _ = InvokeAsync(async () =>
         {
-            StateHasChanged();
-            await Task.Delay(50);
-            // Teleport toast to body-root portal so position:fixed works on mobile
-            try { await JS.InvokeVoidAsync("mountCountdownToast"); } catch { }
-            _toastVisible = true;
-            StateHasChanged();
-            // Initial vignette pulse
-            await JS.InvokeVoidAsync("beatVignette");
+            var btnState = _stopTriggeredByMe ? "add" : "beg";
+            try { await JS.InvokeVoidAsync("CountdownToast.show", null, _stopTriggerName, _stopTriggeredByMe, _secondsRemaining, 10); } catch { }
+            try { await JS.InvokeVoidAsync("beatVignette"); } catch { }
         });
     }
 
@@ -290,11 +244,9 @@ else
     private async void HandleRoundEnded(int answerCount)
     {
         _timer?.Stop();
-        _toastVisible = false;
-        try { await JS.InvokeVoidAsync("unmountCountdownToast"); } catch { }
-        try { await JS.InvokeVoidAsync("clearVignette"); } catch { /* JS not available or disposed */ }
-        // Anti-cheat is paused by ClientGameStateService.OnRoundEnded hub handler — no need to pause here again.
-        // Phase transition handled by GameState hub callbacks
+        _isCountdownActive = false;
+        try { await JS.InvokeVoidAsync("CountdownToast.hide"); } catch { }
+        try { await JS.InvokeVoidAsync("clearVignette"); } catch { }
     }
 
     private void StartTimer()
@@ -307,15 +259,17 @@ else
             {
                 _secondsRemaining--;
                 await InvokeAsync(StateHasChanged);
-                // Vignette pulse on each tick
-                try { await JS.InvokeVoidAsync("beatVignette"); } catch { /* disposed */ }
+                // Update toast & vignette via JS
+                var btnState = _stopTriggeredByMe ? "add" : (_timeBegSent ? "sent" : "beg");
+                try { await JS.InvokeVoidAsync("CountdownToast.update", _secondsRemaining, btnState); } catch { }
+                try { await JS.InvokeVoidAsync("beatVignette"); } catch { }
             }
             else
             {
                 _timer?.Stop();
-                _toastVisible = false;
-                try { await JS.InvokeVoidAsync("unmountCountdownToast"); } catch { }
-                try { await JS.InvokeVoidAsync("clearVignette"); } catch { /* disposed */ }
+                _isCountdownActive = false;
+                try { await JS.InvokeVoidAsync("CountdownToast.hide"); } catch { }
+                try { await JS.InvokeVoidAsync("clearVignette"); } catch { }
                 if (!_hasSubmitted)
                 {
                     await SubmitAnswers();
@@ -392,7 +346,7 @@ else
         return _answers.TryGetValue(category, out var answer) ? answer : "";
     }
 
-    public void Dispose()
+    public async void Dispose()
     {
         GameState.OnStateChanged -= HandleStateChanged;
         GameState.OnStopTriggered -= HandleStopTriggered;
@@ -402,5 +356,8 @@ else
         
         _timer?.Stop();
         _timer?.Dispose();
+
+        // Make sure JS toast is removed when leaving this view
+        try { await JS.InvokeVoidAsync("CountdownToast.hide"); } catch { }
     }
 }
