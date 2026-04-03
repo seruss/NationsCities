@@ -12,6 +12,9 @@ public enum GamePhase
     /// <summary>Room created/joined, waiting for players.</summary>
     Lobby,
     
+    /// <summary>Countdown animation before round starts (3-2-1-letter).</summary>
+    Countdown,
+    
     /// <summary>Active game round - players entering answers.</summary>
     Playing,
     

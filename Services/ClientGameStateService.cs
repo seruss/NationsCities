@@ -56,6 +56,9 @@ public class ClientGameStateService : IAsyncDisposable
     public Player? MyPlayer => CurrentRoom?.Players
         .FirstOrDefault(p => p.Nickname.Equals(Nickname, StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>Letter for the countdown animation (set before transitioning to Countdown phase).</summary>
+    public char CountdownLetter { get; private set; }
+
     // ===== EVENTS =====
     
     /// <summary>Fired when any state changes.</summary>
@@ -292,9 +295,20 @@ public class ClientGameStateService : IAsyncDisposable
 
         _hubConnection.On<char, int>("OnRoundStarted", (letter, roundNumber) =>
         {
+            var previousPhase = CurrentPhase;
             CurrentRoom = _roomService.GetRoom(RoomCode ?? "");
-            _ = StartAntiCheatAsync();
-            SetPhase(GamePhase.Playing);
+            
+            if (previousPhase == GamePhase.Lobby || previousPhase == GamePhase.Home)
+            {
+                // First round after game start — show countdown overlay
+                CountdownLetter = letter;
+                SetPhase(GamePhase.Countdown);
+            }
+            else
+            {
+                _ = StartAntiCheatAsync();
+                SetPhase(GamePhase.Playing);
+            }
         });
 
         _hubConnection.On<char>("OnNewRound", letter =>
@@ -509,6 +523,14 @@ public class ClientGameStateService : IAsyncDisposable
     {
         if (_hubConnection == null || string.IsNullOrEmpty(RoomCode)) return;
         await _hubConnection.InvokeAsync("StartGame", RoomCode);
+    }
+
+    /// <summary>Called when countdown overlay animation finishes — transitions to Playing phase.</summary>
+    public void FinishCountdown()
+    {
+        if (CurrentPhase != GamePhase.Countdown) return;
+        _ = StartAntiCheatAsync();
+        SetPhase(GamePhase.Playing);
     }
 
     /// <summary>Submit answers for current round.</summary>

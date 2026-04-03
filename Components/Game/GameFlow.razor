@@ -18,8 +18,15 @@
         case GamePhase.Lobby:
             <NationsCities.Components.Game.Views.LobbyView />
             break;
+        case GamePhase.Countdown:
+            <NationsCities.Components.Game.Shared.CountdownOverlay 
+                Letter="@GameState.CountdownLetter"
+                OnFinished="OnCountdownFinished" />
+            break;
         case GamePhase.Playing:
-            <NationsCities.Components.Game.Views.RoundView />
+            <div class="@(_roundEnterAnim ? "round-view-enter" : "")">
+                <NationsCities.Components.Game.Views.RoundView />
+            </div>
             break;
         case GamePhase.Voting:
             <NationsCities.Components.Game.Views.VotingView />
@@ -60,6 +67,7 @@
     private bool _initialized = false;
     private bool _showLeaveConfirmation = false;
     private GamePhase _lastPhase = GamePhase.Home;
+    private bool _roundEnterAnim = false;
     
     private bool _shouldPreventNavigation => GameState.CurrentPhase != GamePhase.Home;
 
@@ -96,6 +104,12 @@
         {
             if (GameState.CurrentPhase != _lastPhase)
             {
+                // Clear round-enter animation after it played once
+                if (_lastPhase == GamePhase.Countdown && GameState.CurrentPhase != GamePhase.Playing)
+                {
+                    _roundEnterAnim = false;
+                }
+                
                 _lastPhase = GameState.CurrentPhase;
                 StateHasChanged();
                 await Task.Yield();
@@ -106,6 +120,17 @@
                 StateHasChanged();
             }
         });
+    }
+
+    private async Task OnCountdownFinished()
+    {
+        _roundEnterAnim = true;
+        GameState.FinishCountdown();
+        
+        // Remove animation class after it completes (380ms + buffer)
+        await Task.Delay(500);
+        _roundEnterAnim = false;
+        await InvokeAsync(StateHasChanged);
     }
 
     private void ShowLeaveConfirmation()

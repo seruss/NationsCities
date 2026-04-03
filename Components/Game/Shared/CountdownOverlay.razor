@@ -1,0 +1,97 @@
+@*
+    CountdownOverlay.razor
+    Fullscreen countdown animation: 3 → 2 → 1 → [letter] → OnFinished
+    Displayed to all players simultaneously when the admin starts the game.
+*@
+
+<div class="countdown-overlay">
+    <div class="countdown-glow"></div>
+
+    @if (_showLetter)
+    {
+        <div @key="@_currentKey" class="countdown-item countdown-letter @_animClass">
+            @Letter
+        </div>
+        <div @key="@($"label-{_currentKey}")" class="countdown-letter-label @_animClass">
+            Litera rundy
+        </div>
+    }
+    else if (_isVisible)
+    {
+        <div @key="@_currentKey" class="countdown-item @_animClass">
+            @_currentValue
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public char Letter { get; set; }
+    [Parameter] public EventCallback OnFinished { get; set; }
+
+    private int _currentValue = 3;
+    private bool _showLetter;
+    private bool _isVisible = true;
+    private string _animClass = "cd-entering";
+    private int _currentKey;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await RunSequence();
+    }
+
+    private async Task RunSequence()
+    {
+        // 3, 2, 1
+        foreach (var n in new[] { 3, 2, 1 })
+        {
+            await ShowNumber(n);
+        }
+
+        // Letter
+        await ShowLetterStep();
+
+        // Done — hand off to the round view
+        await OnFinished.InvokeAsync();
+    }
+
+    private async Task ShowNumber(int value)
+    {
+        _currentValue = value;
+        _showLetter = false;
+        _isVisible = true;
+        _animClass = "cd-entering";
+        _currentKey++;
+        await InvokeAsync(StateHasChanged);
+
+        // enter (220ms) + hold (600ms) = 820ms
+        await Task.Delay(820);
+
+        // Exit
+        _animClass = "cd-exiting";
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(260);
+
+        _isVisible = false;
+        await InvokeAsync(StateHasChanged);
+        // Brief gap between elements
+        await Task.Delay(80);
+    }
+
+    private async Task ShowLetterStep()
+    {
+        _showLetter = true;
+        _isVisible = true;
+        _animClass = "cd-entering";
+        _currentKey++;
+        await InvokeAsync(StateHasChanged);
+
+        // enter (220ms) + longer hold for letter (920ms) = 1140ms
+        await Task.Delay(1140);
+
+        // Exit
+        _animClass = "cd-exiting";
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(260);
+    }
+}
