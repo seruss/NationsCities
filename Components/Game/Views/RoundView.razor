@@ -22,84 +22,110 @@
 else
 {
     <div class="flex flex-col min-h-screen bg-bg-light dark:bg-bg-dark">
-        <!-- Header -->
-        <header class="sticky top-0 flex items-center justify-center px-4 py-3 bg-bg-light/95 dark:bg-bg-dark/95 backdrop-blur-md shrink-0 z-20 border-b border-slate-200/60 dark:border-slate-800/60">
-            <h2 class="text-base font-bold tracking-tight uppercase text-slate-500 dark:text-slate-400">Runda @_currentRound</h2>
+        <!-- Sticky header + countdown bar -->
+        <header class="sticky top-0 shrink-0 z-20 bg-bg-light/95 dark:bg-bg-dark/95 backdrop-blur-md border-b border-slate-200/60 dark:border-slate-800/60">
+            <div class="flex items-center justify-center px-4 py-3">
+                <h2 class="text-base font-bold tracking-tight uppercase text-slate-500 dark:text-slate-400">Runda @_currentRound</h2>
+            </div>
+            @if (_isCountdownActive && !_stopTriggeredByMe)
+            {
+                <!-- Thin countdown bar for non-triggerers -->
+                <div class="h-1 w-full bg-slate-200 dark:bg-slate-800">
+                    <div class="h-full rounded-r-full transition-all duration-1000 linear"
+                         style="width: @(Math.Min(100, (_secondsRemaining / 10.0) * 100))%; background: @CounterColor">
+                    </div>
+                </div>
+            }
         </header>
 
-        <!-- Answer Inputs -->
-        <main class="flex-1 overflow-y-auto no-scrollbar" data-scrollable="true">
-            <div class="px-5 py-6 flex flex-col gap-6 pb-32">
+        <!-- Scrollable content -->
+        <div class="flex-1 overflow-y-auto no-scrollbar" data-scrollable="true">
+            <div class="px-5 py-6 flex flex-col gap-5">
+                <!-- Answer Inputs -->
                 @foreach (var category in GameState.CurrentGame.Categories)
                 {
                     var inputId = $"answer-{category.Name.Replace(" ", "-").ToLowerInvariant()}";
-                    <div class="group">
-                        <div class="flex justify-between items-center mb-2">
-                            <label class="text-sm font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-2">
-                                <span class="material-symbols-outlined text-base text-slate-500 dark:text-slate-400">@category.Icon</span>
+                    <div class="flex flex-col gap-2">
+                        <div class="flex justify-between items-center">
+                            <label for="@inputId" class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">
                                 @category.Name
                             </label>
                             @if (!string.IsNullOrEmpty(GetAnswer(category.Name)))
                             {
-                                <span class="w-5 h-5 rounded-full flex items-center justify-center bg-green-500/15">
-                                    <span class="material-symbols-outlined text-green-500" style="font-size: 18px;">check_circle</span>
-                                </span>
+                                <span class="material-symbols-outlined text-green-500" style="font-size: 18px;">check_circle</span>
                             }
                         </div>
-                        <input id="@inputId"
-                               type="text"
-                               @bind="@_answers[category.Name]"
-                               @bind:event="oninput"
-                               placeholder="Wpisz odpowiedź..."
-                               class="w-full border-0 rounded-xl p-4 text-lg shadow-sm ring-1 ring-slate-300 dark:ring-slate-700 focus:ring-2 focus:ring-primary focus:outline-none transition-all disabled:opacity-50 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                               autocomplete="off"
-                               disabled="@_hasSubmitted" />
+                        <div class="relative group">
+                            <input id="@inputId"
+                                   type="text"
+                                   @bind="@_answers[category.Name]"
+                                   @bind:event="oninput"
+                                   placeholder="@(GameState.CurrentGame.CurrentLetter)..."
+                                   class="w-full bg-white dark:bg-slate-800 border-0 rounded-2xl py-4 px-5 pr-12 text-lg text-slate-900 dark:text-white placeholder:text-slate-400/50 dark:placeholder:text-slate-500/50 ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-primary/50 focus:outline-none transition-all disabled:opacity-50"
+                                   autocomplete="off"
+                                   disabled="@_hasSubmitted" />
+                            <span class="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-xl text-slate-300 dark:text-slate-600 group-focus-within:text-primary transition-colors">@category.Icon</span>
+                        </div>
                     </div>
                 }
-            </div>
-        </main>
 
-        <!-- Footer: STOP Button -->
-        <footer class="shrink-0 px-5 py-4 bg-bg-light dark:bg-bg-dark border-t border-slate-200 dark:border-slate-800 fixed bottom-0 w-full z-30 backdrop-blur-md bg-opacity-95 safe-area-bottom">
-            @if (_hasSubmitted)
-            {
-                <div class="text-center py-2">
-                    <p class="text-lg font-bold text-green-500 dark:text-green-400 flex items-center justify-center gap-2">
-                        <span class="material-symbols-outlined">check_circle</span>
-                        Odpowiedzi wysłane!
-                    </p>
-                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Czekam na innych graczy...</p>
+                <!-- Action area (inline, scrolls with content) -->
+                <div class="pt-4 pb-8">
+                    @if (_hasSubmitted)
+                    {
+                        <div class="text-center py-4">
+                            <p class="text-lg font-bold text-green-500 dark:text-green-400 flex items-center justify-center gap-2">
+                                <span class="material-symbols-outlined">check_circle</span>
+                                Odpowiedzi wysłane!
+                            </p>
+                            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Czekam na innych graczy...</p>
+                        </div>
+                    }
+                    else if (_isCountdownActive && _stopTriggeredByMe)
+                    {
+                        <!-- Triggerer: progress bar button + add time -->
+                        <div class="flex flex-col gap-3">
+                            <div class="relative w-full h-14 rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-700">
+                                <div class="absolute inset-0 rounded-xl transition-all duration-1000 linear"
+                                     style="width: @(Math.Min(100, (_secondsRemaining / 10.0) * 100))%; background: @CounterColor">
+                                </div>
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <span class="text-white font-black text-lg tabular-nums drop-shadow-sm">@_secondsRemaining s</span>
+                                </div>
+                            </div>
+                            <button @onclick="AddOneSecond"
+                                    class="w-full flex items-center justify-center gap-2 bg-slate-100 dark:bg-slate-800 hover:bg-green-50 dark:hover:bg-green-900/20 text-slate-600 dark:text-slate-300 hover:text-green-600 dark:hover:text-green-400 font-bold text-sm py-3 rounded-xl border border-slate-200 dark:border-slate-700 transition-all btn-press">
+                                <span class="material-symbols-outlined text-base">add_circle</span>
+                                <span>+1 sekunda</span>
+                            </button>
+                        </div>
+                    }
+                    else if (_isCountdownActive)
+                    {
+                        <!-- Non-triggerer during countdown: submit button -->
+                        <button @onclick="SubmitAnswers"
+                                class="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold text-lg py-4 rounded-xl shadow-lg transition-all btn-press">
+                            <span class="material-symbols-outlined">send</span>
+                            <span>Wyślij odpowiedzi</span>
+                        </button>
+                    }
+                    else
+                    {
+                        <!-- Normal: STOP button -->
+                        <button @onclick="TriggerStop"
+                                disabled="@(!CanStop)"
+                                class="w-full flex items-center justify-center gap-2 @(CanStop ? "bg-red-500 hover:bg-red-600 shadow-red-500/30" : "bg-slate-200 dark:bg-slate-700 cursor-not-allowed") text-white font-bold text-lg py-4 rounded-xl shadow-lg transition-all btn-press">
+                            <span class="material-symbols-outlined">stop_circle</span>
+                            <span>STOP!</span>
+                        </button>
+                        @if (!CanStop)
+                        {
+                            <p class="text-center text-xs text-orange-400 mt-2">Uzupełnij wszystkie odpowiedzi aby zakończyć</p>
+                        }
+                    }
                 </div>
-            }
-            else if (_isCountdownActive)
-            {
-                <div class="flex flex-col gap-2">
-                    <button @onclick="SubmitAnswers" 
-                            class="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold text-lg py-4 rounded-xl shadow-lg transition-all btn-press">
-                        <span class="material-symbols-outlined">send</span>
-                        <span>Wyślij odpowiedzi</span>
-                    </button>
-                    <p class="text-center text-xs text-slate-400">Pozostało @_secondsRemaining sekund!</p>
-                </div>
-            }
-            else
-            {
-                <button @onclick="TriggerStop" 
-                        disabled="@(!CanStop)"
-                        class="w-full flex items-center justify-center gap-2 @(CanStop ? "bg-red-500 hover:bg-red-600 shadow-red-500/30" : "bg-slate-200 dark:bg-slate-700 cursor-not-allowed") text-white font-bold text-lg py-4 rounded-xl shadow-lg transition-all btn-press">
-                    <span class="material-symbols-outlined">stop_circle</span>
-                    <span>STOP!</span>
-                </button>
-                @if (!CanStop)
-                {
-                    <p class="text-center text-xs text-orange-400 mt-2">Uzupełnij wszystkie odpowiedzi aby zakończyć</p>
-                }
-                else
-                {
-                    <p class="text-center text-xs text-slate-500 mt-2">Zatrzymujesz rundę - inni dostają 10 sekund</p>
-                }
-            }
-        </footer>
+            </div>
+        </div>
     </div>
 
     @if (_showRerollConfirmation)
@@ -121,8 +147,6 @@ else
     private bool _isCountdownActive = false;
     private bool _hasSubmitted = false;
     private bool _stopTriggeredByMe = false;
-    private bool _timeBegSent = false;
-    private string _stopTriggerName = "";
     private System.Timers.Timer? _timer;
     private bool _hasInitialized = false;
     private bool _showRerollConfirmation = false;
@@ -130,7 +154,7 @@ else
     // Can only click STOP if all answers are filled
     private bool CanStop => GameState.CurrentGame?.Categories.All(c => !string.IsNullOrWhiteSpace(GetAnswer(c.Name))) ?? false;
 
-    // Color of countdown number and bar
+    // Color of countdown bar
     private string CounterColor => _secondsRemaining <= 3 ? "#f87171"
                                  : _secondsRemaining <= 6 ? "#fb923c"
                                  : "var(--color-primary)";
@@ -153,7 +177,6 @@ else
         
         _currentRound = GameState.CurrentGame.CurrentRound;
         
-        // Initialize answer dictionary
         foreach (var category in GameState.CurrentGame.Categories)
         {
             if (!_answers.ContainsKey(category.Name))
@@ -162,17 +185,13 @@ else
             }
         }
         
-        // Check if countdown is already active (rejoin scenario)
+        // Rejoin scenario
         if (GameState.CurrentGame.Phase == RoundPhase.Countdown && GameState.CurrentGame.CountdownEndTime.HasValue)
         {
             _isCountdownActive = true;
             var remaining = (GameState.CurrentGame.CountdownEndTime.Value - DateTime.UtcNow).TotalSeconds;
             _secondsRemaining = Math.Max(1, (int)Math.Ceiling(remaining));
             _stopTriggeredByMe = GameState.CurrentGame.StopTriggeredBy == GameState.MyPlayer?.SessionId;
-            // Resolve trigger name on rejoin
-            var triggerPlayer = GameState.CurrentRoom?.Players.FirstOrDefault(p => p.SessionId == GameState.CurrentGame.StopTriggeredBy);
-            _stopTriggerName = triggerPlayer?.Nickname ?? "Gracz";
-            _timeBegSent = false;
             StartTimer();
         }
     }
@@ -181,20 +200,18 @@ else
     {
         if (firstRender && GameState.CurrentGame != null)
         {
-            // Start anti-cheat tracking via the state service
             await GameState.StartAntiCheatTrackingAsync(_currentRound);
 
-            // If countdown was already active on mount (rejoin), show JS toast
-            if (_isCountdownActive)
+            // If countdown active on mount (rejoin) and not triggerer, start vignette
+            if (_isCountdownActive && !_stopTriggeredByMe && !_hasSubmitted)
             {
-                try { await JS.InvokeVoidAsync("CountdownToast.show", null, _stopTriggerName, _stopTriggeredByMe, _secondsRemaining, 10); } catch { }
+                try { await JS.InvokeVoidAsync("beatVignette"); } catch { }
             }
         }
     }
 
     private void HandleStateChanged()
     {
-        // Re-initialize if game data changed
         if (!_hasInitialized && GameState.CurrentGame != null)
         {
             InitializeRound();
@@ -206,24 +223,22 @@ else
     {
         _isCountdownActive = true;
         _stopTriggeredByMe = playerId == GameState.MyPlayer?.SessionId;
-        _timeBegSent = false;
-
-        // Resolve trigger player's nickname
-        var triggerPlayer = GameState.CurrentRoom?.Players.FirstOrDefault(p => p.SessionId == playerId);
-        _stopTriggerName = triggerPlayer?.Nickname ?? "Gracz";
 
         var remaining = (endTime - DateTime.UtcNow).TotalSeconds;
         _secondsRemaining = Math.Max(1, (int)Math.Ceiling(remaining));
 
         StartTimer();
 
-        // Show toast via pure JS (appended to document.body)
-        _ = InvokeAsync(async () =>
+        // Start vignette for non-triggerers
+        if (!_stopTriggeredByMe)
         {
-            var btnState = _stopTriggeredByMe ? "add" : "beg";
-            try { await JS.InvokeVoidAsync("CountdownToast.show", null, _stopTriggerName, _stopTriggeredByMe, _secondsRemaining, 10); } catch { }
-            try { await JS.InvokeVoidAsync("beatVignette"); } catch { }
-        });
+            _ = InvokeAsync(async () =>
+            {
+                try { await JS.InvokeVoidAsync("beatVignette"); } catch { }
+            });
+        }
+
+        InvokeAsync(StateHasChanged);
     }
 
     private void HandleTimeAdded(DateTime endTime)
@@ -233,19 +248,10 @@ else
         InvokeAsync(StateHasChanged);
     }
 
-    private async Task RequestMoreTime()
-    {
-        if (_timeBegSent) return;
-        _timeBegSent = true;
-        await GameState.RequestMoreTimeAsync();
-        await InvokeAsync(StateHasChanged);
-    }
-
     private async void HandleRoundEnded(int answerCount)
     {
         _timer?.Stop();
         _isCountdownActive = false;
-        try { await JS.InvokeVoidAsync("CountdownToast.hide"); } catch { }
         try { await JS.InvokeVoidAsync("clearVignette"); } catch { }
     }
 
@@ -259,16 +265,16 @@ else
             {
                 _secondsRemaining--;
                 await InvokeAsync(StateHasChanged);
-                // Update toast & vignette via JS
-                var btnState = _stopTriggeredByMe ? "add" : (_timeBegSent ? "sent" : "beg");
-                try { await JS.InvokeVoidAsync("CountdownToast.update", _secondsRemaining, btnState); } catch { }
-                try { await JS.InvokeVoidAsync("beatVignette"); } catch { }
+                // Vignette pulse for non-triggerers who haven't submitted
+                if (!_stopTriggeredByMe && !_hasSubmitted)
+                {
+                    try { await JS.InvokeVoidAsync("beatVignette"); } catch { }
+                }
             }
             else
             {
                 _timer?.Stop();
                 _isCountdownActive = false;
-                try { await JS.InvokeVoidAsync("CountdownToast.hide"); } catch { }
                 try { await JS.InvokeVoidAsync("clearVignette"); } catch { }
                 if (!_hasSubmitted)
                 {
@@ -282,13 +288,8 @@ else
     private async Task TriggerStop()
     {
         if (_hasSubmitted) return;
-        
         _hasSubmitted = true;
-        
-        // Pause anti-cheat
         await GameState.PauseAntiCheatTrackingAsync();
-        
-        // Send to hub
         await GameState.TriggerStopAsync(_answers);
         await InvokeAsync(StateHasChanged);
     }
@@ -305,12 +306,10 @@ else
     {
         if (_hasSubmitted) return;
         _hasSubmitted = true;
-        
-        // Pause anti-cheat
         await GameState.PauseAntiCheatTrackingAsync();
-        
-        // Send to hub
         await GameState.SubmitAnswersAsync(_answers);
+        // Stop vignette on submit
+        try { await JS.InvokeVoidAsync("clearVignette"); } catch { }
         await InvokeAsync(StateHasChanged);
     }
 
@@ -332,7 +331,6 @@ else
 
     private void HandleLetterRerolled(char newLetter)
     {
-        // Clear all local answers
         foreach (var key in _answers.Keys.ToList())
         {
             _answers[key] = "";
@@ -346,7 +344,7 @@ else
         return _answers.TryGetValue(category, out var answer) ? answer : "";
     }
 
-    public async void Dispose()
+    public void Dispose()
     {
         GameState.OnStateChanged -= HandleStateChanged;
         GameState.OnStopTriggered -= HandleStopTriggered;
@@ -356,8 +354,5 @@ else
         
         _timer?.Stop();
         _timer?.Dispose();
-
-        // Make sure JS toast is removed when leaving this view
-        try { await JS.InvokeVoidAsync("CountdownToast.hide"); } catch { }
     }
 }
