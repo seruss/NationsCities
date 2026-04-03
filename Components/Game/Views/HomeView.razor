@@ -264,25 +264,15 @@
     {
         GameState.OnError += HandleError;
         GameState.OnPublicRoomsUpdated += HandlePublicRoomsUpdated;
+        GameState.OnStateChanged += HandleStateChanged;
 
-        if (!string.IsNullOrEmpty(GameState.RoomCode) && string.IsNullOrEmpty(GameState.Nickname))
-        {
-            _pendingRoomCode = GameState.RoomCode;
-        }
+        TrySetupDeepLink();
 
         // Show kicked/error message if redirected here after being kicked
         if (!string.IsNullOrEmpty(GameState.LastError))
         {
             _kickedMessage = GameState.LastError;
             GameState.LastError = null;
-        }
-
-        // Auto-show join form when coming from URL deep link
-        if (!string.IsNullOrEmpty(_pendingRoomCode))
-        {
-            _roomCode = _pendingRoomCode;
-            _showJoinInput = true;
-            _isCreating = false;
         }
     }
 
@@ -310,6 +300,28 @@
     {
         _publicRooms = rooms;
         InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleStateChanged()
+    {
+        // Re-check deep link after InitializeWithRoomCodeAsync sets RoomCode
+        TrySetupDeepLink();
+        InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// Check if GameState.RoomCode is set (deep link) and auto-open the join form.
+    /// Safe to call multiple times — only activates once.
+    /// </summary>
+    private void TrySetupDeepLink()
+    {
+        if (_pendingRoomCode != null) return; // already set up
+        if (string.IsNullOrEmpty(GameState.RoomCode) || !string.IsNullOrEmpty(GameState.Nickname)) return;
+
+        _pendingRoomCode = GameState.RoomCode;
+        _roomCode = _pendingRoomCode;
+        _showJoinInput = true;
+        _isCreating = false;
     }
 
     private void ShowNicknameForCreate()
@@ -406,6 +418,7 @@
     {
         GameState.OnError -= HandleError;
         GameState.OnPublicRoomsUpdated -= HandlePublicRoomsUpdated;
+        GameState.OnStateChanged -= HandleStateChanged;
         _ = GameState.StopPublicRoomsBrowsingAsync();
     }
 }

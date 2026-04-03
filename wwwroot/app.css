@@ -523,9 +523,6 @@
   .h-px {
     height: 1px;
   }
-  .max-h-\[60vh\] {
-    max-height: 60vh;
-  }
   .min-h-\[120px\] {
     min-height: 120px;
   }

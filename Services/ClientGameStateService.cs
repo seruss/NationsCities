@@ -160,13 +160,17 @@ public class ClientGameStateService : IAsyncDisposable
             await InitializeAsync();
         }
         
-        // If we don't have a session for this room, show home to join
-        if (!string.Equals(RoomCode, roomCode, StringComparison.OrdinalIgnoreCase))
+        // If we successfully reconnected to this room, don't override
+        if (string.Equals(RoomCode, roomCode, StringComparison.OrdinalIgnoreCase) 
+            && CurrentPhase != GamePhase.Home)
         {
-            RoomCode = roomCode.ToUpperInvariant();
-            // Will need nickname - show join modal in HomeView
-            SetPhase(GamePhase.Home);
+            return;
         }
+        
+        // Set room code for deep link join and always notify
+        // (HomeView needs RoomCode even if phase is already Home)
+        RoomCode = roomCode.ToUpperInvariant();
+        NotifyStateChanged();
     }
 
     private async Task EnsureConnectedAsync()
@@ -378,6 +382,7 @@ public class ClientGameStateService : IAsyncDisposable
         _hubConnection.On("OnGameEnded", async () =>
         {
             await ClearSessionAsync();
+            await ForceUrlToHomeAsync();
             SetPhase(GamePhase.Home);
         });
 
@@ -494,7 +499,6 @@ public class ClientGameStateService : IAsyncDisposable
     }
 
     /// <summary>Leave the current game.</summary>
-    /// <summary>Leave the current game.</summary>
     public async Task LeaveGameAsync()
     {
         if (_hubConnection != null && !string.IsNullOrEmpty(RoomCode))
@@ -508,6 +512,7 @@ public class ClientGameStateService : IAsyncDisposable
         
         await ClearSessionAsync();
         await ClearAntiCheatAsync();
+        await ForceUrlToHomeAsync();
         SetPhase(GamePhase.Home);
     }
 
@@ -516,6 +521,7 @@ public class ClientGameStateService : IAsyncDisposable
     {
         await ClearSessionAsync();
         await ClearAntiCheatAsync();
+        await ForceUrlToHomeAsync();
         SetPhase(GamePhase.Home);
     }
 
@@ -911,7 +917,8 @@ public class ClientGameStateService : IAsyncDisposable
     {
         var targetUrl = CurrentPhase switch
         {
-            GamePhase.Home => "/",
+            GamePhase.Home when string.IsNullOrEmpty(RoomCode) => "/",
+            GamePhase.Home when !string.IsNullOrEmpty(RoomCode) => $"/room/{RoomCode}",
             _ when !string.IsNullOrEmpty(RoomCode) => $"/room/{RoomCode}",
             _ => "/"
         };
@@ -924,6 +931,16 @@ public class ClientGameStateService : IAsyncDisposable
             // on non-dispatcher threads when hub callbacks change the phase.
             _ = _jsRuntime.InvokeVoidAsync("history.replaceState", null, "", targetUrl);
         }
+    }
+
+    /// <summary>Explicitly force the browser URL to "/". Awaited to ensure delivery.</summary>
+    private async Task ForceUrlToHomeAsync()
+    {
+        try
+        {
+            await _jsRuntime.InvokeVoidAsync("history.replaceState", null, "", "/");
+        }
+        catch { }
     }
 
     private void NotifyStateChanged()
@@ -946,10 +963,6 @@ public class ClientGameStateService : IAsyncDisposable
         Nickname = null;
         CurrentRoom = null;
         LastError = null;
-        
-        // Always sync URL back to "/" when session is cleared,
-        // because SetPhase(Home) may be skipped if phase is already Home.
-        SyncUrlToPhase();
         
         try
         {
