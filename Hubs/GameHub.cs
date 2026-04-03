@@ -309,6 +309,10 @@ public class GameHub : Hub
         var sessionId = ResolveSessionId();
         if (sessionId == null) return;
         
+        // IMPORTANT: resolve the kicked player's connection ID BEFORE removal,
+        // because KickPlayer removes the session mapping.
+        var kickedConnId = _roomService.GetConnectionId(playerSessionId);
+        
         var result = _roomService.KickPlayer(sessionId, playerSessionId);
         
         if (!result.Success)
@@ -318,7 +322,6 @@ public class GameHub : Hub
         }
 
         // Send kick notification to the kicked player's current connection
-        var kickedConnId = _roomService.GetConnectionId(playerSessionId);
         if (kickedConnId != null)
         {
             await Clients.Client(kickedConnId).SendAsync("OnKicked");

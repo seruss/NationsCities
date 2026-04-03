@@ -88,6 +88,9 @@ public class ClientGameStateService : IAsyncDisposable
     /// <summary>Fired when voting ends.</summary>
     public event Action? OnVotingEnded;
     
+    /// <summary>Fired when the player is kicked from the room.</summary>
+    public event Action? OnKicked;
+    
     /// <summary>Fired when votes submitted count changes.</summary>
     public event Action<int>? OnVotesSubmittedChanged;
     
@@ -259,11 +262,9 @@ public class ClientGameStateService : IAsyncDisposable
             NotifyStateChanged();
         });
 
-        _hubConnection.On("OnKicked", async () =>
+        _hubConnection.On("OnKicked", () =>
         {
-            await ClearSessionAsync();
-            LastError = "Zostałeś wyrzucony z pokoju.";
-            SetPhase(GamePhase.Home);
+            OnKicked?.Invoke();
         });
 
         _hubConnection.On<string>("OnJoinError", error =>
@@ -493,6 +494,7 @@ public class ClientGameStateService : IAsyncDisposable
     }
 
     /// <summary>Leave the current game.</summary>
+    /// <summary>Leave the current game.</summary>
     public async Task LeaveGameAsync()
     {
         if (_hubConnection != null && !string.IsNullOrEmpty(RoomCode))
@@ -504,6 +506,14 @@ public class ClientGameStateService : IAsyncDisposable
             catch { }
         }
         
+        await ClearSessionAsync();
+        await ClearAntiCheatAsync();
+        SetPhase(GamePhase.Home);
+    }
+
+    /// <summary>Handle being kicked — clear state and go to Home.</summary>
+    public async Task HandleKickedAsync()
+    {
         await ClearSessionAsync();
         await ClearAntiCheatAsync();
         SetPhase(GamePhase.Home);
