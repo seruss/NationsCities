@@ -286,7 +286,7 @@ else
     {
         _timer?.Stop();
         _toastVisible = false;
-        await JS.InvokeVoidAsync("clearVignette");
+        try { await JS.InvokeVoidAsync("clearVignette"); } catch { /* JS not available or disposed */ }
         // Anti-cheat is paused by ClientGameStateService.OnRoundEnded hub handler — no need to pause here again.
         // Phase transition handled by GameState hub callbacks
     }
