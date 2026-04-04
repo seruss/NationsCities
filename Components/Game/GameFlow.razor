@@ -10,7 +10,7 @@
 @implements IDisposable
 
 <div class="game-flow-container min-h-screen">
-    @switch (GameState.CurrentPhase)
+    @switch (_displayedPhase)
     {
         case GamePhase.Home:
             <NationsCities.Components.Game.Views.HomeView />
@@ -19,9 +19,7 @@
             <NationsCities.Components.Game.Views.LobbyView />
             break;
         case GamePhase.Countdown:
-            <NationsCities.Components.Game.Shared.CountdownOverlay 
-                Letter="@GameState.CountdownLetter"
-                OnFinished="OnCountdownFinished" />
+            @* CountdownOverlay is rendered separately below to allow fade over previous view *@
             break;
         case GamePhase.Playing:
             <div class="@(_roundEnterAnim ? "round-view-enter" : "")">
@@ -43,6 +41,20 @@
         case GamePhase.Error:
             <NationsCities.Components.Game.Views.ErrorView Message="@GameState.LastError" />
             break;
+    }
+    
+    @if (_showStopOverlayGlobal)
+    {
+        <NationsCities.Components.Game.Shared.StopOverlay 
+            OnCovered="HandleStopCovered"
+            OnFinished="HandleStopFinished" />
+    }
+    
+    @if (_showCountdownOverlay)
+    {
+        <NationsCities.Components.Game.Shared.CountdownOverlay 
+            Letter="@GameState.CountdownLetter"
+            OnFinished="OnCountdownFinished" />
     }
 </div>
 
@@ -87,7 +99,10 @@
     private bool _showLeaveConfirmation = false;
     private bool _showKickedModal = false;
     private GamePhase _lastPhase = GamePhase.Home;
+    private GamePhase _displayedPhase = GamePhase.Home;
     private bool _roundEnterAnim = false;
+    private bool _showStopOverlayGlobal = false;
+    private bool _showCountdownOverlay = false;
     
     private bool _shouldPreventNavigation => GameState.CurrentPhase != GamePhase.Home;
 
@@ -125,12 +140,33 @@
         {
             if (GameState.CurrentPhase != _lastPhase)
             {
+                // Smooth transition TO Countdown:
+                // Keep old view (Lobby/Score) visible, render CountdownOverlay on top
+                if (GameState.CurrentPhase == GamePhase.Countdown)
+                {
+                    _showCountdownOverlay = true;
+                    _lastPhase = GameState.CurrentPhase;
+                    StateHasChanged();
+                    return; // _displayedPhase stays at old view (Lobby/Score)
+                }
+                
+                // Manage STOP overlay transition from Playing -> Voting
+                if (_lastPhase == GamePhase.Playing && GameState.CurrentPhase == GamePhase.Voting)
+                {
+                    _showStopOverlayGlobal = true;
+                    _lastPhase = GameState.CurrentPhase;
+                    StateHasChanged();
+                    return; // Hold off updating _displayedPhase until OnCovered fires
+                }
+                
                 // Clear round-enter animation after it played once
                 if (_lastPhase == GamePhase.Countdown && GameState.CurrentPhase != GamePhase.Playing)
                 {
                     _roundEnterAnim = false;
+                    _showCountdownOverlay = false;
                 }
                 
+                _displayedPhase = GameState.CurrentPhase;
                 _lastPhase = GameState.CurrentPhase;
                 StateHasChanged();
                 await Task.Yield();
@@ -143,10 +179,27 @@
         });
     }
 
+    private void HandleStopCovered()
+    {
+        // Overlay is fully opaque now. Switch the DOM behind it safely.
+        _displayedPhase = GamePhase.Voting;
+        StateHasChanged();
+    }
+
+    private void HandleStopFinished()
+    {
+        _showStopOverlayGlobal = false;
+        StateHasChanged();
+    }
+
     private async Task OnCountdownFinished()
     {
+        // CountdownOverlay sequence done — swap to RoundView behind it, then remove overlay
         _roundEnterAnim = true;
+        _displayedPhase = GamePhase.Playing;
+        _showCountdownOverlay = false;
         GameState.FinishCountdown();
+        StateHasChanged();
         
         // Remove animation class after it completes (380ms + buffer)
         await Task.Delay(500);

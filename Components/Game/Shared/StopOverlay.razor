@@ -1,0 +1,69 @@
+@*
+    StopOverlay.razor
+    Minimalist STOP! transition overlay before voting.
+    Fades + scales in, holds briefly, then fades + scales out.
+*@
+
+@if (_isVisible)
+{
+    <div class="stop-overlay @_stageClass">
+        <div class="stop-overlay-content">
+            <span class="material-symbols-outlined stop-overlay-icon">front_hand</span>
+            <h2 class="stop-overlay-title">STOP!</h2>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback OnCovered { get; set; }
+    [Parameter] public EventCallback OnFinished { get; set; }
+
+    private bool _isVisible = true;
+    private string _stageClass = "stop-entering";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await RunSequence();
+        }
+    }
+
+    private async Task RunSequence()
+    {
+        // 1. Render with stop-entering (opacity-0 scale-0.85) then
+        //    immediately switch to stop-visible to trigger CSS transition
+        await Task.Delay(30);
+
+        _stageClass = "stop-visible";
+        await InvokeAsync(StateHasChanged);
+
+        // 2. Wait for fade+scale in to finish (400ms transition)
+        await Task.Delay(420);
+
+        // 3. Overlay fully opaque — tell parent to swap views behind us
+        if (OnCovered.HasDelegate)
+        {
+            await OnCovered.InvokeAsync();
+        }
+
+        // 4. Hold the STOP screen
+        await Task.Delay(1400);
+
+        // 5. Fade + scale out
+        _stageClass = "stop-exiting";
+        await InvokeAsync(StateHasChanged);
+
+        // 6. Wait for exit transition (400ms)
+        await Task.Delay(420);
+
+        // 7. Remove from DOM
+        _isVisible = false;
+        await InvokeAsync(StateHasChanged);
+
+        if (OnFinished.HasDelegate)
+        {
+            await OnFinished.InvokeAsync();
+        }
+    }
+}

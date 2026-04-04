@@ -46,25 +46,19 @@ else
                 {
                     var inputId = $"answer-{category.Name.Replace(" ", "-").ToLowerInvariant()}";
                     <div class="flex flex-col gap-2">
-                        <div class="flex justify-between items-center">
-                            <label for="@inputId" class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">
-                                @category.Name
-                            </label>
-                            @if (!string.IsNullOrEmpty(GetAnswer(category.Name)))
-                            {
-                                <span class="material-symbols-outlined text-green-500" style="font-size: 18px;">check_circle</span>
-                            }
-                        </div>
+                        <label for="@inputId" class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">
+                            @category.Name
+                        </label>
                         <div class="relative group">
                             <input id="@inputId"
                                    type="text"
                                    @bind="@_answers[category.Name]"
                                    @bind:event="oninput"
                                    placeholder="@(GameState.CurrentGame.CurrentLetter)..."
-                                   class="w-full bg-white dark:bg-slate-800 border-0 rounded-2xl py-4 px-5 pr-12 text-lg text-slate-900 dark:text-white placeholder:text-slate-400/50 dark:placeholder:text-slate-500/50 ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-primary/50 focus:outline-none transition-all disabled:opacity-50"
+                                   class="w-full border-0 rounded-2xl py-4 px-5 pr-12 text-lg text-slate-900 dark:text-white placeholder:text-slate-400/50 dark:placeholder:text-slate-500/50 focus:outline-none transition-all disabled:opacity-50 @(!string.IsNullOrEmpty(GetAnswer(category.Name)) ? "bg-white dark:bg-slate-800 ring-1 ring-green-400/40 dark:ring-green-600/40 focus:ring-2 focus:ring-green-400/50 dark:focus:ring-green-600/50" : "bg-white dark:bg-slate-800 ring-1 ring-slate-200 dark:ring-slate-700 focus:ring-2 focus:ring-primary/50")"
                                    autocomplete="off"
                                    disabled="@_hasSubmitted" />
-                            <span class="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-xl text-slate-300 dark:text-slate-600 group-focus-within:text-primary transition-colors">@category.Icon</span>
+                            <span class="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-xl transition-colors @(!string.IsNullOrEmpty(GetAnswer(category.Name)) ? "text-green-500" : "text-slate-300 dark:text-slate-600 group-focus-within:text-primary")">@category.Icon</span>
                         </div>
                     </div>
                 }
@@ -224,8 +218,8 @@ else
 
         StartTimer();
 
-        // Start vignette for non-triggerers
-        if (!_stopTriggeredByMe)
+        // Start vignette for non-triggerers who haven't submitted yet
+        if (!_stopTriggeredByMe && !_hasSubmitted)
         {
             _ = InvokeAsync(async () =>
             {

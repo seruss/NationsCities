@@ -20,7 +20,7 @@ window.GameLog = (function () {
 
     function ts() {
         const d = new Date();
-        return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}:${d.getSeconds().toString().padStart(2,'0')}.${d.getMilliseconds().toString().padStart(3,'0')}`;
+        return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}.${d.getMilliseconds().toString().padStart(3, '0')}`;
     }
 
     function log(level, tag, msg, ...args) {
@@ -28,8 +28,8 @@ window.GameLog = (function () {
         const prefix = `[${ts()}][${tag}]`;
         switch (level) {
             case 'error': console.error(prefix, msg, ...args); break;
-            case 'warn':  console.warn(prefix, msg, ...args); break;
-            case 'info':  console.info(prefix, msg, ...args); break;
+            case 'warn': console.warn(prefix, msg, ...args); break;
+            case 'info': console.info(prefix, msg, ...args); break;
             case 'debug': console.log(prefix, msg, ...args); break;
             case 'trace': console.log(prefix, `[TRACE]`, msg, ...args); break;
         }
@@ -37,12 +37,12 @@ window.GameLog = (function () {
 
     return {
         error: (tag, msg, ...args) => log('error', tag, msg, ...args),
-        warn:  (tag, msg, ...args) => log('warn', tag, msg, ...args),
-        info:  (tag, msg, ...args) => log('info', tag, msg, ...args),
+        warn: (tag, msg, ...args) => log('warn', tag, msg, ...args),
+        info: (tag, msg, ...args) => log('info', tag, msg, ...args),
         debug: (tag, msg, ...args) => log('debug', tag, msg, ...args),
         trace: (tag, msg, ...args) => log('trace', tag, msg, ...args),
-        setLevel: (lvl) => { try { localStorage.setItem('debug_log_level', lvl); } catch(e){} },
-        getLevel: () => { try { return localStorage.getItem('debug_log_level') || 'info'; } catch(e) { return 'info'; } }
+        setLevel: (lvl) => { try { localStorage.setItem('debug_log_level', lvl); } catch (e) { } },
+        getLevel: () => { try { return localStorage.getItem('debug_log_level') || 'info'; } catch (e) { return 'info'; } }
     };
 })();
 
@@ -400,7 +400,7 @@ window.AntiCheatTracker = class {
             this._saveSession(session);
             this._startHeartbeat();
             GameLog.info('AntiCheat', `Tracking resumed: round=${session.roundNumber}, violations=${session.violationCount}`);
-            
+
             // Drain any pending violations queued while disconnected.
             // NOTE: do NOT reset _processingQueue here — if registerAntiCheatHandler was just
             // called (reconnect scenario), it already reset the flag and started _processQueue.
@@ -996,11 +996,11 @@ window.unregisterAntiCheatHandler = function () {
  * Call once per timer tick while the countdown is active.
  */
 window.beatVignette = function () {
-    const maxAlpha  = 0.55;
-    const maxSize   = 40;
-    const maxSpread = 15;
-    const dur       = 720;   // ms — must be < 1000 (one tick)
-    const sigma     = 0.22;  // sharper peak = tighter edge glow
+    const maxAlpha = 0.6;
+    const maxSize = 30;
+    const maxSpread = 10;
+    const dur = 720;   // ms — must be < 1000 (one tick)
+    const sigma = 0.25;  // sharper peak = tighter edge glow
 
     const el = document.getElementById('countdown-vignette');
     if (!el) return;
@@ -1010,8 +1010,8 @@ window.beatVignette = function () {
     function frame(now) {
         const x = (now - start) / dur; // 0 → 1
         if (x >= 1) { el.style.boxShadow = 'none'; return; }
-        const g  = Math.exp(-Math.pow(x - 0.5, 2) / (2 * sigma * sigma));
-        const a  = (g * maxAlpha).toFixed(3);
+        const g = Math.exp(-Math.pow(x - 0.5, 2) / (2 * sigma * sigma));
+        const a = (g * maxAlpha).toFixed(3);
         const sz = Math.round(g * maxSize);
         const sp = Math.round(g * maxSpread);
         el.style.boxShadow = `inset 0 0 ${sz}px ${sp}px rgba(220,38,38,${a})`;
