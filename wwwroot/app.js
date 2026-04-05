@@ -1048,7 +1048,7 @@ window.unregisterAntiCheatHandler = function () {
  * Call once per timer tick while the countdown is active.
  */
 window.beatVignette = function () {
-    const maxAlpha = 0.6;
+    const maxAlpha = 0.45;
     const maxSize = 30;
     const maxSpread = 10;
     const dur = 720;   // ms — must be < 1000 (one tick)
@@ -1066,7 +1066,7 @@ window.beatVignette = function () {
         const a = (g * maxAlpha).toFixed(3);
         const sz = Math.round(g * maxSize);
         const sp = Math.round(g * maxSpread);
-        el.style.boxShadow = `inset 0 0 ${sz}px ${sp}px rgba(220,38,38,${a})`;
+        el.style.boxShadow = `inset 0 0 ${sz}px ${sp}px rgba(248,113,113,${a})`;
         requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);

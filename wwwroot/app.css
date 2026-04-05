@@ -623,6 +623,10 @@
     --tw-translate-y: calc(1 / 2 * 100%);
     translate: var(--tw-translate-x) var(--tw-translate-y);
   }
+  .translate-y-\[calc\(50\%-3px\)\] {
+    --tw-translate-y: calc(50% - 3px);
+    translate: var(--tw-translate-x) var(--tw-translate-y);
+  }
   .scale-150 {
     --tw-scale-x: 150%;
     --tw-scale-y: 150%;
@@ -1204,6 +1208,9 @@
   .py-8 {
     padding-block: calc(var(--spacing) * 8);
   }
+  .py-\[1px\] {
+    padding-block: 1px;
+  }
   .pt-2 {
     padding-top: calc(var(--spacing) * 2);
   }
@@ -1302,6 +1309,9 @@
   .text-xs {
     font-size: var(--text-xs);
     line-height: var(--tw-leading, var(--text-xs--line-height));
+  }
+  .text-\[7px\] {
+    font-size: 7px;
   }
   .text-\[9px\] {
     font-size: 9px;
@@ -2660,14 +2670,17 @@ body:has(.modal-backdrop) {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(8px);
   z-index: 50;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  animation: fadeIn 0.2s ease-out;
+  animation: modalBackdropIn 0.3s ease-out forwards;
   overflow: hidden;
+}
+.modal-overlay-anim {
+  animation: modalBackdropIn 0.3s ease-out forwards;
 }
 html.dark .modal-backdrop {
   background: rgba(0, 0, 0, 0.75);
@@ -2715,12 +2728,14 @@ html.dark .modal-header {
 html.dark .modal-footer {
   border-top-color: #334155;
 }
-@keyframes fadeIn {
+@keyframes modalBackdropIn {
   from {
     opacity: 0;
+    backdrop-filter: blur(0px);
   }
   to {
     opacity: 1;
+    backdrop-filter: blur(8px);
   }
 }
 @keyframes slideUp {

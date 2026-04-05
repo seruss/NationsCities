@@ -77,7 +77,7 @@ else
                             </div>
                         </button>
                     }
-                    else if (_hasSubmitted)
+                    else if (_explicitlySubmitted)
                     {
                         <div class="text-center py-4">
                             <p class="text-lg font-bold text-green-500 dark:text-green-400 flex items-center justify-center gap-2">
@@ -90,7 +90,7 @@ else
                     else if (_isCountdownActive)
                     {
                         <!-- Non-triggerer during countdown: submit button -->
-                        <button @onclick="SubmitAnswers"
+                        <button @onclick="SubmitAnswersExplicit"
                                 class="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold text-lg py-4 rounded-xl shadow-lg transition-all btn-press">
                             <span class="material-symbols-outlined">send</span>
                             <span>Wyślij odpowiedzi</span>
@@ -134,6 +134,7 @@ else
     private DateTime? _countdownEndTime;
     private bool _isCountdownActive = false;
     private bool _hasSubmitted = false;
+    private bool _explicitlySubmitted = false;
     private bool _stopTriggeredByMe = false;
     private System.Timers.Timer? _timer;
     private bool _hasInitialized = false;
@@ -316,6 +317,12 @@ else
         }
     }
 
+    private async Task SubmitAnswersExplicit()
+    {
+        _explicitlySubmitted = true;
+        await SubmitAnswers();
+    }
+
     private async Task SubmitAnswers()
     {
         if (_hasSubmitted) return;
@@ -350,6 +357,7 @@ else
             _answers[key] = "";
         }
         _hasSubmitted = false;
+        _explicitlySubmitted = false;
         InvokeAsync(StateHasChanged);
     }
 

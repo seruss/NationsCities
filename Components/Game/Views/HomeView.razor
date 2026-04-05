@@ -324,11 +324,12 @@
         _isCreating = false;
     }
 
-    private void ShowNicknameForCreate()
+    private async Task ShowNicknameForCreate()
     {
         _showJoinInput = true;
         _isCreating = true;
         _error = null;
+        await JS.InvokeVoidAsync("history.pushState", null, "", "/?view=create");
     }
 
     private async Task ShowJoinInput()
@@ -336,6 +337,7 @@
         _showJoinInput = true;
         _isCreating = false;
         _error = null;
+        await JS.InvokeVoidAsync("history.pushState", null, "", "/?view=join");
         _isLoadingRooms = true;
         StateHasChanged();
 
@@ -365,7 +367,7 @@
 
 
 
-    private void CancelForm()
+    private async Task CancelForm()
     {
         _showJoinInput = false;
         _isCreating = false;
@@ -373,6 +375,7 @@
         _nickname = "";
         _error = null;
         _pendingRoomCode = null;
+        await JS.InvokeVoidAsync("history.pushState", null, "", "/");
         _ = GameState.StopPublicRoomsBrowsingAsync();
     }
 
