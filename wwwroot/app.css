@@ -514,6 +514,9 @@
   .h-40 {
     height: calc(var(--spacing) * 40);
   }
+  .h-48 {
+    height: calc(var(--spacing) * 48);
+  }
   .h-64 {
     height: calc(var(--spacing) * 64);
   }
@@ -567,6 +570,9 @@
   }
   .w-32 {
     width: calc(var(--spacing) * 32);
+  }
+  .w-48 {
+    width: calc(var(--spacing) * 48);
   }
   .w-64 {
     width: calc(var(--spacing) * 64);
@@ -3105,12 +3111,6 @@ html.dark .reconnect-text {
 }
 html.dark .countdown-overlay {
   background: var(--color-bg-dark);
-}
-.countdown-glow {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(37, 140, 244, 0.12) 0%, transparent 65%);
-  pointer-events: none;
 }
 .countdown-item {
   font-size: clamp(120px, 40vw, 180px);

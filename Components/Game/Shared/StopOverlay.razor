@@ -7,7 +7,10 @@
 @if (_isVisible)
 {
     <div class="stop-overlay @_stageClass">
-        <div class="stop-overlay-content">
+        <!-- Glowing orb matching HomeView -->
+        <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-primary/30 rounded-full scale-150 pointer-events-none" style="filter: blur(80px);"></div>
+        
+        <div class="stop-overlay-content relative z-10">
             <span class="material-symbols-outlined stop-overlay-icon">front_hand</span>
             <h2 class="stop-overlay-title">STOP!</h2>
         </div>
