@@ -1049,7 +1049,7 @@ window.unregisterAntiCheatHandler = function () {
  */
 window.beatVignette = function () {
     const maxAlpha = 0.45;
-    const maxSize = 30;
+    const maxSize = 20;
     const maxSpread = 10;
     const dur = 720;   // ms — must be < 1000 (one tick)
     const sigma = 0.25;  // sharper peak = tighter edge glow
@@ -1066,7 +1066,7 @@ window.beatVignette = function () {
         const a = (g * maxAlpha).toFixed(3);
         const sz = Math.round(g * maxSize);
         const sp = Math.round(g * maxSpread);
-        el.style.boxShadow = `inset 0 0 ${sz}px ${sp}px rgba(248,113,113,${a})`;
+        el.style.boxShadow = `inset 0 0 ${sz}px ${sp}px rgba(170,30,30,${a})`;
         requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
