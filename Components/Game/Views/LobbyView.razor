@@ -187,7 +187,8 @@ else
         </main>
 
         <!-- Footer Actions -->
-        <footer class="sticky bottom-0 p-4 bg-surface-light dark:bg-surface-dark border-t border-slate-200 dark:border-slate-800 z-20 w-full max-w-md mx-auto safe-area-bottom">
+        <footer class="sticky bottom-0 bg-surface-light dark:bg-surface-dark border-t border-slate-200 dark:border-slate-800 z-20 w-full safe-area-bottom">
+            <div class="max-w-md mx-auto w-full p-4">
             <div class="flex justify-between items-center mb-3 text-xs px-1">
                 <span class="text-slate-500 dark:text-slate-400">Gotowość: <span class="font-bold text-slate-900 dark:text-white">@ReadyCount/@room.Players.Count</span></span>
                 @if (!AllReady)
@@ -218,6 +219,7 @@ else
                         <span class="text-base font-bold uppercase">@(AmIReady ? "Gotowy ✓" : "Jestem gotowy")</span>
                     </button>
                 }
+            </div>
             </div>
         </footer>
     </div>

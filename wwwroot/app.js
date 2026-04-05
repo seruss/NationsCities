@@ -50,6 +50,58 @@ window.GameLog = (function () {
 // so it's available immediately for onclick handlers.
 
 // ======================================
+// Countdown Bar (requestAnimationFrame driver)
+// ======================================
+// Drives countdown bar width smoothly using real clock time.
+// Immune to Blazor re-renders and +1s time additions — just call start() with
+// the new endTime and it seamlessly continues from the correct position.
+window.countdownBar = (function () {
+    let _raf = null;
+
+    return {
+        /**
+         * Start (or restart) the countdown bar animation.
+         * Width is driven by JS rAF; color is handled by CSS class (with transition).
+         * @param {number} endTimeMs  - Unix ms timestamp when countdown ends
+         * @param {number} totalMs    - Total countdown duration in ms (for % calculation)
+         * @param {string[]} ids      - Array of element IDs to update
+         */
+        start: function (endTimeMs, totalMs, ids) {
+            if (_raf !== null) {
+                cancelAnimationFrame(_raf);
+                _raf = null;
+            }
+
+            function tick() {
+                const remaining = Math.max(0, endTimeMs - Date.now());
+                const pct = Math.min(100, (remaining / totalMs) * 100);
+
+                for (const id of ids) {
+                    const el = document.getElementById(id);
+                    if (el) el.style.width = pct + '%';
+                }
+
+                if (remaining > 0) {
+                    _raf = requestAnimationFrame(tick);
+                } else {
+                    _raf = null;
+                }
+            }
+
+            tick();
+        },
+
+        stop: function () {
+            if (_raf !== null) {
+                cancelAnimationFrame(_raf);
+                _raf = null;
+            }
+        }
+    };
+})();
+
+
+// ======================================
 // Disable Pull-to-Refresh on iOS Safari
 // ======================================
 // CSS overscroll-behavior is not reliable on iOS Safari.

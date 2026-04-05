@@ -29,10 +29,9 @@ else
             </div>
             @if (_isCountdownActive && !_stopTriggeredByMe)
             {
-                <!-- Thin countdown bar for non-triggerers -->
-                <div class="h-1 w-full bg-slate-200 dark:bg-slate-800">
-                    <div class="h-full rounded-r-full transition-all duration-1000 linear"
-                         style="width: @(Math.Min(100, (_secondsRemaining / 10.0) * 100))%; background: @CounterColor">
+                <!-- Thin countdown bar for non-triggerers — driven by JS rAF -->
+                <div class="h-1 w-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                    <div id="countdown-bar-thin" class="h-full rounded-r-full @CounterColorClass" style="width: 100%">
                     </div>
                 </div>
             }
@@ -70,8 +69,7 @@ else
                         <!-- Triggerer: single button that is both countdown bar and +1s action -->
                         <button @onclick="AddOneSecond"
                                 class="relative w-full h-14 rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-700 shadow-lg btn-press cursor-pointer border-0">
-                            <div class="absolute inset-y-0 left-0 transition-all duration-1000 linear"
-                                 style="width: @(Math.Min(100, (_secondsRemaining / 10.0) * 100))%; background: @CounterColor">
+                            <div id="countdown-bar-btn" class="absolute inset-y-0 left-0 rounded-r-xl @CounterColorClass" style="width: 100%">
                             </div>
                             <div class="absolute inset-0 flex items-center justify-center gap-2">
                                 <span class="material-symbols-outlined text-white drop-shadow-sm" style="font-size: 20px;">add_circle</span>
@@ -103,7 +101,7 @@ else
                         <!-- Normal: STOP button -->
                         <button @onclick="TriggerStop"
                                 disabled="@(!CanStop)"
-                                class="w-full flex items-center justify-center gap-2 @(CanStop ? "bg-red-500 hover:bg-red-600 shadow-red-500/30" : "bg-slate-200 dark:bg-slate-700 cursor-not-allowed") text-white font-bold text-lg py-4 rounded-xl shadow-lg transition-all btn-press">
+                                class="w-full h-14 flex items-center justify-center gap-2 @(CanStop ? "bg-red-500 hover:bg-red-600 shadow-red-500/30" : "bg-slate-200 dark:bg-slate-700 cursor-not-allowed") text-white font-bold text-lg py-4 rounded-xl shadow-lg transition-all btn-press">
                             <span class="material-symbols-outlined">stop_circle</span>
                             <span>STOP!</span>
                         </button>
@@ -133,6 +131,7 @@ else
     private Dictionary<string, string> _answers = new();
     private int _currentRound = 1;
     private int _secondsRemaining = 10;
+    private DateTime? _countdownEndTime;
     private bool _isCountdownActive = false;
     private bool _hasSubmitted = false;
     private bool _stopTriggeredByMe = false;
@@ -143,10 +142,24 @@ else
     // Can only click STOP if all answers are filled
     private bool CanStop => GameState.CurrentGame?.Categories.All(c => !string.IsNullOrWhiteSpace(GetAnswer(c.Name))) ?? false;
 
-    // Color of countdown bar
-    private string CounterColor => _secondsRemaining <= 3 ? "#f87171"
-                                 : _secondsRemaining <= 6 ? "#fb923c"
-                                 : "var(--color-primary)";
+    // Color CSS class for countdown bars — changes every 1s, CSS transition makes it smooth
+    private string CounterColorClass => _secondsRemaining <= 3 ? "countdown-color-danger"
+                                      : _secondsRemaining <= 6 ? "countdown-color-warning"
+                                      : "countdown-color-normal";
+
+    // Helper: start or restart the rAF countdown bar in JS
+    private async Task StartCountdownBarAsync(DateTime endTime)
+    {
+        var endTimeMs = ((DateTimeOffset)DateTime.SpecifyKind(endTime, DateTimeKind.Utc)).ToUnixTimeMilliseconds();
+        var totalMs = (GameState.CurrentRoom?.Settings.CountdownSeconds ?? 10) * 1000;
+        var ids = new[] { "countdown-bar-thin", "countdown-bar-btn" };
+        try { await JS.InvokeVoidAsync("countdownBar.start", endTimeMs, totalMs, ids); } catch { }
+    }
+
+    private async Task StopCountdownBarAsync()
+    {
+        try { await JS.InvokeVoidAsync("countdownBar.stop"); } catch { }
+    }
 
     protected override void OnInitialized()
     {
@@ -174,13 +187,14 @@ else
             }
         }
         
-        // Rejoin scenario
+        // Rejoin scenario: countdown was active when we joined
         if (GameState.CurrentGame.Phase == RoundPhase.Countdown && GameState.CurrentGame.CountdownEndTime.HasValue)
         {
             _isCountdownActive = true;
             var remaining = (GameState.CurrentGame.CountdownEndTime.Value - DateTime.UtcNow).TotalSeconds;
             _secondsRemaining = Math.Max(1, (int)Math.Ceiling(remaining));
             _stopTriggeredByMe = GameState.CurrentGame.StopTriggeredBy == GameState.MyPlayer?.SessionId;
+            _countdownEndTime = GameState.CurrentGame.CountdownEndTime.Value;
             StartTimer();
         }
     }
@@ -191,10 +205,15 @@ else
         {
             await GameState.StartAntiCheatTrackingAsync(_currentRound);
 
-            // If countdown active on mount (rejoin) and not triggerer, start vignette
-            if (_isCountdownActive && !_stopTriggeredByMe && !_hasSubmitted)
+            // If countdown active on mount (rejoin), start the rAF bar and vignette
+            if (_isCountdownActive && _countdownEndTime.HasValue)
             {
-                try { await JS.InvokeVoidAsync("beatVignette"); } catch { }
+                await StartCountdownBarAsync(_countdownEndTime.Value);
+
+                if (!_stopTriggeredByMe && !_hasSubmitted)
+                {
+                    try { await JS.InvokeVoidAsync("beatVignette"); } catch { }
+                }
             }
         }
     }
@@ -212,11 +231,13 @@ else
     {
         _isCountdownActive = true;
         _stopTriggeredByMe = playerId == GameState.MyPlayer?.SessionId;
+        _countdownEndTime = endTime;
 
         var remaining = (endTime - DateTime.UtcNow).TotalSeconds;
         _secondsRemaining = Math.Max(1, (int)Math.Ceiling(remaining));
 
         StartTimer();
+        _ = InvokeAsync(() => StartCountdownBarAsync(endTime));
 
         // Start vignette for non-triggerers who haven't submitted yet
         if (!_stopTriggeredByMe && !_hasSubmitted)
@@ -232,8 +253,11 @@ else
 
     private void HandleTimeAdded(DateTime endTime)
     {
+        _countdownEndTime = endTime;
         var remaining = (endTime - DateTime.UtcNow).TotalSeconds;
         _secondsRemaining = Math.Max(1, (int)Math.Ceiling(remaining));
+        // Restart the rAF bar with the new endTime — this is the key fix
+        _ = InvokeAsync(() => StartCountdownBarAsync(endTime));
         InvokeAsync(StateHasChanged);
     }
 
@@ -241,6 +265,7 @@ else
     {
         _timer?.Stop();
         _isCountdownActive = false;
+        await StopCountdownBarAsync();
         try { await JS.InvokeVoidAsync("clearVignette"); } catch { }
     }
 

@@ -25,6 +25,7 @@
     --color-amber-500: oklch(76.9% 0.188 70.08);
     --color-amber-600: oklch(66.6% 0.179 58.318);
     --color-yellow-100: oklch(97.3% 0.071 103.193);
+    --color-yellow-300: oklch(90.5% 0.182 98.111);
     --color-yellow-400: oklch(85.2% 0.199 91.936);
     --color-yellow-500: oklch(79.5% 0.184 86.047);
     --color-yellow-600: oklch(68.1% 0.162 75.834);
@@ -618,6 +619,10 @@
     --tw-translate-y: calc(calc(1 / 2 * 100%) * -1);
     translate: var(--tw-translate-x) var(--tw-translate-y);
   }
+  .translate-y-1\/2 {
+    --tw-translate-y: calc(1 / 2 * 100%);
+    translate: var(--tw-translate-x) var(--tw-translate-y);
+  }
   .scale-150 {
     --tw-scale-x: 150%;
     --tw-scale-y: 150%;
@@ -774,6 +779,10 @@
     border-top-right-radius: var(--radius-full);
     border-bottom-right-radius: var(--radius-full);
   }
+  .rounded-r-xl {
+    border-top-right-radius: var(--radius-xl);
+    border-bottom-right-radius: var(--radius-xl);
+  }
   .border {
     border-style: var(--tw-border-style);
     border-width: 1px;
@@ -844,6 +853,9 @@
   }
   .border-red-100 {
     border-color: var(--color-red-100);
+  }
+  .border-red-400 {
+    border-color: var(--color-red-400);
   }
   .border-red-500\/20 {
     border-color: color-mix(in srgb, oklch(63.7% 0.237 25.331) 20%, transparent);
@@ -1069,6 +1081,12 @@
   }
   .bg-yellow-400 {
     background-color: var(--color-yellow-400);
+  }
+  .bg-yellow-400\/20 {
+    background-color: color-mix(in srgb, oklch(85.2% 0.199 91.936) 20%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-yellow-400) 20%, transparent);
+    }
   }
   .bg-yellow-500 {
     background-color: var(--color-yellow-500);
@@ -1623,10 +1641,6 @@
     --tw-duration: 300ms;
     transition-duration: 300ms;
   }
-  .duration-1000 {
-    --tw-duration: 1000ms;
-    transition-duration: 1000ms;
-  }
   .group-focus-within\:text-primary {
     &:is(:where(.group):focus-within *) {
       color: var(--color-primary);
@@ -1774,6 +1788,13 @@
     &:hover {
       @media (hover: hover) {
         background-color: var(--color-slate-300);
+      }
+    }
+  }
+  .hover\:bg-yellow-300 {
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--color-yellow-300);
       }
     }
   }
@@ -2609,6 +2630,18 @@ input.no-focus-glow:focus {
   to {
     width: 0%;
   }
+}
+.countdown-color-normal {
+  background: #258cf4;
+  transition: background-color 1.2s ease;
+}
+.countdown-color-warning {
+  background: #fb923c;
+  transition: background-color 1.2s ease;
+}
+.countdown-color-danger {
+  background: #f87171;
+  transition: background-color 1.2s ease;
 }
 .avatar-initials {
   display: flex;

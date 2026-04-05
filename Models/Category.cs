@@ -44,5 +44,7 @@ public class Category
         new("Jedzenie", "lunch_dining"),
         new("Filmy", "theaters"),
         new("Kolory", "palette"),
+        new("Marki", "storefront"),
+        new("Samochody", "directions_car"),
     ];
 }

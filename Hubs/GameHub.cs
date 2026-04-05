@@ -295,6 +295,9 @@ public class GameHub : Hub
             if (!result.RoomDeleted)
             {
                 await Clients.Group(roomCode).SendAsync("OnPlayerLeft", leavingNickname ?? sessionId);
+                var leaveMsg = $"{leavingNickname ?? "Gracz"} opuścił pokój.";
+                AddSystemMessageInternal(_roomService.GetRoom(roomCode), leaveMsg);
+                await Clients.Group(roomCode).SendAsync("OnChatMessage", "System", leaveMsg, true);
                 
                 if (result.NewHostSessionId != null && result.NewHostNickname != null)
                 {
@@ -313,6 +316,10 @@ public class GameHub : Hub
         // because KickPlayer removes the session mapping.
         var kickedConnId = _roomService.GetConnectionId(playerSessionId);
         
+        // Capture kicked player's nickname BEFORE removal
+        var kickedRoom = _roomService.GetRoom(roomCode);
+        var kickedNickname = kickedRoom?.Players.FirstOrDefault(p => p.SessionId == playerSessionId)?.Nickname;
+        
         var result = _roomService.KickPlayer(sessionId, playerSessionId);
         
         if (!result.Success)
@@ -328,6 +335,9 @@ public class GameHub : Hub
             await Groups.RemoveFromGroupAsync(kickedConnId, roomCode);
         }
         await Clients.Group(roomCode).SendAsync("OnPlayerKicked", playerSessionId);
+        var kickMsg = $"{kickedNickname ?? "Gracz"} został wyrzucony z pokoju.";
+        AddSystemMessageInternal(_roomService.GetRoom(roomCode), kickMsg);
+        await Clients.Group(roomCode).SendAsync("OnChatMessage", "System", kickMsg, true);
     }
 
     /// <summary>

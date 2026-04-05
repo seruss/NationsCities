@@ -182,6 +182,12 @@ input.no-focus-glow:focus {
     }
 }
 
+/* Countdown bar color classes — theme-accurate colors with smooth transition.
+   Width is set exclusively by JS rAF (countdownBar.start) via style.width. */
+.countdown-color-normal  { background: #258cf4; transition: background-color 1.2s ease; }
+.countdown-color-warning { background: #fb923c; transition: background-color 1.2s ease; }
+.countdown-color-danger  { background: #f87171; transition: background-color 1.2s ease; }
+
 .avatar-initials {
     display: flex;
     align-items: center;

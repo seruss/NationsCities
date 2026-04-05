@@ -100,6 +100,9 @@ public class ClientGameStateService : IAsyncDisposable
     /// <summary>Fired when the letter is rerolled mid-round (new letter).</summary>
     public event Action<char>? OnLetterRerolled;
 
+    /// <summary>Fired when the current player becomes the host (previous host left).</summary>
+    public event Action? OnBecameHost;
+
     public ClientGameStateService(
         NavigationManager navigation, 
         IJSRuntime jsRuntime,
@@ -263,6 +266,11 @@ public class ClientGameStateService : IAsyncDisposable
         _hubConnection.On<string, string>("OnNewHost", (nickname, sessionId) =>
         {
             CurrentRoom = _roomService.GetRoom(RoomCode ?? "");
+            // If we are the new host, fire the OnBecameHost event
+            if (!string.IsNullOrEmpty(SessionId) && sessionId == SessionId)
+            {
+                OnBecameHost?.Invoke();
+            }
             NotifyStateChanged();
         });
 
