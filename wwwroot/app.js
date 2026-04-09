@@ -1066,7 +1066,7 @@ window.beatVignette = function () {
         const a = (g * maxAlpha).toFixed(3);
         const sz = Math.round(g * maxSize);
         const sp = Math.round(g * maxSpread);
-        el.style.boxShadow = `inset 0 0 ${sz}px ${sp}px rgba(170,30,30,${a})`;
+        el.style.boxShadow = `inset 0 0 ${sz}px ${sp}px rgba(180,30,30,${a})`;
         requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);

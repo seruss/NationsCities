@@ -372,9 +372,10 @@
         _showJoinInput = false;
         _isCreating = false;
         _roomCode = "";
-        _nickname = "";
         _error = null;
         _pendingRoomCode = null;
+        // Przywróć nick z localStorage, żeby był pre-fillowany przy kolejnym otwarciu formularza
+        _nickname = await GameState.GetLastNicknameAsync();
         await JS.InvokeVoidAsync("history.pushState", null, "", "/");
         _ = GameState.StopPublicRoomsBrowsingAsync();
     }

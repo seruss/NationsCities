@@ -11,13 +11,15 @@ namespace NationsCities.Services;
 public class GameService
 {
     private readonly RoomService _roomService;
+    private readonly ILogger<GameService> _logger;
     
     // Per-room locks to prevent race conditions in TriggerStop
     private readonly ConcurrentDictionary<string, object> _roomLocks = new();
 
-    public GameService(RoomService roomService)
+    public GameService(RoomService roomService, ILogger<GameService> logger)
     {
         _roomService = roomService;
+        _logger = logger;
     }
 
     /// <summary>
@@ -38,11 +40,13 @@ public class GameService
 
         if (room.Players.Count < 2)
         {
+            _logger.LogWarning("StartGame: room={RoomCode} — not enough players ({Count})", room.Code, room.Players.Count);
             return (false, "Potrzeba minimum 2 graczy.");
         }
 
         if (!room.Players.All(p => p.IsReady))
         {
+            _logger.LogWarning("StartGame: room={RoomCode} — not all players ready", room.Code);
             return (false, "Nie wszyscy gracze są gotowi.");
         }
 
@@ -52,6 +56,11 @@ public class GameService
             Categories = room.Settings.SelectedCategories.ToList(),
             Phase = RoundPhase.Waiting
         };
+
+        _logger.LogInformation("StartGame: room={RoomCode}, players={Players}, categories={Categories}",
+            room.Code,
+            string.Join(", ", room.Players.Select(p => p.Nickname)),
+            string.Join(", ", room.Settings.SelectedCategories));
 
         return (true, null);
     }
@@ -105,6 +114,9 @@ public class GameService
             player.RoundScore = 0;
         }
 
+        _logger.LogInformation("StartRound: room={RoomCode}, round={Round}, letter={Letter}",
+            roomCode, game.CurrentRound, letter);
+
         return (true, letter, null);
     }
 
@@ -139,6 +151,11 @@ public class GameService
             game.StopTriggeredBy = sessionId;
             game.Phase = RoundPhase.Countdown;
             game.CountdownEndTime = DateTime.UtcNow.AddSeconds(countdownSeconds);
+
+            var stopperNick = _roomService.GetRoom(roomCode)?.Players
+                .FirstOrDefault(p => p.SessionId == sessionId)?.Nickname ?? sessionId;
+            _logger.LogInformation("TriggerStop: room={RoomCode}, by={Nickname}, endTime={EndTime}",
+                roomCode, stopperNick, game.CountdownEndTime.Value);
 
             return (true, game.CountdownEndTime.Value, null);
         }
@@ -369,6 +386,12 @@ public class GameService
         }
 
         game.Phase = RoundPhase.Results;
+
+        var scores = room.Players
+            .OrderByDescending(p => p.TotalScore)
+            .Select(p => $"{p.Nickname}:{p.RoundScore}(+{p.RoundScore})");
+        _logger.LogInformation("FinalizeVoting: room={RoomCode}, round={Round}, scores=[{Scores}]",
+            roomCode, game.CurrentRound, string.Join(", ", scores));
     }
 
     /// <summary>
@@ -382,6 +405,8 @@ public class GameService
         var game = room.CurrentGame;
         game.CurrentRound++;
         game.Phase = RoundPhase.Waiting;
+
+        _logger.LogInformation("NextRoundOrEndGame: room={RoomCode}, newRound={Round}", roomCode, game.CurrentRound);
         return true;
     }
 
