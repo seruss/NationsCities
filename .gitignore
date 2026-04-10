@@ -99,3 +99,6 @@ $RECYCLE.BIN/
 tailwindcss.exe
 
 tailwindcss
+
+# Razor Copilot Preview cache
+.copilot-razor-previews/
