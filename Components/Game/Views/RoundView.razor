@@ -101,7 +101,7 @@ else
                         <!-- Normal: STOP button -->
                         <button @onclick="TriggerStop"
                                 disabled="@(!CanStop)"
-                                class="w-full h-14 flex items-center justify-center gap-2 @(CanStop ? "bg-red-500 hover:bg-red-600 shadow-red-500/30" : "bg-slate-200 dark:bg-slate-700 cursor-not-allowed") text-white font-bold text-lg py-4 rounded-xl shadow-lg transition-all btn-press">
+                                class="w-fit mx-auto px-10 h-14 flex items-center justify-center gap-2 @(CanStop ? "bg-red-500 hover:bg-red-600 shadow-red-500/30" : "bg-slate-200 dark:bg-slate-700 cursor-not-allowed") text-white font-bold text-lg py-4 rounded-xl shadow-lg transition-all btn-press">
                             <span class="material-symbols-outlined">stop_circle</span>
                             <span>STOP!</span>
                         </button>

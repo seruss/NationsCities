@@ -1,13 +1,15 @@
 @* 
-    VotingView.razor - SPA Voting View (Swipe Card Interface)
+    VotingView.razor - SPA Voting View
+    Converted from Validation.razor to work with ClientGameStateService
 *@
 @using NationsCities.Models
 @using NationsCities.Services
 @inject ClientGameStateService GameState
-@inject IJSRuntime JS
 @implements IDisposable
 
 <PageTitle>Głosowanie - Państwa, Miasta</PageTitle>
+
+
 
 @if (GameState.CurrentRoom == null || GameState.CurrentGame == null || _answersForVoting == null)
 {
@@ -36,175 +38,128 @@ else
     var categoryName = currentCategory?.Name ?? "";
     var answersForCurrentCategory = _filteredAnswers.Where(a => a.Category == categoryName).ToList();
     var myAnswer = GetMyAnswerForCategory(categoryName);
-    var currentAnswer = answersForCurrentCategory.ElementAtOrDefault(_currentAnswerIndex);
-    var nextAnswer = answersForCurrentCategory.ElementAtOrDefault(_currentAnswerIndex + 1);
-    var remaining = Math.Max(0, answersForCurrentCategory.Count - _currentAnswerIndex - 1);
-    var isAutoDetected = currentAnswer?.IsAutoDetectedDuplicate ?? false;
-
-    <div class="flex flex-col h-screen bg-bg-light dark:bg-bg-dark overflow-hidden">
-
-        <!-- Header -->
-        <header class="shrink-0 z-20 bg-surface-light dark:bg-surface-dark border-b border-slate-200 dark:border-slate-800 shadow-sm">
-            <div class="flex items-center px-4 h-14 justify-center max-w-lg mx-auto w-full">
+    
+    <div class="flex flex-col min-h-screen bg-bg-light dark:bg-bg-dark">
+        <!-- Header with category name and progress -->
+        <header class="sticky top-0 z-20 bg-surface-light dark:bg-surface-dark border-b border-slate-200 dark:border-slate-800 shadow-sm">
+            <div class="flex items-center px-4 h-16 justify-center max-w-lg mx-auto w-full">
                 <div class="text-center">
-                    <h1 class="text-base font-bold text-slate-900 dark:text-white">@categoryName</h1>
+                    <h1 class="text-lg font-bold text-slate-900 dark:text-white">@categoryName</h1>
                     <span class="text-xs text-primary font-semibold">@(_currentCategoryIndex + 1) / @_categoriesWithAnswers.Count</span>
                 </div>
             </div>
+            
+            <!-- Progress bar -->
             <div class="h-1 w-full bg-slate-200 dark:bg-slate-700">
-                <div class="h-full bg-primary transition-all duration-300"
-                     style="width: @((_currentCategoryIndex + 1) * 100 / _categoriesWithAnswers.Count)%"></div>
+                <div class="h-full bg-primary transition-all duration-300" style="width: @((_currentCategoryIndex + 1) * 100 / _categoriesWithAnswers.Count)%"></div>
             </div>
         </header>
 
-        <!-- "Twoja odpowiedź" bar -->
-        <div class="shrink-0 max-w-lg mx-auto w-full px-4 pt-3">
+        <!-- Main content -->
+        <main class="flex-1 flex flex-col overflow-y-auto w-full max-w-lg mx-auto px-4 pt-4 pb-4" data-scrollable="true">
+            <!-- "Twoja odpowiedź" header -->
             @if (!string.IsNullOrWhiteSpace(myAnswer))
             {
-                <div class="w-full bg-primary/10 dark:bg-surface-dark border border-primary/20 dark:border-slate-700 rounded-xl px-4 py-2 flex items-center justify-between">
+                <div class="w-full bg-primary/10 dark:bg-surface-dark border border-primary/20 dark:border-slate-700 rounded-xl p-4 mb-4 flex items-center justify-between">
                     <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Twoja odpowiedź:</span>
-                    <span class="text-base font-bold text-primary dark:text-white">@myAnswer</span>
+                    <span class="text-lg font-bold text-primary dark:text-white">@myAnswer</span>
                 </div>
             }
             else
             {
-                <div class="w-full bg-slate-100 dark:bg-surface-dark border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2 flex items-center justify-between">
+                <div class="w-full bg-slate-100 dark:bg-surface-dark border border-slate-200 dark:border-slate-700 rounded-xl p-4 mb-4 flex items-center justify-between">
                     <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Twoja odpowiedź:</span>
-                    <span class="text-base font-medium text-slate-400 dark:text-slate-500 italic">Brak</span>
+                    <span class="text-lg font-medium text-slate-400 dark:text-slate-500 italic">Brak</span>
                 </div>
             }
-        </div>
-
-        <!-- Swipe card area -->
-        <div class="flex-1 relative overflow-hidden select-none max-w-lg mx-auto w-full">
-
-            @if (_hasSubmittedVotes)
-            {
-                <div class="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
-                    <span class="material-symbols-outlined text-5xl text-green-500 mb-3">check_circle</span>
-                    <p class="text-lg font-bold text-slate-900 dark:text-white mb-1">Głosy przesłane!</p>
-                    <p class="text-sm text-slate-400">Czekam na innych graczy... (@_votesSubmittedCount/@_totalPlayers)</p>
-                    @if (GameState.IsHost)
-                    {
-                        <button @onclick="ForceEndVoting"
-                                class="mt-5 text-sm font-medium text-slate-400 hover:text-red-400 py-2 transition-colors">
-                            Wymuś zakończenie głosowania
-                        </button>
-                    }
-                </div>
-            }
-            else if (currentAnswer == null)
-            {
-                <div class="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
-                    <span class="material-symbols-outlined text-5xl text-green-500 mb-3">check_circle</span>
-                    <p class="text-lg font-bold text-slate-900 dark:text-white">Wszystkie ocenione!</p>
-                    <p class="text-sm text-slate-400 mt-1">Przechodzę dalej...</p>
-                </div>
-            }
-            else
-            {
-                <!-- Background card (peek at next answer) -->
-                @if (nextAnswer != null)
+            
+            <!-- Answer list -->
+            <div class="flex-1 space-y-3">
+                @foreach (var answer in answersForCurrentCategory)
                 {
-                    <div class="absolute bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-700 rounded-3xl"
-                         style="top:14%; left:10%; right:10%; bottom:14%; transform:scale(0.94) translateY(10px); opacity:0.5; z-index:1;"
-                         aria-hidden="true"></div>
-                }
-
-                <!-- Main swipeable card -->
-                <div id="swipe-card"
-                     class="absolute bg-surface-light dark:bg-surface-dark border-2 border-slate-200 dark:border-slate-700 rounded-3xl flex flex-col p-5 overflow-hidden touch-none"
-                     style="top:8%; left:6%; right:6%; bottom:8%; z-index:2; cursor:grab; box-shadow:0 18px 40px -16px rgba(15,23,42,0.25);">
-
-                    <!-- Card header row -->
-                    <div class="flex items-center justify-between mb-3">
-                        <span class="inline-flex items-center gap-1 text-xs font-semibold text-primary bg-primary/10 rounded-full px-3 py-1">
-                            <span class="material-symbols-outlined text-sm">flag</span>
-                            @categoryName
-                        </span>
-                        <span class="text-xs text-slate-400 dark:text-slate-500 tabular-nums">
-                            @(_currentAnswerIndex + 1) / @answersForCurrentCategory.Count
-                        </span>
-                    </div>
-
-                    <!-- Answer content -->
-                    <div class="flex-1 flex flex-col items-center justify-center gap-3">
-                        <div class="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-center">
-                            @if (GameState.CurrentGame?.CurrentLetter != default(char))
+                    var isAutoDetected = answer.IsAutoDetectedDuplicate;
+                    
+                    <div class="@($"bg-surface-light dark:bg-surface-dark rounded-xl p-4 shadow-sm border {(isAutoDetected ? "border-amber-300 dark:border-amber-600" : "border-slate-200 dark:border-slate-700")} flex flex-col gap-2")">
+                        <!-- Answer text and variants -->
+                        <div class="flex items-center justify-between">
+                            @if (isAutoDetected && answer.DuplicateGroupAnswers.Count > 1)
                             {
-                                <span>Litera „@GameState.CurrentGame!.CurrentLetter"</span>
-                            }
-                            @if (currentAnswer.SubmitterNicknames.Any())
-                            {
-                                <span> · od @currentAnswer.SubmitterNicknames.First()</span>
-                            }
-                        </div>
-
-                        <div class="text-4xl font-extrabold text-slate-900 dark:text-white text-center leading-tight px-2">
-                            @if (isAutoDetected && currentAnswer.DuplicateGroupAnswers.Count > 1)
-                            {
-                                @string.Join(" / ", currentAnswer.DuplicateGroupAnswers.Take(2))
+                                <!-- Show all variants for auto-detected duplicates -->
+                                <div class="flex flex-col">
+                                    <span class="text-lg font-bold text-slate-800 dark:text-white">@string.Join(" / ", answer.DuplicateGroupAnswers.Take(3))</span>
+                                    @if (answer.DuplicateGroupAnswers.Count > 3)
+                                    {
+                                        <span class="text-xs text-slate-400">+@(answer.DuplicateGroupAnswers.Count - 3) więcej...</span>
+                                    }
+                                    <span class="text-xs text-amber-500 flex items-center gap-1 mt-1">
+                                        <span class="material-symbols-outlined text-sm">auto_awesome</span>
+                                        Automatycznie zgrupowano (@answer.SubmittedBy.Count graczy)
+                                    </span>
+                                </div>
                             }
                             else
                             {
-                                @currentAnswer.Answer
+                                <span class="text-lg font-bold text-slate-800 dark:text-white">@answer.Answer</span>
                             }
+                            
+                            <!-- Voting buttons -->
+                            <div class="flex items-center gap-2 flex-shrink-0">
+                                <button @onclick="@(() => Vote(answer.Id, "valid"))"
+                                        disabled="@_hasSubmittedVotes"
+                                        class="@($"w-10 h-10 rounded-lg flex items-center justify-center transition-all {(HasVotedValid(answer) ? "bg-green-500 text-white shadow-md" : "border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:bg-green-50 dark:hover:bg-slate-700 hover:text-green-600 dark:hover:text-green-400")} disabled:opacity-50")">
+                                    <span class="material-symbols-outlined text-xl">check</span>
+                                </button>
+                                <button @onclick="@(() => Vote(answer.Id, "invalid"))"
+                                        disabled="@_hasSubmittedVotes"
+                                        class="@($"w-10 h-10 rounded-lg flex items-center justify-center transition-all {(HasVotedInvalid(answer) ? "bg-red-500 text-white shadow-md" : "border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:bg-red-50 dark:hover:bg-slate-700 hover:text-red-600 dark:hover:text-red-400")} disabled:opacity-50")">
+                                    <span class="material-symbols-outlined text-xl">close</span>
+                                </button>
+                                @if (!isAutoDetected)
+                                {
+                                    <button @onclick="@(() => Vote(answer.Id, "duplicate"))"
+                                            disabled="@_hasSubmittedVotes"
+                                            class="@($"w-10 h-10 rounded-lg flex items-center justify-center transition-all {(HasVotedDuplicate(answer) ? "bg-amber-500 text-white shadow-md" : "border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:bg-amber-50 dark:hover:bg-slate-700 hover:text-amber-600 dark:hover:text-amber-400")} disabled:opacity-50")">
+                                        <span class="material-symbols-outlined text-xl">content_copy</span>
+                                    </button>
+                                }
+                            </div>
                         </div>
-
-                        @if (isAutoDetected)
-                        {
-                            <span class="text-xs font-semibold text-amber-500 flex items-center gap-1">
-                                <span class="material-symbols-outlined text-sm">auto_awesome</span>
-                                Auto-grupa · @currentAnswer.SubmitterNicknames.Count graczy
-                            </span>
-                        }
                     </div>
-
-                    <!-- Swipe direction hints -->
-                    <div class="flex items-center justify-between text-xs text-slate-400 dark:text-slate-500 mt-3">
-                        <span class="flex items-center gap-1">
-                            <span class="material-symbols-outlined text-sm">swipe_left</span>Błędne
-                        </span>
-                        <span class="flex items-center gap-1">
-                            Poprawne<span class="material-symbols-outlined text-sm">swipe_right</span>
-                        </span>
+                }
+                
+                @if (!answersForCurrentCategory.Any())
+                {
+                    <div class="text-center py-8">
+                        <span class="material-symbols-outlined text-4xl text-slate-400 dark:text-slate-600">inbox</span>
+                        <p class="text-slate-500 dark:text-slate-400 mt-2">Brak odpowiedzi do głosowania w tej kategorii</p>
                     </div>
-
-                    <!-- Tint labels (opacity driven by JS) -->
-                    <div id="swipe-label-good"
-                         class="absolute top-6 left-5 border-4 border-green-500 text-green-500 rounded-xl px-3 py-1.5 font-black text-xl -rotate-12 pointer-events-none select-none"
-                         style="opacity:0;">POPRAWNE</div>
-                    <div id="swipe-label-bad"
-                         class="absolute top-6 right-5 border-4 border-red-500 text-red-500 rounded-xl px-3 py-1.5 font-black text-xl rotate-12 pointer-events-none select-none"
-                         style="opacity:0;">BŁĘDNE</div>
-
-                </div>
-            }
-        </div>
-
-        <!-- Bottom action bar -->
-        @if (!_hasSubmittedVotes && currentAnswer != null)
-        {
-            <div class="shrink-0 py-3 px-7 flex items-center justify-between max-w-lg mx-auto w-full safe-area-bottom">
-                <button @onclick="@(() => SwipeButton("invalid"))"
-                        class="w-16 h-16 rounded-full bg-red-500 text-white flex items-center justify-center active:scale-90 transition-transform"
-                        style="box-shadow:0 8px 20px -8px rgba(239,68,68,0.7);">
-                    <span class="material-symbols-outlined text-3xl">close</span>
-                </button>
-
-                <div class="flex flex-col items-center gap-0.5">
-                    <span class="text-xs font-semibold text-slate-400 dark:text-slate-500">Pozostało</span>
-                    <span class="text-2xl font-extrabold text-slate-900 dark:text-white tabular-nums">@remaining</span>
-                </div>
-
-                <button @onclick="@(() => SwipeButton("valid"))"
-                        class="w-16 h-16 rounded-full bg-green-500 text-white flex items-center justify-center active:scale-90 transition-transform"
-                        style="box-shadow:0 8px 20px -8px rgba(34,197,94,0.7);">
-                    <span class="material-symbols-outlined text-3xl">check</span>
-                </button>
+                }
             </div>
-        }
+        </main>
 
+        <!-- Footer -->
+        <footer class="sticky bottom-0 p-4 bg-surface-light dark:bg-surface-dark border-t border-slate-200 dark:border-slate-800 z-20 w-full safe-area-bottom">
+            <div class="max-w-lg mx-auto w-full flex flex-col gap-2">
+                @if (_hasSubmittedVotes)
+                {
+                    <div class="text-center py-4">
+                        <p class="text-lg font-bold text-green-400 flex items-center justify-center gap-2">
+                            <span class="material-symbols-outlined">check_circle</span>
+                            Głosy przesłane!
+                        </p>
+                        <p class="text-sm text-slate-400 mt-1">Czekam na innych graczy... (@_votesSubmittedCount/@_totalPlayers)</p>
+                    </div>
+                    
+                    @if (GameState.IsHost)
+                    {
+                        <button @onclick="ForceEndVoting"
+                                class="w-full text-center text-sm font-medium text-slate-400 hover:text-red-400 py-2 transition-colors">
+                            Wymuś zakończenie głosowania
+                        </button>
+                    }
+                }
+            </div>
+        </footer>
     </div>
 }
 
@@ -216,12 +171,8 @@ else
     private int _votesSubmittedCount = 0;
     private int _totalPlayers = 0;
     private int _currentCategoryIndex = 0;
-    private int _currentAnswerIndex = 0;
     private Dictionary<string, string?> _myVotes = new();
     private bool _hasInitialized = false;
-    private bool _isDeciding = false;
-    private DotNetObjectReference<VotingView>? _dotNetRef;
-    private string _lastSwipeInitKey = "";
 
     protected override void OnInitialized()
     {
@@ -255,87 +206,18 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        if (firstRender && !_hasSubmittedVotes)
         {
-            _dotNetRef = DotNetObjectReference.Create(this);
-            if (!_hasSubmittedVotes && !_categoriesWithAnswers.Any())
+            if (!_categoriesWithAnswers.Any())
             {
                 // No answers to vote on — auto-submit immediately so voting doesn't stall
                 await SubmitVotes();
-                return;
             }
-        }
-
-        // Re-init swipe listener whenever a new card is rendered
-        if (!_hasSubmittedVotes && _dotNetRef != null)
-        {
-            var currentAnswer = GetCurrentAnswer();
-            if (currentAnswer != null)
+            else
             {
-                var key = $"{_currentCategoryIndex}_{_currentAnswerIndex}";
-                if (key != _lastSwipeInitKey)
-                {
-                    _lastSwipeInitKey = key;
-                    await JS.InvokeVoidAsync("swipeCard.init", _dotNetRef);
-                }
+                await CheckAndAutoAdvance();
             }
         }
-    }
-
-    [JSInvokable]
-    public Task OnSwipeDecided(string voteType) =>
-        InvokeAsync(() => SwipeDecide(voteType));
-
-    private async Task SwipeButton(string voteType)
-    {
-        if (_hasSubmittedVotes || _isDeciding) return;
-        // Trigger JS fly-out animation; JS will call OnSwipeDecided when done
-        await JS.InvokeVoidAsync("swipeCard.flyOut", voteType);
-    }
-
-    private async Task SwipeDecide(string voteType)
-    {
-        if (_hasSubmittedVotes || _isDeciding) return;
-        _isDeciding = true;
-        try
-        {
-            var currentCategory = _categoriesWithAnswers.ElementAtOrDefault(_currentCategoryIndex);
-            var categoryName = currentCategory?.Name ?? "";
-            var answersForCategory = _filteredAnswers.Where(a => a.Category == categoryName).ToList();
-            var currentAnswer = answersForCategory.ElementAtOrDefault(_currentAnswerIndex);
-            if (currentAnswer == null) return;
-
-            _myVotes[currentAnswer.Id] = voteType;
-            await GameState.VoteAnswerAsync(currentAnswer.Id, voteType);
-
-            _currentAnswerIndex++;
-            if (_currentAnswerIndex >= answersForCategory.Count)
-            {
-                _currentAnswerIndex = 0;
-                if (_currentCategoryIndex < _categoriesWithAnswers.Count - 1)
-                {
-                    _currentCategoryIndex++;
-                }
-                else
-                {
-                    await SubmitVotes();
-                    return;
-                }
-            }
-        }
-        finally
-        {
-            _isDeciding = false;
-        }
-        StateHasChanged();
-    }
-
-    private AnswerForVoting? GetCurrentAnswer()
-    {
-        var currentCategory = _categoriesWithAnswers.ElementAtOrDefault(_currentCategoryIndex);
-        var categoryName = currentCategory?.Name ?? "";
-        return _filteredAnswers.Where(a => a.Category == categoryName)
-                               .ElementAtOrDefault(_currentAnswerIndex);
     }
 
     private void HandleStateChanged()
@@ -358,6 +240,47 @@ else
         InvokeAsync(StateHasChanged);
     }
 
+    private async Task Vote(string answerId, string voteType)
+    {
+        if (_hasSubmittedVotes) return;
+        
+        _myVotes[answerId] = voteType;
+        await GameState.VoteAnswerAsync(answerId, voteType);
+        
+        // Check if all answers in current category are voted - auto-advance
+        await CheckAndAutoAdvance();
+        StateHasChanged();
+    }
+
+    private async Task CheckAndAutoAdvance()
+    {
+        var currentCategory = _categoriesWithAnswers.ElementAtOrDefault(_currentCategoryIndex);
+        var categoryName = currentCategory?.Name ?? "";
+        var answersForCurrentCategory = _filteredAnswers.Where(a => a.Category == categoryName).ToList();
+        
+        var allVoted = !answersForCurrentCategory.Any() || 
+                       answersForCurrentCategory.All(a => _myVotes.ContainsKey(a.Id));
+        
+        if (allVoted)
+        {
+            if (answersForCurrentCategory.Any())
+            {
+                await Task.Delay(300);
+            }
+            
+            if (_currentCategoryIndex < _categoriesWithAnswers.Count - 1)
+            {
+                _currentCategoryIndex++;
+                StateHasChanged();
+                await CheckAndAutoAdvance();
+            }
+            else
+            {
+                await SubmitVotes();
+            }
+        }
+    }
+
     private async Task SubmitVotes()
     {
         if (_hasSubmittedVotes) return;
@@ -375,6 +298,27 @@ else
         }
     }
 
+    private bool HasVotedValid(AnswerForVoting answer)
+    {
+        if (_myVotes.TryGetValue(answer.Id, out var vote))
+            return vote == "valid";
+        return false;
+    }
+
+    private bool HasVotedInvalid(AnswerForVoting answer)
+    {
+        if (_myVotes.TryGetValue(answer.Id, out var vote))
+            return vote == "invalid";
+        return false;
+    }
+
+    private bool HasVotedDuplicate(AnswerForVoting answer)
+    {
+        if (_myVotes.TryGetValue(answer.Id, out var vote))
+            return vote == "duplicate";
+        return false;
+    }
+
     private string GetMyAnswerForCategory(string categoryName)
     {
         var myAnswer = _answersForVoting?
@@ -388,7 +332,5 @@ else
         GameState.OnStateChanged -= HandleStateChanged;
         GameState.OnVotingEnded -= HandleVotingEnded;
         GameState.OnVotesSubmittedChanged -= HandleVotesSubmittedChanged;
-        _ = JS.InvokeVoidAsync("swipeCard.dispose");
-        _dotNetRef?.Dispose();
     }
 }
