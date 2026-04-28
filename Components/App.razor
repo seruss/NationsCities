@@ -111,6 +111,49 @@
 </head>
 
 <body class="bg-bg-light dark:bg-bg-dark font-sans text-slate-900 dark:text-white antialiased min-h-screen touch-manipulation">
+    <!-- In-app browser detection (Messenger, Facebook, Instagram, etc.) -->
+    <script>
+        (function() {
+            var ua = navigator.userAgent || navigator.vendor || '';
+            // Detect Facebook/Messenger/Instagram in-app browsers
+            var isInApp = /FBAN|FBAV|FB_IAB|Messenger|Instagram|Line\/|Twitter|KAKAOTALK/i.test(ua);
+            if (!isInApp) return;
+
+            var url = window.location.href;
+
+            // Android: try intent:// to open in default browser
+            if (/android/i.test(ua)) {
+                var intentUrl = 'intent://' + url.replace(/^https?:\/\//, '') 
+                    + '#Intent;scheme=https;action=android.intent.action.VIEW;end';
+                window.location.replace(intentUrl);
+                // Don't return - show fallback overlay in case intent fails
+            }
+
+            // Show blocking overlay
+            document.addEventListener('DOMContentLoaded', function() {
+                var overlay = document.getElementById('inapp-browser-block');
+                if (overlay) overlay.style.display = 'flex';
+            });
+            // Also try immediately in case DOM is already ready
+            var overlay = document.getElementById('inapp-browser-block');
+            if (overlay) overlay.style.display = 'flex';
+        })();
+    </script>
+    <div id="inapp-browser-block" style="display:none; position:fixed; inset:0; z-index:99999; background:#101922; color:#fff; flex-direction:column; align-items:center; justify-content:center; padding:2rem; text-align:center; font-family:'Inter',system-ui,sans-serif;">
+        <div style="font-size:3rem; margin-bottom:1rem;">🌐</div>
+        <h1 style="font-size:1.5rem; font-weight:700; margin-bottom:0.75rem;">Otwórz w przeglądarce</h1>
+        <p style="font-size:1rem; color:#94a3b8; margin-bottom:1.5rem; max-width:20rem; line-height:1.5;">
+            Ta aplikacja nie działa poprawnie w przeglądarce wbudowanej w Messengera lub inną aplikację.
+        </p>
+        <p style="font-size:0.9rem; color:#cbd5e1; margin-bottom:1rem; max-width:20rem; line-height:1.5;">
+            <strong>Kliknij ikonę ⋮ lub ⋯</strong> w prawym górnym/dolnym rogu ekranu i wybierz <strong>&bdquo;Otwórz w przeglądarce&rdquo;</strong>.
+        </p>
+        <button onclick="navigator.clipboard.writeText(window.location.href).then(function(){var b=event.target;b.textContent='Skopiowano ✓';setTimeout(function(){b.textContent='Skopiuj link'},2000)})" 
+                style="margin-top:0.5rem; padding:0.75rem 1.5rem; background:#3b82f6; color:#fff; border:none; border-radius:0.5rem; font-size:0.95rem; font-weight:600; cursor:pointer;">
+            Skopiuj link
+        </button>
+    </div>
+
     <Routes />
     
     <!-- Custom Blazor Reconnect Modal -->
