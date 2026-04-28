@@ -1079,3 +1079,128 @@ window.clearVignette = function () {
     const el = document.getElementById('countdown-vignette');
     if (el) el.style.boxShadow = 'none';
 };
+
+// ======================================
+// Swipe Card Voting
+// ======================================
+// Handles pointer-driven swipe gestures on the voting card.
+// Blazor calls swipeCard.init(dotNetRef) after each new card is rendered.
+// When the swipe threshold is crossed (or flyOut is called from a button),
+// it animates the card off-screen and invokes OnSwipeDecided on the .NET side.
+window.swipeCard = (function () {
+    let _el = null;
+    let _dotNet = null;
+    let _startX = 0;
+    let _dragX = 0;
+    let _active = false;
+    let _exiting = false;
+
+    const DRAG_THRESHOLD = 90;   // px to trigger a decision
+    const TINT_START = 30;       // px where tint labels start fading in
+    const FLY_DISTANCE = 900;    // px to fly off screen
+    const EXIT_MS = 220;         // animation duration in ms
+
+    function updateVisuals(x) {
+        if (!_el) return;
+        _el.style.transform = `translateX(${x}px) rotate(${x * 0.04}deg)`;
+        const labelGood = document.getElementById('swipe-label-good');
+        const labelBad = document.getElementById('swipe-label-bad');
+        if (x > TINT_START) {
+            _el.style.setProperty('--tw-border-opacity', '1');
+            _el.style.borderColor = 'oklch(72.3% 0.219 149.579)'; // green-500
+            if (labelGood) labelGood.style.opacity = Math.min(1, (x - TINT_START) / 60);
+            if (labelBad) labelBad.style.opacity = 0;
+        } else if (x < -TINT_START) {
+            _el.style.borderColor = 'oklch(63.7% 0.237 25.331)'; // red-500
+            if (labelBad) labelBad.style.opacity = Math.min(1, (-x - TINT_START) / 60);
+            if (labelGood) labelGood.style.opacity = 0;
+        } else {
+            _el.style.borderColor = '';
+            if (labelGood) labelGood.style.opacity = 0;
+            if (labelBad) labelBad.style.opacity = 0;
+        }
+    }
+
+    function flyOut(voteType) {
+        if (!_el || _exiting) return;
+        _exiting = true;
+        const offset = voteType === 'valid' ? FLY_DISTANCE : -FLY_DISTANCE;
+        _el.style.transition = `transform ${EXIT_MS}ms ease`;
+        _el.style.transform = `translateX(${offset}px) rotate(${offset * 0.04}deg)`;
+        // Fully reveal the tint label before flying off
+        const labelGood = document.getElementById('swipe-label-good');
+        const labelBad = document.getElementById('swipe-label-bad');
+        if (voteType === 'valid' && labelGood) labelGood.style.opacity = 1;
+        if (voteType === 'invalid' && labelBad) labelBad.style.opacity = 1;
+        setTimeout(() => {
+            if (_dotNet) {
+                _dotNet.invokeMethodAsync('OnSwipeDecided', voteType).catch(() => {});
+            }
+        }, EXIT_MS);
+    }
+
+    function onDown(e) {
+        if (_exiting) return;
+        _startX = e.clientX;
+        _dragX = 0;
+        _active = true;
+        _el.setPointerCapture(e.pointerId);
+        _el.style.transition = 'none';
+    }
+
+    function onMove(e) {
+        if (!_active || _exiting) return;
+        _dragX = e.clientX - _startX;
+        updateVisuals(_dragX);
+    }
+
+    function onUp() {
+        if (!_active) return;
+        _active = false;
+        if (_dragX > DRAG_THRESHOLD) {
+            flyOut('valid');
+        } else if (_dragX < -DRAG_THRESHOLD) {
+            flyOut('invalid');
+        } else {
+            // Snap back
+            _el.style.transition = `transform ${EXIT_MS}ms ease`;
+            updateVisuals(0);
+        }
+    }
+
+    function cleanup() {
+        if (_el) {
+            _el.removeEventListener('pointerdown', onDown);
+            _el.removeEventListener('pointermove', onMove);
+            _el.removeEventListener('pointerup', onUp);
+            _el.removeEventListener('pointercancel', onUp);
+            _el = null;
+        }
+    }
+
+    return {
+        init: function (dotNetRef) {
+            cleanup();
+            _dotNet = dotNetRef;
+            _exiting = false;
+            _active = false;
+            _dragX = 0;
+            _el = document.getElementById('swipe-card');
+            if (!_el) return;
+            _el.style.transform = '';
+            _el.style.borderColor = '';
+            _el.style.transition = 'none';
+            _el.addEventListener('pointerdown', onDown);
+            _el.addEventListener('pointermove', onMove);
+            _el.addEventListener('pointerup', onUp);
+            _el.addEventListener('pointercancel', onUp);
+        },
+        flyOut: function (voteType) {
+            flyOut(voteType);
+        },
+        dispose: function () {
+            cleanup();
+            _dotNet = null;
+        }
+    };
+})();
