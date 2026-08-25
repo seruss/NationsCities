@@ -38,15 +38,29 @@ else
     var categoryName = currentCategory?.Name ?? "";
     var answersForCurrentCategory = _filteredAnswers.Where(a => a.Category == categoryName).ToList();
     var myAnswer = GetMyAnswerForCategory(categoryName);
+    var isLastCategory = _currentCategoryIndex == _categoriesWithAnswers.Count - 1;
+    var allVotedInCategory = answersForCurrentCategory.All(a => _myVotes.ContainsKey(a.Id));
     
     <div class="flex flex-col min-h-screen bg-bg-light dark:bg-bg-dark">
         <!-- Header with category name and progress -->
         <header class="sticky top-0 z-20 bg-surface-light dark:bg-surface-dark border-b border-slate-200 dark:border-slate-800 shadow-sm">
-            <div class="flex items-center px-4 h-16 justify-center max-w-lg mx-auto w-full">
+            <div class="flex items-center px-4 h-16 justify-between max-w-lg mx-auto w-full">
+                <!-- Back arrow -->
+                <button @onclick="GoToPrevCategory"
+                        disabled="@(_currentCategoryIndex == 0)"
+                        class="@(_currentCategoryIndex == 0 ? "opacity-0 pointer-events-none" : "") w-9 h-9 flex items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                    <span class="material-symbols-outlined text-xl">arrow_back</span>
+                </button>
                 <div class="text-center">
                     <h1 class="text-lg font-bold text-slate-900 dark:text-white">@categoryName</h1>
                     <span class="text-xs text-primary font-semibold">@(_currentCategoryIndex + 1) / @_categoriesWithAnswers.Count</span>
                 </div>
+                <!-- Forward arrow (ghost when on last) -->
+                <button @onclick="GoToNextCategory"
+                        disabled="@(isLastCategory)"
+                        class="@(isLastCategory ? "opacity-0 pointer-events-none" : "") w-9 h-9 flex items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                    <span class="material-symbols-outlined text-xl">arrow_forward</span>
+                </button>
             </div>
             
             <!-- Progress bar -->
@@ -72,16 +86,36 @@ else
                     <span class="text-lg font-medium text-slate-400 dark:text-slate-500 italic">Brak</span>
                 </div>
             }
+
+            <!-- Legend -->
+            <div class="flex items-center gap-3 mb-3 px-1">
+                <span class="text-xs text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wider">Oceń odpowiedzi innych:</span>
+            </div>
+            <div class="flex gap-2 mb-4 flex-wrap">
+                <span class="flex items-center gap-1 text-[11px] font-semibold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-full px-2.5 py-1">
+                    <span class="material-symbols-outlined text-sm" style="font-size:14px">check</span>Poprawna
+                </span>
+                <span class="flex items-center gap-1 text-[11px] font-semibold text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-full px-2.5 py-1">
+                    <span class="material-symbols-outlined text-sm" style="font-size:14px">close</span>Błędna
+                </span>
+                <span class="flex items-center gap-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-full px-2.5 py-1">
+                    <span class="material-symbols-outlined text-sm" style="font-size:14px">content_copy</span>Duplikat
+                </span>
+            </div>
             
             <!-- Answer list -->
             <div class="flex-1 space-y-3">
                 @foreach (var answer in answersForCurrentCategory)
                 {
                     var isAutoDetected = answer.IsAutoDetectedDuplicate;
+                    var votedValid = HasVotedValid(answer);
+                    var votedInvalid = HasVotedInvalid(answer);
+                    var votedDuplicate = HasVotedDuplicate(answer);
+                    var hasVoted = _myVotes.ContainsKey(answer.Id);
                     
-                    <div class="@($"bg-surface-light dark:bg-surface-dark rounded-xl p-4 shadow-sm border {(isAutoDetected ? "border-amber-300 dark:border-amber-600" : "border-slate-200 dark:border-slate-700")} flex flex-col gap-2")">
+                    <div class="@($"bg-surface-light dark:bg-surface-dark rounded-xl shadow-sm border {(isAutoDetected ? "border-amber-300 dark:border-amber-600" : "border-slate-200 dark:border-slate-700")} flex flex-col gap-3 p-4")">
                         <!-- Answer text and variants -->
-                        <div class="flex items-center justify-between">
+                        <div class="flex items-start justify-between gap-3">
                             @if (isAutoDetected && answer.DuplicateGroupAnswers.Count > 1)
                             {
                                 <!-- Show all variants for auto-detected duplicates -->
@@ -102,27 +136,37 @@ else
                                 <span class="text-lg font-bold text-slate-800 dark:text-white">@answer.Answer</span>
                             }
                             
-                            <!-- Voting buttons -->
-                            <div class="flex items-center gap-2 flex-shrink-0">
-                                <button @onclick="@(() => Vote(answer.Id, "valid"))"
+                            @if (hasVoted)
+                            {
+                                <span class="shrink-0 text-[11px] font-bold rounded-full px-2 py-0.5 @(votedValid ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" : votedInvalid ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400" : "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400")">
+                                    @(votedValid ? "✓ Poprawna" : votedInvalid ? "✗ Błędna" : "⧉ Duplikat")
+                                </span>
+                            }
+                        </div>
+                        
+                        <!-- Voting buttons row -->
+                        <div class="flex gap-2 @(_hasSubmittedVotes ? "opacity-50 pointer-events-none" : "")">
+                            <button @onclick="@(() => Vote(answer.Id, "valid"))"
+                                    disabled="@_hasSubmittedVotes"
+                                    class="@($"flex-1 h-10 rounded-lg flex items-center justify-center gap-1.5 text-sm font-semibold transition-all {(votedValid ? "bg-green-500 text-white shadow-md shadow-green-500/20" : "border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-green-50 dark:hover:bg-slate-700 hover:text-green-600 dark:hover:text-green-400 hover:border-green-300 dark:hover:border-green-700")}")">
+                                <span class="material-symbols-outlined text-base" style="font-size:18px">check</span>
+                                <span>Poprawna</span>
+                            </button>
+                            <button @onclick="@(() => Vote(answer.Id, "invalid"))"
+                                    disabled="@_hasSubmittedVotes"
+                                    class="@($"flex-1 h-10 rounded-lg flex items-center justify-center gap-1.5 text-sm font-semibold transition-all {(votedInvalid ? "bg-red-500 text-white shadow-md shadow-red-500/20" : "border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-slate-700 hover:text-red-600 dark:hover:text-red-400 hover:border-red-300 dark:hover:border-red-700")}")">
+                                <span class="material-symbols-outlined text-base" style="font-size:18px">close</span>
+                                <span>Błędna</span>
+                            </button>
+                            @if (!isAutoDetected)
+                            {
+                                <button @onclick="@(() => Vote(answer.Id, "duplicate"))"
                                         disabled="@_hasSubmittedVotes"
-                                        class="@($"w-10 h-10 rounded-lg flex items-center justify-center transition-all {(HasVotedValid(answer) ? "bg-green-500 text-white shadow-md" : "border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:bg-green-50 dark:hover:bg-slate-700 hover:text-green-600 dark:hover:text-green-400")} disabled:opacity-50")">
-                                    <span class="material-symbols-outlined text-xl">check</span>
+                                        class="@($"flex-1 h-10 rounded-lg flex items-center justify-center gap-1.5 text-sm font-semibold transition-all {(votedDuplicate ? "bg-amber-500 text-white shadow-md shadow-amber-500/20" : "border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-amber-50 dark:hover:bg-slate-700 hover:text-amber-600 dark:hover:text-amber-400 hover:border-amber-300 dark:hover:border-amber-700")}")">
+                                    <span class="material-symbols-outlined text-base" style="font-size:18px">content_copy</span>
+                                    <span>Duplikat</span>
                                 </button>
-                                <button @onclick="@(() => Vote(answer.Id, "invalid"))"
-                                        disabled="@_hasSubmittedVotes"
-                                        class="@($"w-10 h-10 rounded-lg flex items-center justify-center transition-all {(HasVotedInvalid(answer) ? "bg-red-500 text-white shadow-md" : "border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:bg-red-50 dark:hover:bg-slate-700 hover:text-red-600 dark:hover:text-red-400")} disabled:opacity-50")">
-                                    <span class="material-symbols-outlined text-xl">close</span>
-                                </button>
-                                @if (!isAutoDetected)
-                                {
-                                    <button @onclick="@(() => Vote(answer.Id, "duplicate"))"
-                                            disabled="@_hasSubmittedVotes"
-                                            class="@($"w-10 h-10 rounded-lg flex items-center justify-center transition-all {(HasVotedDuplicate(answer) ? "bg-amber-500 text-white shadow-md" : "border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:bg-amber-50 dark:hover:bg-slate-700 hover:text-amber-600 dark:hover:text-amber-400")} disabled:opacity-50")">
-                                        <span class="material-symbols-outlined text-xl">content_copy</span>
-                                    </button>
-                                }
-                            </div>
+                            }
                         </div>
                     </div>
                 }
@@ -158,9 +202,79 @@ else
                         </button>
                     }
                 }
+                else if (isLastCategory)
+                {
+                    <!-- Last category — show submit/confirm button -->
+                    var pendingCount = _categoriesWithAnswers.SelectMany(c =>
+                        _filteredAnswers.Where(a => a.Category == c.Name && !_myVotes.ContainsKey(a.Id))).Count();
+                    
+                    <button @onclick="ShowSubmitConfirmation"
+                            class="@($"w-full h-13 flex items-center justify-center gap-2 rounded-xl font-bold text-base py-4 transition-all shadow-lg btn-press {(pendingCount == 0 ? "bg-primary hover:bg-primary-dark text-white shadow-primary/20" : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400")}")">
+                        <span class="material-symbols-outlined">@(pendingCount == 0 ? "send" : "warning")</span>
+                        @if (pendingCount > 0)
+                        {
+                            <span>Wyślij głosy (pominięto @pendingCount)</span>
+                        }
+                        else
+                        {
+                            <span>Wyślij głosy</span>
+                        }
+                    </button>
+                }
+                else
+                {
+                    <!-- Not last category — show Next button -->
+                    <button @onclick="GoToNextCategory"
+                            class="w-full h-13 flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-bold text-base py-4 rounded-xl shadow-lg shadow-primary/20 transition-all btn-press">
+                        <span>Następna kategoria</span>
+                        <span class="material-symbols-outlined">arrow_forward</span>
+                    </button>
+                }
             </div>
         </footer>
     </div>
+    
+    <!-- Confirmation modal before submitting votes -->
+    @if (_showSubmitConfirmation)
+    {
+        var totalAnswers = _filteredAnswers.Count;
+        var votedAnswers = _myVotes.Count;
+        var unvoted = totalAnswers - votedAnswers;
+        
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 modal-overlay-anim" @onclick="HideSubmitConfirmation">
+            <div class="bg-surface-light dark:bg-surface-dark rounded-2xl w-full max-w-sm shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden" @onclick:stopPropagation="true">
+                <div class="p-6 border-b border-slate-100 dark:border-slate-800">
+                    <div class="flex items-center gap-3 mb-1">
+                        <span class="material-symbols-outlined text-primary text-2xl">how_to_vote</span>
+                        <h2 class="text-base font-bold text-slate-900 dark:text-white">Wysłać głosy?</h2>
+                    </div>
+                    @if (unvoted > 0)
+                    {
+                        <p class="text-sm text-slate-500 dark:text-slate-400 mt-2">
+                            Oceniono <strong class="text-slate-700 dark:text-white">@votedAnswers / @totalAnswers</strong> odpowiedzi.
+                            <span class="text-amber-500 font-medium">@unvoted bez oceny</span> — zostaną pominięte.
+                        </p>
+                    }
+                    else
+                    {
+                        <p class="text-sm text-slate-500 dark:text-slate-400 mt-2">
+                            Oceniono wszystkie <strong class="text-slate-700 dark:text-white">@totalAnswers</strong> odpowiedzi. Gotowe!
+                        </p>
+                    }
+                </div>
+                <div class="flex gap-3 p-4">
+                    <button @onclick="HideSubmitConfirmation"
+                            class="flex-1 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-semibold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                        Wróć
+                    </button>
+                    <button @onclick="ConfirmSubmitVotes"
+                            class="flex-1 py-3 rounded-xl bg-primary hover:bg-primary-dark text-white font-bold text-sm transition-colors shadow-lg shadow-primary/20">
+                        Wyślij głosy
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
 }
 
 @code {
@@ -173,6 +287,7 @@ else
     private int _currentCategoryIndex = 0;
     private Dictionary<string, string?> _myVotes = new();
     private bool _hasInitialized = false;
+    private bool _showSubmitConfirmation = false;
 
     protected override void OnInitialized()
     {
@@ -213,10 +328,6 @@ else
                 // No answers to vote on — auto-submit immediately so voting doesn't stall
                 await SubmitVotes();
             }
-            else
-            {
-                await CheckAndAutoAdvance();
-            }
         }
     }
 
@@ -244,41 +355,54 @@ else
     {
         if (_hasSubmittedVotes) return;
         
-        _myVotes[answerId] = voteType;
-        await GameState.VoteAnswerAsync(answerId, voteType);
+        // Toggle off if same vote clicked again
+        if (_myVotes.TryGetValue(answerId, out var existing) && existing == voteType)
+        {
+            _myVotes.Remove(answerId);
+        }
+        else
+        {
+            _myVotes[answerId] = voteType;
+            await GameState.VoteAnswerAsync(answerId, voteType);
+        }
         
-        // Check if all answers in current category are voted - auto-advance
-        await CheckAndAutoAdvance();
         StateHasChanged();
     }
 
-    private async Task CheckAndAutoAdvance()
+    private void GoToNextCategory()
     {
-        var currentCategory = _categoriesWithAnswers.ElementAtOrDefault(_currentCategoryIndex);
-        var categoryName = currentCategory?.Name ?? "";
-        var answersForCurrentCategory = _filteredAnswers.Where(a => a.Category == categoryName).ToList();
-        
-        var allVoted = !answersForCurrentCategory.Any() || 
-                       answersForCurrentCategory.All(a => _myVotes.ContainsKey(a.Id));
-        
-        if (allVoted)
+        if (_currentCategoryIndex < _categoriesWithAnswers.Count - 1)
         {
-            if (answersForCurrentCategory.Any())
-            {
-                await Task.Delay(300);
-            }
-            
-            if (_currentCategoryIndex < _categoriesWithAnswers.Count - 1)
-            {
-                _currentCategoryIndex++;
-                StateHasChanged();
-                await CheckAndAutoAdvance();
-            }
-            else
-            {
-                await SubmitVotes();
-            }
+            _currentCategoryIndex++;
+            StateHasChanged();
         }
+    }
+
+    private void GoToPrevCategory()
+    {
+        if (_currentCategoryIndex > 0)
+        {
+            _currentCategoryIndex--;
+            StateHasChanged();
+        }
+    }
+
+    private void ShowSubmitConfirmation()
+    {
+        _showSubmitConfirmation = true;
+        StateHasChanged();
+    }
+
+    private void HideSubmitConfirmation()
+    {
+        _showSubmitConfirmation = false;
+        StateHasChanged();
+    }
+
+    private async Task ConfirmSubmitVotes()
+    {
+        _showSubmitConfirmation = false;
+        await SubmitVotes();
     }
 
     private async Task SubmitVotes()

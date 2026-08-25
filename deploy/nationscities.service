@@ -1,0 +1,15 @@
+[Unit]
+Description=NationsCities Blazor App
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/app/current
+ExecStart=/usr/bin/dotnet %h/app/current/NationsCities.dll
+EnvironmentFile=%h/app/shared/env
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

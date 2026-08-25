@@ -1,62 +1,72 @@
-name: Deploy to VPS
+name: Deploy
 
 on:
   push:
-    branches: [ "main" ]
-  workflow_dispatch:
+    branches: [main]
+
+env:
+  PUBLISH_DIR: publish
+  SERVICE_NAME: nationscities
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: 10.0.x
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
 
-    - name: Publish
-      run: dotnet publish -c Release -r linux-x64 --self-contained false -o ./publish
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
 
-    - name: Stop Service
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.VPS_HOST }}
-        username: ${{ secrets.VPS_USERNAME }}
-        key: ${{ secrets.VPS_SSH_KEY }}
-        port: ${{ secrets.VPS_PORT }}
-        script: |
-          sudo systemctl stop nationscities.service
+      - name: Restore
+        run: dotnet restore NationsCities.sln
 
-    - name: Delete Existing Files
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.VPS_HOST }}
-        username: ${{ secrets.VPS_USERNAME }}
-        key: ${{ secrets.VPS_SSH_KEY }}
-        port: ${{ secrets.VPS_PORT }}
-        script: |
-          rm -rf ${{ secrets.VPS_TARGET_DIR }}/*
+      - name: Publish web
+        run: >
+          dotnet publish NationsCities.csproj
+          -c Release -r linux-x64 --self-contained false
+          -o ${{ env.PUBLISH_DIR }}
 
-    - name: Copy files via SCP
-      uses: appleboy/scp-action@v0.1.7
-      with:
-        host: ${{ secrets.VPS_HOST }}
-        username: ${{ secrets.VPS_USERNAME }}
-        key: ${{ secrets.VPS_SSH_KEY }}
-        port: ${{ secrets.VPS_PORT }}
-        source: "./publish/*"
-        target: ${{ secrets.VPS_TARGET_DIR }}
-        strip_components: 1
+      - name: Package release
+        run: tar czf release.tar.gz -C ${{ env.PUBLISH_DIR }} .
 
-    - name: Start Service
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.VPS_HOST }}
-        username: ${{ secrets.VPS_USERNAME }}
-        key: ${{ secrets.VPS_SSH_KEY }}
-        port: ${{ secrets.VPS_PORT }}
-        script: |
-          sudo systemctl start nationscities.service
+      - name: Verify deploy secrets are configured
+        run: |
+          missing=()
+          [ -z "${{ secrets.DEPLOY_HOST }}" ] && missing+=(DEPLOY_HOST)
+          [ -z "${{ secrets.DEPLOY_USER }}" ] && missing+=(DEPLOY_USER)
+          [ -z "${{ secrets.DEPLOY_SSH_KEY }}" ] && missing+=(DEPLOY_SSH_KEY)
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::Missing repo secrets: ${missing[*]}."
+            exit 1
+          fi
+
+      - name: Upload release artifact + deploy script to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: "release.tar.gz,deploy/deploy.sh"
+          target: "~/incoming"
+          strip_components: 0
+
+      - name: Run remote deploy script
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            chmod +x ~/incoming/deploy/deploy.sh
+            ~/incoming/deploy/deploy.sh "${{ env.SERVICE_NAME }}" "${{ github.sha }}" ~/incoming/release.tar.gz
