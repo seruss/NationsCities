@@ -45,6 +45,7 @@ jobs:
           [ -z "${{ secrets.DEPLOY_HOST }}" ] && missing+=(DEPLOY_HOST)
           [ -z "${{ secrets.DEPLOY_USER }}" ] && missing+=(DEPLOY_USER)
           [ -z "${{ secrets.DEPLOY_SSH_KEY }}" ] && missing+=(DEPLOY_SSH_KEY)
+          [ -z "${{ secrets.DEPLOY_PORT }}" ] && missing+=(DEPLOY_PORT)
           if [ ${#missing[@]} -ne 0 ]; then
             echo "::error::Missing repo secrets: ${missing[*]}."
             exit 1
@@ -56,6 +57,8 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          # sshd nie stoi na 22 - port jest w sekrecie DEPLOY_PORT.
+          port: ${{ secrets.DEPLOY_PORT }}
           source: "release.tar.gz,deploy/deploy.sh"
           target: "~/incoming"
           strip_components: 0
@@ -66,6 +69,8 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          # sshd nie stoi na 22 - port jest w sekrecie DEPLOY_PORT.
+          port: ${{ secrets.DEPLOY_PORT }}
           script: |
             set -euo pipefail
             chmod +x ~/incoming/deploy/deploy.sh
